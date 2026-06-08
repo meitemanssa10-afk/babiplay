@@ -1078,17 +1078,9 @@ async function checkout(){
       promo_code:promoApplied?promoApplied.code:null
     }).select().single();
     if(error){showToast('Erreur: '+error.message,'err');btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';return;}
-    const res=await fetch('https://app.paydunya.com/api/v1/checkout-invoice/create',{
-      method:'POST',
-      headers:{
-     'Content-Type':'application/json',
-'PAYDUNYA-MASTER-KEY':PD_MASTER,
-'PAYDUNYA-PRIVATE-KEY':PD_PRIV,
-'PAYDUNYA-TOKEN':PD_TOKEN
-      },
-      body:JSON.stringify({
+    const pdBody={
         invoice:{total_amount:total,description:produit.nom},
-        store:{name:'BabiPlay CI',website_url:'https://babiplay.store'},
+        store:{name:'BabiPlay CI',tagline:'Cartes gaming en FCFA',postal_address:'Abidjan CI',phone_number:'0700000000',logo_url:'https://babiplay.store',website_url:'https://babiplay.store'},
         actions:{
           cancel_url:'https://babiplay.store',
           return_url:'https://babiplay.store/compte.html',
@@ -1096,14 +1088,32 @@ async function checkout(){
         },
         customer:{name:userProfile?`${userProfile.prenom||''} ${userProfile.nom||''}`.trim():currentUser.email,email:currentUser.email},
         custom_data:{order_id:order.id}
-      })
+      };
+    const res=await fetch('https://app.paydunya.com/api/v1/checkout-invoice/create',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'PAYDUNYA-MASTER-KEY':PD_MASTER,
+        'PAYDUNYA-PRIVATE-KEY':PD_PRIV,
+        'PAYDUNYA-TOKEN':PD_TOKEN
+      },
+      body:JSON.stringify(pdBody)
     });
-    const data=await res.json();
-    if(data.response_code==='00'&&data.invoice_url){
-      await sb.from('orders').update({transaction_id:data.token}).eq('id',order.id);
-      window.location.href=data.invoice_url;
+    const rawText=await res.text();
+    let data;
+    try{data=JSON.parse(rawText);}catch(e){showToast('Réponse invalide: '+rawText.substring(0,100),'err');btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';return;}
+    console.log('PayDunya response:',data);
+    if(data.response_code==='00'){
+      const url=data.invoice_url||data.response_text;
+      if(url&&url.startsWith('http')){
+        await sb.from('orders').update({transaction_id:data.token||''}).eq('id',order.id);
+        window.location.href=url;
+      }else{
+        showToast('Erreur: '+(data.response_text||JSON.stringify(data)),'err');
+        btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';
+      }
     }else{
-      showToast('Erreur: '+(data.response_text||'Réessayez'),'err');
+      showToast('Erreur: '+(data.response_text||data.description||JSON.stringify(data)),'err');
       btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';
     }
   }catch(e){
