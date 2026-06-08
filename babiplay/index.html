@@ -1078,10 +1078,13 @@ async function checkout(){
       promo_code:promoApplied?promoApplied.code:null
     }).select().single();
     if(error){showToast('Erreur: '+error.message,'err');btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';return;}
-    const res=await fetch('/.netlify/functions/paydunya',{
+    const res=await fetch('https://app.paydunya.com/api/v1/checkout-invoice/create',{
       method:'POST',
       headers:{
-        'Content-Type':'application/json'
+     'Content-Type':'application/json',
+'PAYDUNYA-MASTER-KEY':PD_MASTER,
+'PAYDUNYA-PRIVATE-KEY':PD_PRIV,
+'PAYDUNYA-TOKEN':PD_TOKEN
       },
       body:JSON.stringify({
         invoice:{total_amount:total,description:produit.nom},
