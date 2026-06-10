@@ -1,0 +1,9 @@
+{
+  "name": "babiplay-agent",
+  "version": "1.0.0",
+  "main": "agent.js",
+  "scripts": { "start": "node agent.js" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
