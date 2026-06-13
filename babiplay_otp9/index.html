@@ -900,7 +900,7 @@ function renderProducts(plat,cat,type){
         <div class="card-name">${p.nom}</div>
         <div class="card-foot">
           <div><div class="card-price">${fmt(p.prix)}<br><small>FCFA</small></div></div>
-          <button class="add-btn" onclick="event.stopPropagation();addToCart('${p.id}')" ${p.stock<=0?'disabled':''}>+</button>
+          <button class="add-btn" onclick="event.stopPropagation();addToCart('${p.id}')">+</button>
         </div>
       </div>
     </div>`;
@@ -1023,8 +1023,8 @@ function openModal(id){
   const pts=10;
   document.getElementById('m-pts').textContent=`⭐ Vous gagnerez 10 points avec cet achat (${Math.floor((userProfile?.points||0)/10)+1}/10 achats)`;
   const btn=document.getElementById('m-buy');
-  btn.disabled=p.stock<=0;
-  btn.textContent=p.stock<=0?'❌ Rupture de stock':'⚡ AJOUTER AU PANIER';
+  btn.disabled=false;
+  btn.textContent='⚡ AJOUTER AU PANIER';
   btn.onclick=()=>{addToCart(id);closeModalBtn();};
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow='hidden';
