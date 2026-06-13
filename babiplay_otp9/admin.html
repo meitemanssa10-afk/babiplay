@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BabiPlay — Administration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0b0b0e;--bg2:#111116;--bg3:#18181f;--bg4:#1e1e28;
+  --border:#2b2b3a;--border2:#38384a;
+  --text:#e6e6f0;--muted:#6b6b88;--muted2:#9a9ab8;
+  --gold:#f5a623;--gold2:#ffbe55;
+  --green:#52b043;--red:#e4000f;--blue:#0070d1;
+  --radius:10px;--radius-lg:14px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* LOGIN */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;padding:40px;width:100%;max-width:380px;text-align:center}
+.login-box h1{font-family:'Rajdhani',sans-serif;font-size:32px;font-weight:700;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.login-box p{color:var(--muted);font-size:13px;margin-bottom:28px}
+.login-box input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;margin-bottom:12px;transition:border-color .2s}
+.login-box input:focus{outline:none;border-color:var(--gold)}
+.login-btn{width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:13px;border-radius:10px;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;margin-top:4px}
+.login-btn:hover{opacity:.9}
+.login-err{font-size:13px;color:#ff6b6b;margin-top:10px;min-height:18px}
+
+/* LAYOUT ADMIN */
+.admin-wrap{display:none;min-height:100vh}
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);position:fixed;top:0;left:0;height:100%;display:flex;flex-direction:column;z-index:50}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.sidebar-logo h2{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-logo span{font-size:10px;color:var(--muted);letter-spacing:2px;display:block;margin-top:-2px}
+.sidebar-nav{flex:1;padding:12px 10px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted2);transition:all .2s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:'DM Sans',sans-serif}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:rgba(245,166,35,.1);color:var(--gold);border:1px solid rgba(245,166,35,.2)}
+.nav-item .icon{font-size:16px;flex-shrink:0}
+.nav-badge{background:var(--gold);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto}
+.sidebar-foot{padding:12px 10px;border-top:1px solid var(--border)}
+.logout-btn{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);background:none;border:none;width:100%;font-family:'DM Sans',sans-serif;transition:all .2s}
+.logout-btn:hover{color:#ff6b6b;background:rgba(228,0,15,.08)}
+
+.main{margin-left:220px;padding:28px;min-height:100vh}
+.page-header{margin-bottom:24px}
+.page-header h1{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;letter-spacing:1px}
+.page-header p{color:var(--muted2);font-size:14px;margin-top:2px}
+
+/* SECTIONS */
+.section{display:none}
+.section.active{display:block}
+
+/* STATS CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.stat-label{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.stat-value{font-family:'Rajdhani',sans-serif;font-size:32px;font-weight:700;color:var(--gold);line-height:1}
+.stat-sub{font-size:12px;color:var(--muted2);margin-top:4px}
+.stat-icon{font-size:24px;float:right;margin-top:-4px}
+
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.table-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.table-head h3{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;letter-spacing:.5px}
+.table-search{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;width:220px}
+.table-search:focus{outline:none;border-color:var(--gold)}
+table{width:100%;border-collapse:collapse}
+th{padding:11px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg3)}
+td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;letter-spacing:.5px}
+.badge-green{background:rgba(82,176,67,.15);color:#7dd670;border:1px solid rgba(82,176,67,.3)}
+.badge-gold{background:rgba(245,166,35,.15);color:var(--gold);border:1px solid rgba(245,166,35,.3)}
+.badge-red{background:rgba(228,0,15,.15);color:#ff6b6b;border:1px solid rgba(228,0,15,.3)}
+.badge-blue{background:rgba(0,112,209,.15);color:#5baeff;border:1px solid rgba(0,112,209,.3)}
+.badge-gray{background:var(--bg4);color:var(--muted2);border:1px solid var(--border2)}
+.platform-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-psn{background:#5baeff}
+.dot-xbox{background:#52b043}
+.dot-steam{background:#66c0f4}
+.dot-nin{background:#ff6b6b}
+
+/* ACTION BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;border:none}
+.btn-primary{background:var(--gold);color:#000}
+.btn-primary:hover{background:var(--gold2)}
+.btn-secondary{background:var(--bg3);border:1px solid var(--border2);color:var(--text)}
+.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
+.btn-danger{background:rgba(228,0,15,.15);border:1px solid rgba(228,0,15,.3);color:#ff6b6b}
+.btn-danger:hover{background:rgba(228,0,15,.25)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-green{background:rgba(82,176,67,.15);border:1px solid rgba(82,176,67,.3);color:#7dd670}
+.btn-green:hover{background:rgba(82,176,67,.25)}
+
+/* MODALE */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700}
+.modal-x{background:var(--bg3);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:24px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;color:var(--muted2);margin-bottom:6px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--gold)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-group select option{background:var(--bg3)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
+.form-check input{width:16px;height:16px;accent-color:var(--gold)}
+.modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:10px;
+  padding:24px;text-align:center;cursor:pointer;
+  transition:all .2s;background:var(--bg3);
+  margin-top:8px;
+}
+.upload-zone:hover{border-color:var(--gold);background:rgba(245,166,35,.04)}
+.upload-progress{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;padding:12px 16px;margin-top:8px;
+  font-size:13px;color:var(--muted2);display:none;
+}
+.progress-bar{
+  height:4px;background:var(--border);border-radius:2px;
+  margin-top:8px;overflow:hidden;
+}
+.progress-fill{
+  height:100%;background:var(--gold);border-radius:2px;
+  width:0%;transition:width .3s;
+}
+
+/* CODES SECTION */
+.codes-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+.codes-box h4{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.code-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;font-size:13px;font-family:monospace}
+.code-item.used{opacity:.5;text-decoration:line-through}
+.codes-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:13px;font-family:monospace;height:120px;resize:vertical}
+.codes-textarea:focus{outline:none;border-color:var(--gold)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:48px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* COMMANDE DETAIL */
+.order-detail{background:var(--bg3);border-radius:10px;padding:16px;font-size:13px;line-height:2}
+.order-detail strong{color:var(--text);min-width:140px;display:inline-block}
+.order-detail span{color:var(--muted2)}
+.code-reveal{background:var(--bg2);border:1px solid var(--gold);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:16px;color:var(--gold);letter-spacing:2px;text-align:center;margin:12px 0}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--gold);color:var(--text);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:999;transform:translateY(80px);transition:transform .3s;pointer-events:none}
+.toast.show{transform:translateY(0)}
+.toast.err{border-color:#ff6b6b}
+.toast.ok{border-color:var(--green)}
+
+/* SELECT FILTER */
+.filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.dest-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--muted2);padding:8px 16px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
+.dest-btn:hover,.dest-btn.active{background:rgba(245,166,35,.1);border-color:var(--gold);color:var(--gold)}
+.template-btn{background:var(--bg4);border:1px solid var(--border2);color:var(--muted2);padding:7px 14px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
+.template-btn:hover{border-color:var(--gold);color:var(--gold)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <h1>🎮 BabiPlay</h1>
+    <p>Panneau d'administration</p>
+    <input type="email" id="admin-email" placeholder="Email administrateur">
+    <input type="password" id="admin-password" placeholder="Mot de passe">
+    <button class="login-btn" onclick="adminLogin()">Se connecter →</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ÉCRAN OTP ADMIN -->
+<div class="login-screen" id="admin-otp-screen" style="display:none">
+  <div class="login-box">
+    <h1>🔐 Vérification</h1>
+    <p id="admin-otp-msg">Code envoyé sur votre email</p>
+    <input type="number" id="admin-otp-input" placeholder="Code à 6 chiffres" style="text-align:center;font-size:24px;font-weight:700;letter-spacing:8px">
+    <button class="login-btn" onclick="verifyAdminOTP()">Vérifier →</button>
+    <div class="login-err" id="admin-otp-err"></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="admin-wrap" id="admin-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h2>BabiPlay</h2>
+      <span>ADMINISTRATION</span>
+    </div>
+    <div class="sidebar-nav">
+      <button class="nav-item active" onclick="showSection('dashboard')"><span class="icon">📊</span> Tableau de bord</button>
+      <button class="nav-item" onclick="showSection('produits')"><span class="icon">🎮</span> Produits</button>
+      <button class="nav-item" onclick="showSection('codes')"><span class="icon">🔑</span> Codes de jeu</button>
+      <button class="nav-item" onclick="showSection('commandes')"><span class="icon">📦</span> Commandes <span class="nav-badge" id="badge-commandes">0</span></button>
+      <button class="nav-item" onclick="showSection('clients')"><span class="icon">👥</span> Clients</button>
+      <button class="nav-item" onclick="showSection('promos')"><span class="icon">🎁</span> Codes promo</button>
+      <button class="nav-item" onclick="showSection('cadeaux')"><span class="icon">🎀</span> Cadeaux <span class="nav-badge" id="badge-cadeaux">0</span></button>
+      <button class="nav-item" onclick="showSection('points')"><span class="icon">⭐</span> Points fidélité</button>
+      <button class="nav-item" onclick="showSection('emails')"><span class="icon">📨</span> Emails marketing</button>
+    </div>
+    <div class="sidebar-foot">
+      <a href="index.html" style="text-decoration:none"><button class="logout-btn">🌐 Voir le site</button></a>
+      <button class="logout-btn" onclick="adminLogout()">🚪 Déconnexion</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="section active" id="section-dashboard">
+      <div class="page-header"><h1>Tableau de bord</h1><p>Vue d'ensemble de BabiPlay</p></div>
+      <div class="stats-grid">
+        <div class="stat-card"><span class="stat-icon">📦</span><div class="stat-label">Commandes totales</div><div class="stat-value" id="stat-orders">—</div><div class="stat-sub">Toutes statuts confondus</div></div>
+        <div class="stat-card"><span class="stat-icon">✅</span><div class="stat-label">Codes envoyés</div><div class="stat-value" id="stat-sent">—</div><div class="stat-sub">Commandes livrées</div></div>
+        <div class="stat-card"><span class="stat-icon">👥</span><div class="stat-label">Clients inscrits</div><div class="stat-value" id="stat-clients">—</div><div class="stat-sub">Comptes créés</div></div>
+        <div class="stat-card"><span class="stat-icon">🎮</span><div class="stat-label">Produits actifs</div><div class="stat-value" id="stat-products">—</div><div class="stat-sub">En vente sur le site</div></div>
+        <div class="stat-card"><span class="stat-icon">🔑</span><div class="stat-label">Codes disponibles</div><div class="stat-value" id="stat-codes">—</div><div class="stat-sub">Non utilisés en stock</div></div>
+        <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-label">En attente</div><div class="stat-value" id="stat-pending">—</div><div class="stat-sub">Commandes à traiter</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-head"><h3>Dernières commandes</h3></div>
+        <table><thead><tr><th>Client</th><th>Produit</th><th>Prix</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="recent-orders"></tbody></table>
+      </div>
+    </div>
+
+    <!-- PRODUITS -->
+    <div class="section" id="section-produits">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1>Produits</h1><p>Gérez votre catalogue gaming</p></div>
+        <button class="btn btn-primary" onclick="openProductModal()">+ Ajouter un produit</button>
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" onchange="filterProducts(this.value)">
+          <option value="all">Toutes les plateformes</option>
+          <option value="psn">PSN</option>
+          <option value="xbox">Xbox</option>
+          <option value="steam">Steam</option>
+          <option value="nintendo">Nintendo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Image</th><th>Nom</th><th>Plateforme</th><th>Prix</th><th>Stock codes</th><th>Slider</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="products-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CODES -->
+    <div class="section" id="section-codes">
+      <div class="page-header"><h1>Codes de jeu</h1><p>Gérez les codes stockés par produit</p></div>
+      <div class="filter-row">
+        <select class="filter-select" id="codes-product-filter" onchange="loadCodesForProduct(this.value)">
+          <option value="">— Sélectionnez un produit —</option>
+        </select>
+        <button class="btn btn-primary" onclick="openAddCodesModal()">+ Ajouter des codes</button>
+      </div>
+      <div class="table-wrap" id="codes-table-wrap">
+        <div class="empty"><div class="empty-icon">🔑</div><p>Sélectionnez un produit pour voir ses codes</p></div>
+      </div>
+    </div>
+
+    <!-- COMMANDES -->
+    <div class="section" id="section-commandes">
+      <div class="page-header"><h1>Commandes</h1><p>Toutes les commandes passées</p></div>
+      <div class="filter-row">
+        <select class="filter-select" onchange="filterOrders(this.value)">
+          <option value="all">Tous les statuts</option>
+          <option value="en_attente">En attente</option>
+          <option value="paye">Payé</option>
+          <option value="code_envoye">Code envoyé</option>
+          <option value="annule">Annulé</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>N° Commande</th><th>Client</th><th>Produit</th><th>Prix payé</th><th>Statut</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="orders-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div class="section" id="section-clients">
+      <div class="page-header"><h1>Clients</h1><p>Tous les comptes inscrits</p></div>
+      <div class="table-wrap">
+        <div class="table-head">
+          <h3>Liste des clients</h3>
+          <input class="table-search" placeholder="Rechercher..." oninput="searchClients(this.value)">
+        </div>
+        <table><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Points</th><th>Commandes</th><th>Inscrit le</th></tr></thead>
+        <tbody id="clients-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- PROMOS -->
+    <div class="section" id="section-promos">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1>Codes promo</h1><p>Créez et gérez les réductions</p></div>
+        <button class="btn btn-primary" onclick="openPromoModal()">+ Nouveau code</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Code</th><th>Réduction</th><th>Utilisations</th><th>Expiration</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="promos-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CADEAUX -->
+    <div class="section" id="section-cadeaux">
+      <div class="page-header"><h1>🎀 Cadeaux à envoyer</h1><p>Clients ayant atteint un palier de points</p></div>
+      <div class="filter-row">
+        <select class="filter-select" onchange="filterRewards(this.value)">
+          <option value="all">Tous les statuts</option>
+          <option value="en_attente">En attente</option>
+          <option value="cadeau_choisi">Cadeau choisi</option>
+          <option value="envoye">Envoyé</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Client</th><th>Email</th><th>Palier</th><th>Cadeau choisi</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="rewards-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- EMAILS MARKETING -->
+    <div class="section" id="section-emails">
+      <div class="page-header"><h1>📨 Emails Marketing</h1><p>Envoyez des emails directement à vos clients</p></div>
+
+      <!-- STATS RAPIDES -->
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+        <div class="stat-card"><span class="stat-icon">👥</span><div class="stat-label">Total clients</div><div class="stat-value" id="email-stat-total">—</div></div>
+        <div class="stat-card"><span class="stat-icon">😴</span><div class="stat-label">Inactifs +30 jours</div><div class="stat-value" id="email-stat-inactifs">—</div></div>
+        <div class="stat-card"><span class="stat-icon">✅</span><div class="stat-label">Actifs récemment</div><div class="stat-value" id="email-stat-actifs">—</div></div>
+      </div>
+
+      <!-- RELANCE AUTOMATIQUE -->
+      <div class="table-wrap" style="margin-bottom:24px;border-color:rgba(245,166,35,.3)">
+        <div class="table-head" style="background:rgba(245,166,35,.05)">
+          <h3>🔄 Relance automatique des inactifs</h3>
+        </div>
+        <div style="padding:24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+            <div>
+              <p style="font-size:14px;color:var(--text);margin-bottom:6px">
+                Envoie automatiquement un email de relance à tous les clients qui n'ont pas commandé depuis <strong style="color:var(--gold)">30 jours</strong>.
+              </p>
+              <p style="font-size:13px;color:var(--muted2)">
+                💡 Clique une fois par semaine — le système envoie uniquement aux clients pas encore relancés cette semaine.
+              </p>
+            </div>
+            <button class="btn btn-primary" style="padding:14px 28px;font-size:15px;white-space:nowrap" onclick="relancerInactifs()">
+              🔄 Relancer les inactifs
+            </button>
+          </div>
+          <div id="relance-result" style="display:none;margin-top:16px;background:rgba(82,176,67,.08);border:1px solid rgba(82,176,67,.3);border-radius:10px;padding:14px;font-size:13px;color:#7dd670"></div>
+          <div id="relance-liste" style="margin-top:16px"></div>
+        </div>
+      </div>
+
+      <!-- COMPOSER EMAIL -->
+      <div class="table-wrap" style="margin-bottom:24px">
+        <div class="table-head"><h3>✉️ Composer un email</h3></div>
+        <div style="padding:24px">
+
+          <!-- DESTINATAIRES -->
+          <div class="form-group">
+            <label>Envoyer à</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+              <button class="dest-btn active" onclick="setDest('tous',this)">👥 Tous les clients</button>
+              <button class="dest-btn" onclick="setDest('inactifs',this)">😴 Clients inactifs (+30j)</button>
+              <button class="dest-btn" onclick="setDest('commandes',this)">🛒 Ont déjà commandé</button>
+              <button class="dest-btn" onclick="setDest('un',this)">👤 Un client précis</button>
+            </div>
+          </div>
+
+          <!-- EMAIL PRÉCIS -->
+          <div class="form-group" id="dest-un-wrap" style="display:none">
+            <label>Email du client</label>
+            <input type="email" id="dest-email-unique" placeholder="client@email.com">
+          </div>
+
+          <!-- TEMPLATE RAPIDE -->
+          <div class="form-group">
+            <label>Template rapide</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <button class="template-btn" onclick="applyTemplate('promo')">🔥 Promotion</button>
+              <button class="template-btn" onclick="applyTemplate('relance')">👋 Relance</button>
+              <button class="template-btn" onclick="applyTemplate('nouveau')">🆕 Nouveau produit</button>
+              <button class="template-btn" onclick="applyTemplate('fidelite')">⭐ Fidélité</button>
+              <button class="template-btn" onclick="applyTemplate('vide')">✏️ Message libre</button>
+            </div>
+          </div>
+
+          <!-- OBJET -->
+          <div class="form-group">
+            <label>Objet de l'email *</label>
+            <input type="text" id="email-objet" placeholder="Ex: 🔥 Promo spéciale BabiPlay — Ce weekend seulement !">
+          </div>
+
+          <!-- MESSAGE -->
+          <div class="form-group">
+            <label>Message *</label>
+            <textarea id="email-message" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;min-height:180px;resize:vertical" placeholder="Écrivez votre message ici..."></textarea>
+          </div>
+
+          <!-- APERCU + ENVOI -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div id="email-dest-info" style="font-size:13px;color:var(--muted2)">Destinataires : tous les clients</div>
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-secondary" onclick="previewEmail()">👁️ Aperçu</button>
+              <button class="btn btn-primary" onclick="envoyerEmailMarketing()">📨 Envoyer maintenant</button>
+            </div>
+          </div>
+
+          <!-- APERCU BOX -->
+          <div id="email-preview-box" style="display:none;margin-top:20px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:20px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Aperçu de l'email</div>
+            <div id="email-preview-content"></div>
+          </div>
+
+          <!-- RÉSULTAT ENVOI -->
+          <div id="email-result" style="display:none;margin-top:16px;background:rgba(82,176,67,.08);border:1px solid rgba(82,176,67,.3);border-radius:10px;padding:16px;font-size:13px;color:#7dd670"></div>
+        </div>
+      </div>
+
+      <!-- HISTORIQUE -->
+      <div class="table-wrap">
+        <div class="table-head"><h3>📋 Historique des envois</h3></div>
+        <div id="email-historique" style="padding:20px;color:var(--muted);font-size:13px;text-align:center">
+          Les envois apparaîtront ici après le premier email.
+        </div>
+      </div>
+    </div>
+
+    <!-- POINTS FIDÉLITÉ -->
+    <div class="section" id="section-points">
+      <div class="page-header"><h1>⭐ Points fidélité</h1><p>Gérez les clients fidèles et envoyez leurs récompenses</p></div>
+
+      <!-- RÈGLES -->
+      <div class="table-wrap" style="margin-bottom:24px">
+        <div class="table-head"><h3>📋 Règles du système</h3></div>
+        <div style="padding:20px;font-size:14px;line-height:2.5">
+          <div>🛒 <strong>1 achat = 10 points</strong> — peu importe le montant</div>
+          <div>🏆 À <strong>100 points</strong> (10 achats) → tu envoies un code promo</div>
+          <div>🔄 Après envoi du code → <strong>points remis à zéro</strong> → le cycle recommence</div>
+        </div>
+      </div>
+
+      <!-- CLIENTS FIDÈLES À 100+ POINTS -->
+      <div class="table-wrap">
+        <div class="table-head" style="flex-wrap:wrap;gap:12px">
+          <h3>🏆 Clients à 100+ points</h3>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:13px;color:var(--muted2)">Réduction ce mois :</span>
+            <select id="promo-pct-global" class="filter-select">
+              <option value="10">10%</option>
+              <option value="15">15%</option>
+              <option value="20">20%</option>
+              <option value="25">25%</option>
+              <option value="30">30%</option>
+            </select>
+            <button class="btn btn-primary" onclick="envoyerPromoTous()">📨 Envoyer à tous</button>
+          </div>
+        </div>
+        <div id="fidelite-list">
+          <div class="loader">Chargement...</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /admin-wrap -->
+
+<!-- MODAL PRODUIT -->
+<div class="modal-overlay" id="modal-product">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-product-title">Ajouter un produit</h3>
+      <button class="modal-x" onclick="closeModal('modal-product')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="prod-id">
+      <div class="form-row">
+        <div class="form-group"><label>Nom du produit *</label><input type="text" id="prod-nom" placeholder="Carte PSN 20€"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Plateforme *</label>
+          <select id="prod-plateforme" onchange="updateCatOptions()">
+            <option value="pc">PC</option>
+            <option value="psn">PlayStation</option>
+            <option value="xbox">Xbox</option>
+            <option value="nintendo">Nintendo</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Catégorie *</label>
+          <select id="prod-categorie">
+            <option value="Steam">Steam</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Sous-catégorie</label>
+        <select id="prod-sous-categorie">
+          <option value="Cartes cadeaux">Cartes cadeaux</option>
+          <option value="Abonnements">Abonnements</option>
+          <option value="Game Pass">Game Pass</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="prod-desc" placeholder="20€ de crédit PlayStation Store..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="prod-prix" placeholder="14500"></div>
+        <div class="form-group"><label>Stock initial de codes</label><input type="number" id="prod-stock" placeholder="0" value="0" readonly style="opacity:.6"></div>
+      </div>
+      <div class="form-group">
+        <label>Image du produit</label>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <input type="url" id="prod-image" placeholder="ou colle un lien image..." oninput="previewImage()" style="flex:1">
+        </div>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('prod-image-file').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+          ondragleave="this.style.borderColor='var(--border2)'"
+          ondrop="handleImageDrop(event)">
+          <input type="file" id="prod-image-file" accept="image/*,video/mp4,video/webm" style="display:none" onchange="handleImageUpload(event)">
+          <div id="upload-zone-content">
+            <div style="font-size:32px;margin-bottom:8px">📁</div>
+            <div style="font-size:13px;color:var(--muted2)">Clique pour choisir une image ou vidéo</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">ou glisse-dépose ici · JPG, PNG, MP4 · Max 50Mo</div>
+          </div>
+        </div>
+        <div class="img-preview" id="img-preview" style="margin-top:8px">
+          <div class="img-preview-text">Aperçu de l'image ici</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>URL de la vidéo (optionnel)</label>
+        <input type="url" id="prod-video" placeholder="https://... (lien MP4 de la vidéo)">
+        <small style="color:var(--muted);font-size:12px;margin-top:4px;display:block">Tu peux aussi uploader une vidéo dans le champ image ci-dessus</small>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-check"><input type="checkbox" id="prod-slider"> Afficher dans le slider principal</label>
+        </div>
+        <div class="form-group">
+          <label>Ordre dans le slider</label>
+          <input type="number" id="prod-slider-ordre" placeholder="1" value="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-check"><input type="checkbox" id="prod-populaire"> Marquer comme populaire ⭐</label>
+      </div>
+      <div class="form-group">
+        <label class="form-check"><input type="checkbox" id="prod-actif" checked> Produit actif (visible sur le site)</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-product')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveProduct()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CODES -->
+<div class="modal-overlay" id="modal-codes">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Ajouter des codes de jeu</h3>
+      <button class="modal-x" onclick="closeModal('modal-codes')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Produit</label>
+        <select id="codes-product-select" id="codes-product-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Codes (un par ligne)</label>
+        <textarea class="codes-textarea" id="codes-textarea" placeholder="XXXX-XXXX-XXXX-XXXX&#10;YYYY-YYYY-YYYY-YYYY&#10;ZZZZ-ZZZZ-ZZZZ-ZZZZ"></textarea>
+        <small style="color:var(--muted);font-size:12px">Entrez un code par ligne. Ils seront envoyés automatiquement après paiement.</small>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-codes')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveCodes()">💾 Ajouter les codes</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMMANDE -->
+<div class="modal-overlay" id="modal-commande">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Détail de la commande</h3>
+      <button class="modal-x" onclick="closeModal('modal-commande')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-commande-body"></div>
+    <div class="modal-foot" id="modal-commande-foot"></div>
+  </div>
+</div>
+
+<!-- MODAL PROMO -->
+<div class="modal-overlay" id="modal-promo">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-promo-title">Nouveau code promo</h3>
+      <button class="modal-x" onclick="closeModal('modal-promo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="promo-id">
+      <div class="form-row">
+        <div class="form-group"><label>Code promo *</label><input type="text" id="promo-code" placeholder="BABIPLAY10" style="text-transform:uppercase"></div>
+        <div class="form-group"><label>Utilisations max</label><input type="number" id="promo-max" placeholder="100" value="100"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Réduction en % (ex: 10 = -10%)</label><input type="number" id="promo-pct" placeholder="0" value="0"></div>
+        <div class="form-group"><label>Réduction en FCFA (ex: 1000)</label><input type="number" id="promo-fcfa" placeholder="0" value="0"></div>
+      </div>
+      <div class="form-group"><label>Date d'expiration (optionnel)</label><input type="datetime-local" id="promo-expire"></div>
+      <div class="form-group"><label class="form-check"><input type="checkbox" id="promo-actif" checked> Code actif</label></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-promo')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePromo()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CADEAU -->
+<div class="modal-overlay" id="modal-cadeau">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🎁 Choisir un cadeau</h3>
+      <button class="modal-x" onclick="closeModal('modal-cadeau')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cadeau-reward-id">
+      <input type="hidden" id="cadeau-user-email">
+      <input type="hidden" id="cadeau-user-prenom">
+      <div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px">
+        <div id="cadeau-client-info" style="color:var(--muted2);line-height:2"></div>
+      </div>
+      <div class="form-group">
+        <label>Choisir le produit à offrir</label>
+        <select id="cadeau-product-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Code à envoyer (sera choisi automatiquement depuis le stock)</label>
+        <input type="text" id="cadeau-code-manual" placeholder="Optionnel — laisser vide pour piocher dans le stock">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cadeau')">Annuler</button>
+      <button class="btn btn-primary" onclick="envoyerCadeau()">🎁 Envoyer le cadeau</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let sb;
+const ADMIN_EMAIL='meitemanssa10@gmail.com';
+let allOrders=[],allClients=[],allProducts=[],allCodes=[],allPromos=[];
+
+// Charger config Supabase depuis fonction Netlify
+(async()=>{
+  const r=await fetch('/.netlify/functions/get-config');
+  const c=await r.json();
+  sb=supabase.createClient(c.surl,c.skey);
+  // Check session au chargement
+  const{data:{session}}=await sb.auth.getSession();
+  if(session&&session.user.email===ADMIN_EMAIL){
+    // Vérification OTP admin aussi
+    const otpOk=sessionStorage.getItem('admin_otp_ok');
+    if(otpOk==='1') showAdmin();
+    else showAdminOTP(session.user.email);
+  }
+})();
+
+// ============================================================
+// AUTH ADMIN
+// ============================================================
+async function adminLogin(){
+  const email=document.getElementById('admin-email').value.trim();
+  const password=document.getElementById('admin-password').value;
+  const errEl=document.getElementById('login-err');
+  if(!sb){errEl.textContent='Chargement en cours, réessayez...';return;}
+  if(!email||!password){errEl.textContent='Remplissez tous les champs';return;}
+  if(email!==ADMIN_EMAIL){errEl.textContent='Accès refusé';return;}
+  const{error}=await sb.auth.signInWithPassword({email,password});
+  if(error){errEl.textContent='Mot de passe incorrect';return;}
+  // Mot de passe OK → envoyer code OTP par email
+  errEl.textContent='Envoi du code...';
+  await fetch('/.netlify/functions/send-otp',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'admin',email,name:'Admin'})
+  });
+  errEl.textContent='';
+  showAdminOTP(email);
+}
+
+function showAdminOTP(email){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('admin-otp-screen').style.display='flex';
+  document.getElementById('admin-otp-msg').textContent='Code envoyé sur '+email;
+}
+
+async function verifyAdminOTP(){
+  const code=document.getElementById('admin-otp-input').value.trim();
+  const errEl=document.getElementById('admin-otp-err');
+  if(code.length!==6){errEl.textContent='Code à 6 chiffres';return;}
+  errEl.textContent='Vérification...';
+  const res=await fetch('/.netlify/functions/verify-otp',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({identifier:ADMIN_EMAIL,code})
+  });
+  const data=await res.json();
+  if(!data.valid){errEl.textContent=data.reason||'Code incorrect';return;}
+  sessionStorage.setItem('admin_otp_ok','1');
+  showAdmin();
+}
+
+async function showAdmin(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('admin-otp-screen').style.display='none';
+  document.getElementById('admin-wrap').style.display='flex';
+  await loadDashboard();
+  await loadProducts();
+  await loadOrders();
+  await loadClients();
+  await loadPromos();
+  await loadRewards();
+  await loadEmailStats();
+  await loadPointsConfig();
+  populateProductSelects();
+}
+
+async function adminLogout(){
+  sessionStorage.removeItem('admin_otp_ok');
+  await sb.auth.signOut();
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('admin-wrap').style.display='none';
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+async function loadDashboard(){
+  const[orders,clients,products,codes]=await Promise.all([
+    sb.from('orders').select('*'),
+    sb.from('profiles').select('*'),
+    sb.from('products').select('*').eq('est_actif',true),
+    sb.from('game_codes').select('*').eq('est_utilise',false)
+  ]);
+  const o=orders.data||[],c=clients.data||[],p=products.data||[],k=codes.data||[];
+  document.getElementById('stat-orders').textContent=o.length;
+  document.getElementById('stat-sent').textContent=o.filter(x=>x.statut==='code_envoye').length;
+  document.getElementById('stat-clients').textContent=c.length;
+  document.getElementById('stat-products').textContent=p.length;
+  document.getElementById('stat-codes').textContent=k.length;
+  document.getElementById('stat-pending').textContent=o.filter(x=>x.statut==='en_attente'||x.statut==='paye').length;
+  document.getElementById('badge-commandes').textContent=o.filter(x=>x.statut==='en_attente').length;
+
+  // Dernières commandes
+  const recent=o.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,8);
+  document.getElementById('recent-orders').innerHTML=recent.length?recent.map(r=>orderRow(r)).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucune commande</td></tr>';
+}
+
+// ============================================================
+// PRODUITS
+// ============================================================
+async function loadProducts(){
+  const{data}=await sb.from('products').select('*').order('created_at',{ascending:false});
+  allProducts=data||[];renderProducts('all');
+}
+
+function renderProducts(filter){
+  const list=filter==='all'?allProducts:allProducts.filter(p=>p.plateforme===filter);
+  const tb=document.getElementById('products-tbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="8"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun produit</p></div></td></tr>';return;}
+  tb.innerHTML=list.map(p=>`
+    <tr>
+      <td>${p.image_url?`<img src="${p.image_url}" style="width:48px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:platEmoji(p.plateforme)}</td>
+      <td><strong>${p.nom}</strong>${p.est_populaire?' ⭐':''}</td>
+      <td><span class="platform-dot dot-${platDot(p.plateforme)}"></span>${platLabel(p.plateforme)}</td>
+      <td><strong style="color:var(--gold)">${fmt(p.prix)}</strong> <small>FCFA</small></td>
+      <td><span class="badge ${p.stock>0?'badge-green':'badge-red'}">${p.stock} codes</span></td>
+      <td>${p.est_slider?'<span class="badge badge-gold">✓ Slider</span>':'<span class="badge badge-gray">Non</span>'}</td>
+      <td>${p.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick='editProduct(${JSON.stringify(p)})'>✏️ Modifier</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleProduct('${p.id}',${p.est_actif})">${p.est_actif?'🚫 Désactiver':'✅ Activer'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterProducts(val){renderProducts(val);}
+
+function openProductModal(p=null){
+  document.getElementById('modal-product-title').textContent=p?'Modifier le produit':'Ajouter un produit';
+  document.getElementById('prod-id').value=p?p.id:'';
+  document.getElementById('prod-nom').value=p?p.nom:'';
+  document.getElementById('prod-plateforme').value=p?p.plateforme:'psn';
+  document.getElementById('prod-desc').value=p?p.description||'':'';
+  document.getElementById('prod-prix').value=p?p.prix:'';
+  document.getElementById('prod-image').value=p?p.image_url||'':'';
+  document.getElementById('prod-video').value=p?p.video_url||'':'';
+  document.getElementById('prod-slider').checked=p?p.est_slider:false;
+  document.getElementById('prod-slider-ordre').value=p?p.slider_ordre:1;
+  document.getElementById('prod-populaire').checked=p?p.est_populaire:false;
+  document.getElementById('prod-actif').checked=p?p.est_actif:true;
+  previewImage();
+  document.getElementById('modal-product').classList.add('open');
+}
+
+function editProduct(p){openProductModal(p);}
+
+function previewImage(){
+  const url=document.getElementById('prod-image').value;
+  const prev=document.getElementById('img-preview');
+  if(url){prev.innerHTML=`<img src="${url}" onerror="this.parentElement.innerHTML='<div class=img-preview-text>❌ Image introuvable</div>'">`;}
+  else{prev.innerHTML='<div class="img-preview-text">👆 Collez un lien image ci-dessus</div>';}
+}
+
+async function saveProduct(){
+  const id=document.getElementById('prod-id').value;
+  const data={
+    nom:document.getElementById('prod-nom').value.trim(),
+    plateforme:document.getElementById('prod-plateforme').value,
+    categorie:document.getElementById('prod-categorie').value,
+    sous_categorie:document.getElementById('prod-sous-categorie').value,
+    description:document.getElementById('prod-desc').value.trim(),
+    prix:parseInt(document.getElementById('prod-prix').value)||0,
+    image_url:document.getElementById('prod-image').value.trim(),
+    video_url:document.getElementById('prod-video').value.trim(),
+    est_slider:document.getElementById('prod-slider').checked,
+    slider_ordre:parseInt(document.getElementById('prod-slider-ordre').value)||1,
+    est_populaire:document.getElementById('prod-populaire').checked,
+    est_actif:document.getElementById('prod-actif').checked,
+  };
+  if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
+  let error;
+  if(id){({error}=await sb.from('products').update(data).eq('id',id));}
+  else{({error}=await sb.from('products').insert(data));}
+  if(error){showToast('Erreur : '+error.message,'err');return;}
+  closeModal('modal-product');showToast('✅ Produit enregistré !','ok');
+  await loadProducts();populateProductSelects();
+}
+
+async function toggleProduct(id,current){
+  await sb.from('products').update({est_actif:!current}).eq('id',id);
+  await loadProducts();showToast(current?'Produit désactivé':'Produit activé','ok');
+}
+
+// ============================================================
+// CODES DE JEU
+// ============================================================
+function populateProductSelects(){
+  const sel1=document.getElementById('codes-product-filter');
+  const sel2=document.getElementById('codes-product-select');
+  const opts=allProducts.map(p=>`<option value="${p.id}">${p.nom} (${platLabel(p.plateforme)})</option>`).join('');
+  if(sel1)sel1.innerHTML='<option value="">— Sélectionnez un produit —</option>'+opts;
+  if(sel2)sel2.innerHTML=opts;
+}
+
+async function loadCodesForProduct(productId){
+  if(!productId){document.getElementById('codes-table-wrap').innerHTML='<div class="empty"><div class="empty-icon">🔑</div><p>Sélectionnez un produit</p></div>';return;}
+  const{data}=await sb.from('game_codes').select('*').eq('product_id',productId).order('created_at',{ascending:false});
+  const codes=data||[];
+  const dispo=codes.filter(c=>!c.est_utilise).length;
+  document.getElementById('codes-table-wrap').innerHTML=`
+    <div class="table-head">
+      <h3>Codes du produit</h3>
+      <span class="badge badge-green">${dispo} disponibles</span>
+      <span class="badge badge-red">${codes.length-dispo} utilisés</span>
+    </div>
+    <table><thead><tr><th>Code</th><th>Statut</th><th>Ajouté le</th></tr></thead>
+    <tbody>${codes.length?codes.map(c=>`
+      <tr>
+        <td><code style="font-size:13px;letter-spacing:1px">${c.code}</code></td>
+        <td>${c.est_utilise?'<span class="badge badge-gray">Utilisé</span>':'<span class="badge badge-green">Disponible</span>'}</td>
+        <td style="color:var(--muted)">${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+      </tr>`).join(''):'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:24px">Aucun code pour ce produit</td></tr>'}
+    </tbody></table>`;
+}
+
+function openAddCodesModal(){
+  document.getElementById('codes-textarea').value='';
+  document.getElementById('modal-codes').classList.add('open');
+}
+
+async function saveCodes(){
+  const productId=document.getElementById('codes-product-select').value;
+  const raw=document.getElementById('codes-textarea').value.trim();
+  if(!productId||!raw){showToast('Sélectionnez un produit et entrez les codes','err');return;}
+  const codes=raw.split('\n').map(c=>c.trim()).filter(c=>c.length>0);
+  if(!codes.length){showToast('Aucun code valide','err');return;}
+  const rows=codes.map(code=>({product_id:productId,code}));
+  const{error}=await sb.from('game_codes').insert(rows);
+  if(error){showToast('Erreur : '+error.message,'err');return;}
+  // Mettre à jour le stock du produit
+  const prod=allProducts.find(p=>p.id===productId);
+  if(prod)await sb.from('products').update({stock:(prod.stock||0)+codes.length}).eq('id',productId);
+  closeModal('modal-codes');
+  showToast(`✅ ${codes.length} code(s) ajouté(s) !`,'ok');
+  await loadProducts();
+  const filter=document.getElementById('codes-product-filter');
+  if(filter.value)loadCodesForProduct(filter.value);
+}
+
+// ============================================================
+// COMMANDES
+// ============================================================
+async function loadOrders(){
+  const{data}=await sb.from('orders').select('*').order('created_at',{ascending:false});
+  allOrders=data||[];renderOrders('all');
+}
+
+function orderRow(o){
+  const badge=statusBadge(o.statut);
+  return `<tr>
+    <td><code style="font-size:11px">${o.id.substring(0,8)}...</code></td>
+    <td style="font-size:12px;color:var(--muted2)">${o.user_id?o.user_id.substring(0,8)+'...':'—'}</td>
+    <td>${o.nom_produit||'—'}</td>
+    <td><strong style="color:var(--gold)">${fmt(o.prix_paye)}</strong> FCFA</td>
+    <td>${badge}</td>
+    <td style="color:var(--muted);font-size:12px">${new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+    <td><button class="btn btn-secondary btn-sm" onclick='openOrderModal(${JSON.stringify(o)})'>👁️ Voir</button></td>
+  </tr>`;
+}
+
+function renderOrders(filter){
+  const list=filter==='all'?allOrders:allOrders.filter(o=>o.statut===filter);
+  const tb=document.getElementById('orders-tbody');
+  tb.innerHTML=list.length?list.map(orderRow).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Aucune commande</td></tr>';
+}
+function filterOrders(val){renderOrders(val);}
+
+function statusBadge(s){
+  const map={en_attente:'<span class="badge badge-gold">⏳ En attente</span>',paye:'<span class="badge badge-blue">💳 Payé</span>',code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',annule:'<span class="badge badge-red">❌ Annulé</span>'};
+  return map[s]||s;
+}
+
+function openOrderModal(o){
+  document.getElementById('modal-commande-body').innerHTML=`
+    <div class="order-detail">
+      <div><strong>N° Commande</strong><span>${o.id}</span></div>
+      <div><strong>Produit</strong><span>${o.nom_produit||'—'}</span></div>
+      <div><strong>Plateforme</strong><span>${o.plateforme||'—'}</span></div>
+      <div><strong>Prix payé</strong><span style="color:var(--gold);font-weight:700">${fmt(o.prix_paye)} FCFA</span></div>
+      <div><strong>Points gagnés</strong><span>${o.points_gagnes||0} pts</span></div>
+      <div><strong>Code promo</strong><span>${o.promo_code||'Aucun'}</span></div>
+      <div><strong>Statut</strong><span>${statusBadge(o.statut)}</span></div>
+      <div><strong>Transaction ID</strong><span>${o.transaction_id||'—'}</span></div>
+      <div><strong>Date</strong><span>${new Date(o.created_at).toLocaleString('fr-FR')}</span></div>
+    </div>
+    ${o.code_jeu?`<div class="code-reveal">🔑 ${o.code_jeu}</div>`:'<p style="color:var(--muted);font-size:13px;margin-top:12px">Aucun code attribué pour l\'instant.</p>'}`;
+  const foot=document.getElementById('modal-commande-foot');
+  foot.innerHTML='';
+  if(o.statut==='paye'||o.statut==='en_attente'){
+    foot.innerHTML=`
+      <button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>
+      <button class="btn btn-green" onclick="assignCode('${o.id}','${o.product_id}')">🔑 Attribuer un code</button>
+      <button class="btn btn-danger" onclick="cancelOrder('${o.id}')">❌ Annuler</button>`;
+  }else{
+    foot.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>`;
+  }
+  document.getElementById('modal-commande').classList.add('open');
+}
+
+async function assignCode(orderId,productId){
+  const{data:codes}=await sb.from('game_codes').select('*').eq('product_id',productId).eq('est_utilise',false).limit(1);
+  if(!codes||!codes.length){showToast('❌ Aucun code disponible pour ce produit','err');return;}
+  const code=codes[0];
+  await sb.from('game_codes').update({est_utilise:true,order_id:orderId}).eq('id',code.id);
+  await sb.from('orders').update({code_jeu:code.code,statut:'code_envoye'}).eq('id',orderId);
+  const prod=allProducts.find(p=>p.id===productId);
+  if(prod)await sb.from('products').update({stock:Math.max(0,(prod.stock||1)-1)}).eq('id',productId);
+
+  // Récupérer infos client pour l'email
+  const order=allOrders.find(o=>o.id===orderId);
+  if(order&&order.user_id){
+    const{data:profile}=await sb.from('profiles').select('*').eq('id',order.user_id).single();
+    if(profile){
+      const ok=await envoyerEmailCode(
+        profile.email,
+        profile.prenom||profile.nom||'Client',
+        order.nom_produit||'Produit',
+        code.code,
+        order.prix_paye,
+        order.points_gagnes||0,
+        orderId
+      );
+      if(ok)showToast('✅ Code attribué et email envoyé automatiquement !','ok');
+      else showToast('✅ Code attribué — email non envoyé (vérifier Brevo)','ok');
+    }
+  }else{
+    showToast('✅ Code attribué !','ok');
+  }
+  closeModal('modal-commande');
+  await loadOrders();await loadProducts();await loadDashboard();
+}
+
+async function cancelOrder(orderId){
+  if(!confirm('Annuler cette commande ?'))return;
+  await sb.from('orders').update({statut:'annule'}).eq('id',orderId);
+  closeModal('modal-commande');showToast('Commande annulée','ok');
+  await loadOrders();await loadDashboard();
+}
+
+// ============================================================
+// CLIENTS
+// ============================================================
+async function loadClients(){
+  const{data}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
+  allClients=data||[];renderClients(allClients);
+}
+function renderClients(list){
+  const tb=document.getElementById('clients-tbody');
+  tb.innerHTML=list.length?list.map(c=>`
+    <tr>
+      <td><strong>${c.prenom||''} ${c.nom||''}</strong></td>
+      <td style="color:var(--muted2)">${c.email}</td>
+      <td style="color:var(--muted2)">${c.telephone||'—'}</td>
+      <td><span class="badge badge-gold">⭐ ${c.points||0} pts</span></td>
+      <td>${c.total_commandes||0}</td>
+      <td style="color:var(--muted);font-size:12px">${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+    </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun client</td></tr>';
+}
+function searchClients(q){
+  const filtered=allClients.filter(c=>(c.email||'').toLowerCase().includes(q.toLowerCase())||(c.nom||'').toLowerCase().includes(q.toLowerCase())||(c.prenom||'').toLowerCase().includes(q.toLowerCase()));
+  renderClients(filtered);
+}
+
+// ============================================================
+// PROMOS
+// ============================================================
+async function loadPromos(){
+  const{data}=await sb.from('promo_codes').select('*').order('created_at',{ascending:false});
+  allPromos=data||[];renderPromos();
+}
+function renderPromos(){
+  const tb=document.getElementById('promos-tbody');
+  tb.innerHTML=allPromos.length?allPromos.map(p=>`
+    <tr>
+      <td><code style="font-size:14px;letter-spacing:1px;color:var(--gold)">${p.code}</code></td>
+      <td>${p.reduction_pct>0?`<strong>-${p.reduction_pct}%</strong>`:p.reduction_fcfa>0?`<strong>-${fmt(p.reduction_fcfa)} FCFA</strong>`:'-'}</td>
+      <td>${p.utilisations_actuelles||0} / ${p.utilisations_max}</td>
+      <td style="color:var(--muted);font-size:12px">${p.expire_le?new Date(p.expire_le).toLocaleDateString('fr-FR'):'Pas de limite'}</td>
+      <td>${p.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick='editPromo(${JSON.stringify(p)})'>✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="togglePromo('${p.id}',${p.est_actif})">${p.est_actif?'🚫':'✅'}</button>
+      </td>
+    </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun code promo</td></tr>';
+}
+function openPromoModal(){
+  document.getElementById('promo-id').value='';
+  document.getElementById('promo-code').value='';
+  document.getElementById('promo-pct').value='0';
+  document.getElementById('promo-fcfa').value='0';
+  document.getElementById('promo-max').value='100';
+  document.getElementById('promo-expire').value='';
+  document.getElementById('promo-actif').checked=true;
+  document.getElementById('modal-promo-title').textContent='Nouveau code promo';
+  document.getElementById('modal-promo').classList.add('open');
+}
+function editPromo(p){
+  document.getElementById('promo-id').value=p.id;
+  document.getElementById('promo-code').value=p.code;
+  document.getElementById('promo-pct').value=p.reduction_pct;
+  document.getElementById('promo-fcfa').value=p.reduction_fcfa;
+  document.getElementById('promo-max').value=p.utilisations_max;
+  document.getElementById('promo-expire').value=p.expire_le?p.expire_le.substring(0,16):'';
+  document.getElementById('promo-actif').checked=p.est_actif;
+  document.getElementById('modal-promo-title').textContent='Modifier le code promo';
+  document.getElementById('modal-promo').classList.add('open');
+}
+async function savePromo(){
+  const id=document.getElementById('promo-id').value;
+  const data={
+    code:document.getElementById('promo-code').value.trim().toUpperCase(),
+    reduction_pct:parseInt(document.getElementById('promo-pct').value)||0,
+    reduction_fcfa:parseInt(document.getElementById('promo-fcfa').value)||0,
+    utilisations_max:parseInt(document.getElementById('promo-max').value)||100,
+    expire_le:document.getElementById('promo-expire').value||null,
+    est_actif:document.getElementById('promo-actif').checked,
+  };
+  if(!data.code){showToast('Entrez un code promo','err');return;}
+  let error;
+  if(id){({error}=await sb.from('promo_codes').update(data).eq('id',id));}
+  else{({error}=await sb.from('promo_codes').insert(data));}
+  if(error){showToast('Erreur : '+error.message,'err');return;}
+  closeModal('modal-promo');showToast('✅ Code promo enregistré !','ok');await loadPromos();
+}
+async function togglePromo(id,current){
+  await sb.from('promo_codes').update({est_actif:!current}).eq('id',id);
+  await loadPromos();showToast(current?'Code désactivé':'Code activé','ok');
+}
+
+// ============================================================
+// POINTS CONFIG
+// ============================================================
+// ============================================================
+// CLIENTS FIDÈLES
+// ============================================================
+async function loadPointsConfig(){
+  await loadClientsFideles();
+}
+
+async function loadClientsFideles(){
+  const{data:clients}=await sb.from('profiles').select('*').gte('points',100).order('points',{ascending:false});
+  const list=clients||[];
+  const el=document.getElementById('fidelite-list');
+
+  if(!list.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">⭐</div><p>Aucun client n'a encore atteint 100 points.</p></div>`;
+    return;
+  }
+
+  el.innerHTML=`
+    <table>
+      <thead><tr>
+        <th>Client</th><th>Email</th><th>Points</th><th>Achats</th><th>Réduction</th><th>Action</th>
+      </tr></thead>
+      <tbody>
+        ${list.map(c=>`
+          <tr>
+            <td><strong>${c.prenom||''} ${c.nom||''}</strong></td>
+            <td style="color:var(--muted2);font-size:12px">${c.email}</td>
+            <td><span class="badge badge-gold">⭐ ${c.points} pts</span></td>
+            <td style="color:var(--muted2)">${Math.floor(c.points/10)} achats</td>
+            <td>
+              <select class="filter-select" id="pct-${c.id}" style="padding:5px 8px;font-size:12px">
+                <option value="10">-10%</option>
+                <option value="15">-15%</option>
+                <option value="20">-20%</option>
+                <option value="25">-25%</option>
+                <option value="30">-30%</option>
+              </select>
+            </td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="envoyerPromoClient('${c.id}','${c.email}','${c.prenom||'Client'}')">
+                📨 Envoyer code
+              </button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function envoyerPromoClient(userId, email, prenom){
+  const pct=document.getElementById('pct-'+userId)?.value||'10';
+  await _envoyerPromoEtReset(userId, email, prenom, parseInt(pct));
+}
+
+async function envoyerPromoTous(){
+  const pct=parseInt(document.getElementById('promo-pct-global').value)||10;
+  const{data:clients}=await sb.from('profiles').select('*').gte('points',100);
+  if(!clients||!clients.length){showToast('Aucun client à 100+ points','err');return;}
+  showToast(`📨 Envoi en cours à ${clients.length} client(s)...`);
+  for(const c of clients){
+    await _envoyerPromoEtReset(c.id,c.email,c.prenom||'Client',pct);
+    await new Promise(r=>setTimeout(r,300));
+  }
+  showToast(`✅ Codes envoyés à ${clients.length} client(s) !`,'ok');
+  await loadClientsFideles();
+}
+
+async function _envoyerPromoEtReset(userId, email, prenom, pct){
+  // Générer un code promo unique
+  const code='FIDELITE'+pct+'_'+Math.random().toString(36).substring(2,7).toUpperCase();
+
+  // Créer le code promo dans Supabase
+  await sb.from('promo_codes').insert({
+    code,
+    reduction_pct:pct,
+    reduction_fcfa:0,
+    utilisations_max:1,
+    est_actif:true
+  });
+
+  // Envoyer email via Brevo
+  try{
+    await fetch('https://api.brevo.com/v3/smtp/email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+      body:JSON.stringify({
+        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+        to:[{email,name:prenom}],
+        subject:`🎁 Votre récompense fidélité BabiPlay — ${pct}% de réduction !`,
+        htmlContent:`
+          <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
+            <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
+              <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:24px;text-align:center">
+                <h1 style="color:#000;margin:0;font-size:24px;letter-spacing:2px">BabiPlay CI</h1>
+                <p style="color:#000;margin:6px 0 0;font-size:13px">🏆 Récompense fidélité</p>
+              </div>
+              <div style="padding:28px">
+                <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${prenom}</strong> 👋</p>
+                <p style="color:#9a9ab8;font-size:14px;line-height:1.7;margin-bottom:20px">
+                  Félicitations ! Vous avez atteint <strong style="color:#f5a623">100 points</strong> de fidélité sur BabiPlay CI.<br>
+                  En récompense, voici votre code de réduction exclusif :
+                </p>
+                <div style="background:#0b0b0e;border:2px solid #f5a623;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+                  <p style="color:#9a9ab8;font-size:11px;margin:0 0 8px;letter-spacing:2px;text-transform:uppercase">Votre code promo</p>
+                  <p style="color:#f5a623;font-size:28px;font-weight:bold;letter-spacing:4px;margin:0;font-family:monospace">${code}</p>
+                  <p style="color:#9a9ab8;font-size:13px;margin:8px 0 0">= <strong style="color:#f5a623">${pct}% de réduction</strong> sur votre prochain achat</p>
+                </div>
+                <p style="color:#9a9ab8;font-size:13px;line-height:1.7;margin-bottom:20px">
+                  ✅ Valable sur tous nos produits<br>
+                  ✅ Utilisable une seule fois<br>
+                  ✅ Entrez le code dans votre panier
+                </p>
+                <div style="text-align:center">
+                  <a href="https://babiplay.store" style="background:linear-gradient(100deg,#f5a623,#ff8c00);color:#000;padding:14px 32px;border-radius:10px;font-weight:700;text-decoration:none;font-size:16px;display:inline-block">
+                    🎮 Commander maintenant
+                  </a>
+                </div>
+                <p style="color:#6b6b88;font-size:12px;text-align:center;margin-top:20px">
+                  © 2026 BabiPlay CI — Abidjan, Côte d'Ivoire
+                </p>
+              </div>
+            </div>
+          </div>`
+      })
+    });
+  }catch(e){console.error('Erreur email:',e);}
+
+  // Remettre les points à zéro
+  await sb.from('profiles').update({points:0}).eq('id',userId);
+  showToast(`✅ Code ${code} envoyé à ${email} — Points remis à 0`,'ok');
+}
+
+// ============================================================
+// CADEAUX
+// ============================================================
+let allRewards=[];
+
+async function loadRewards(){
+  const{data}=await sb.from('rewards').select('*').order('created_at',{ascending:false});
+  allRewards=data||[];
+  const pending=allRewards.filter(r=>r.statut==='en_attente').length;
+  document.getElementById('badge-cadeaux').textContent=pending;
+  renderRewards('all');
+}
+
+function renderRewards(filter){
+  const list=filter==='all'?allRewards:allRewards.filter(r=>r.statut===filter);
+  const tb=document.getElementById('rewards-tbody');
+  if(!list.length){
+    tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">🎀</div><p>Aucune demande de cadeau</p></div></td></tr>';
+    return;
+  }
+  tb.innerHTML=list.map(r=>`
+    <tr>
+      <td><strong>${r.prenom||''} ${r.nom||''}</strong></td>
+      <td style="color:var(--muted2);font-size:12px">${r.email||'—'}</td>
+      <td>
+        ${r.points_palier===100
+          ?'<span class="badge badge-gold">🥉 100 pts — Palier 1</span>'
+          :'<span class="badge" style="background:rgba(245,166,35,.2);color:var(--gold);border:1px solid var(--gold)">🥇 500 pts — Palier 2</span>'}
+      </td>
+      <td style="font-size:13px">${r.produit_offert_nom||'<span style="color:var(--muted)">Non choisi</span>'}</td>
+      <td>${rewardBadge(r.statut)}</td>
+      <td style="color:var(--muted);font-size:12px">${new Date(r.created_at).toLocaleDateString('fr-FR')}</td>
+      <td>
+        ${r.statut==='en_attente'
+          ?`<button class="btn btn-primary btn-sm" onclick='openCadeauModal(${JSON.stringify(r)})'>🎁 Choisir cadeau</button>`
+          :r.statut==='cadeau_choisi'
+            ?`<button class="btn btn-green btn-sm" onclick='envoyerCodeCadeau("${r.id}")'>📧 Envoyer code</button>`
+            :'<span style="color:var(--muted);font-size:12px">✅ Terminé</span>'}
+      </td>
+    </tr>`).join('');
+}
+
+function rewardBadge(s){
+  return{
+    en_attente:'<span class="badge badge-gold">⏳ En attente</span>',
+    cadeau_choisi:'<span class="badge badge-blue">🎁 Cadeau choisi</span>',
+    envoye:'<span class="badge badge-green">✅ Envoyé</span>'
+  }[s]||s;
+}
+
+function filterRewards(val){renderRewards(val);}
+
+function openCadeauModal(r){
+  document.getElementById('cadeau-reward-id').value=r.id;
+  document.getElementById('cadeau-user-email').value=r.email||'';
+  document.getElementById('cadeau-user-prenom').value=r.prenom||'';
+  document.getElementById('cadeau-client-info').innerHTML=`
+    <strong style="color:var(--text)">Client :</strong> ${r.prenom||''} ${r.nom||''}<br>
+    <strong style="color:var(--text)">Email :</strong> ${r.email||'—'}<br>
+    <strong style="color:var(--text)">Palier :</strong> ${r.points_palier} points`;
+  document.getElementById('cadeau-code-manual').value='';
+  // Remplir select produits
+  const sel=document.getElementById('cadeau-product-select');
+  sel.innerHTML=allProducts.map(p=>`<option value="${p.id}">${p.nom} (${platLabel(p.plateforme)}) — Stock: ${p.stock}</option>`).join('');
+  document.getElementById('modal-cadeau').classList.add('open');
+}
+
+async function envoyerCadeau(){
+  const rewardId=document.getElementById('cadeau-reward-id').value;
+  const productId=document.getElementById('cadeau-product-select').value;
+  const manualCode=document.getElementById('cadeau-code-manual').value.trim();
+  const prod=allProducts.find(p=>p.id===productId);
+  if(!prod){showToast('Sélectionnez un produit','err');return;}
+
+  let code=manualCode;
+
+  // Si pas de code manuel, piocher dans le stock
+  if(!code){
+    const{data:codes}=await sb.from('game_codes').select('*').eq('product_id',productId).eq('est_utilise',false).limit(1);
+    if(!codes||!codes.length){showToast('❌ Aucun code en stock pour ce produit !','err');return;}
+    code=codes[0].code;
+    // Marquer code comme utilisé
+    await sb.from('game_codes').update({est_utilise:true,order_id:rewardId}).eq('id',codes[0].id);
+  }
+
+  // Mettre à jour la demande cadeau
+  await sb.from('rewards').update({
+    statut:'envoye',
+    produit_offert_id:productId,
+    produit_offert_nom:prod.nom,
+    code_cadeau:code
+  }).eq('id',rewardId);
+
+  // Mettre à jour le stock
+  if(!manualCode&&prod.stock>0){
+    await sb.from('products').update({stock:prod.stock-1}).eq('id',productId);
+  }
+
+  // Remettre les points du client à zéro
+  const reward=allRewards.find(r=>r.id===rewardId);
+  if(reward&&reward.user_id){
+    await sb.from('profiles').update({points:0}).eq('id',reward.user_id);
+  }
+
+  closeModal('modal-cadeau');
+
+  // Envoyer email automatique
+  const email=document.getElementById('cadeau-user-email').value;
+  const prenom=document.getElementById('cadeau-user-prenom').value;
+  if(email){
+    const ok=await envoyerEmailCode(email,prenom,prod.nom,code,0,0,rewardId);
+    if(ok)showToast('🎁 Cadeau envoyé et email parti automatiquement !','ok');
+    else showToast('🎁 Cadeau envoyé — email non parti (vérifier Brevo)','ok');
+  }else{
+    showToast('✅ Cadeau envoyé avec succès !','ok');
+  }
+  await loadRewards();await loadProducts();await loadDashboard();
+}
+
+// ============================================================
+// ============================================================
+// EMAILS MARKETING
+// ============================================================
+let destMode='tous';
+let emailHistorique=[];
+
+async function relancerInactifs(){
+  const btn=event.currentTarget;
+  btn.disabled=true;btn.textContent='⏳ En cours...';
+
+  // Récupérer tous les clients
+  const{data:clients}=await sb.from('profiles').select('*');
+  const cl=clients||[];
+
+  // Clients inactifs depuis 30 jours
+  const il30=new Date();il30.setDate(il30.getDate()-30);
+  const{data:orders}=await sb.from('orders').select('user_id,created_at');
+  const actifsIds=new Set((orders||[]).filter(o=>new Date(o.created_at)>il30).map(o=>o.user_id));
+  const inactifs=cl.filter(c=>c.email&&!actifsIds.has(c.id));
+
+  // Afficher la liste des inactifs
+  const listeEl=document.getElementById('relance-liste');
+  if(!inactifs.length){
+    listeEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">✅ Aucun client inactif — tout le monde est actif !</div>`;
+    btn.disabled=false;btn.textContent='🔄 Relancer les inactifs';
+    return;
+  }
+
+  listeEl.innerHTML=`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">
+      ${inactifs.length} client(s) inactif(s) détecté(s)
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${inactifs.map(c=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px">
+          <span>${c.prenom||''} ${c.nom||''} <span style="color:var(--muted2)">(${c.email})</span></span>
+          <span class="badge badge-gold">😴 Inactif</span>
+        </div>`).join('')}
+    </div>`;
+
+  // Envoyer emails de relance
+  let envoyes=0,erreurs=0;
+  for(const dest of inactifs){
+    try{
+      const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+        body:JSON.stringify({
+          sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+          to:[{email:dest.email,name:dest.prenom||'Client'}],
+          subject:'👋 On vous manque ! Revenez jouer avec BabiPlay CI',
+          htmlContent:`
+            <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
+              <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
+                <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:24px;text-align:center">
+                  <h1 style="color:#000;margin:0;font-size:24px;letter-spacing:2px">BabiPlay CI</h1>
+                  <p style="color:#000;margin:6px 0 0;font-size:13px">On vous manque !</p>
+                </div>
+                <div style="padding:28px">
+                  <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${dest.prenom||''}}</strong> 👋</p>
+                  <p style="color:#9a9ab8;font-size:14px;line-height:1.7">
+                    Cela fait un moment qu'on ne vous a pas vu sur BabiPlay CI !<br><br>
+                    Nous sommes toujours là avec vos cartes gaming préférées :
+                  </p>
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:20px 0">
+                    <div style="background:#00225a;border-radius:8px;padding:10px 16px;color:#fff;font-size:13px;font-weight:bold">🎮 PSN</div>
+                    <div style="background:#107c10;border-radius:8px;padding:10px 16px;color:#fff;font-size:13px;font-weight:bold">🕹️ Xbox</div>
+                    <div style="background:#1b2838;border-radius:8px;padding:10px 16px;color:#fff;font-size:13px;font-weight:bold">🖥️ Steam</div>
+                    <div style="background:#e60012;border-radius:8px;padding:10px 16px;color:#fff;font-size:13px;font-weight:bold">🔴 Nintendo</div>
+                  </div>
+                  <p style="color:#9a9ab8;font-size:13px;line-height:1.7">
+                    ✅ Paiement Mobile Money (Orange / MTN / Moov)<br>
+                    ⚡ Code livré par email en quelques minutes<br>
+                    ⭐ Points fidélité sur chaque achat
+                  </p>
+                  <div style="text-align:center;margin:24px 0">
+                    <a href="https://voluble-truffle-a3020b.netlify.app" style="background:linear-gradient(100deg,#f5a623,#ff8c00);color:#000;padding:14px 32px;border-radius:10px;font-weight:700;text-decoration:none;font-size:16px;display:inline-block">
+                      🎮 Commander maintenant
+                    </a>
+                  </div>
+                  <p style="color:#6b6b88;font-size:12px;text-align:center">
+                    © 2026 BabiPlay CI — Abidjan, Côte d'Ivoire<br>
+                    <a href="https://voluble-truffle-a3020b.netlify.app" style="color:#6b6b88">Se désabonner</a>
+                  </p>
+                </div>
+              </div>
+            </div>`
+        })
+      });
+      if(res.ok)envoyes++;else erreurs++;
+    }catch(e){erreurs++;}
+    await new Promise(r=>setTimeout(r,200));
+  }
+
+  // Résultat
+  const resultEl=document.getElementById('relance-result');
+  resultEl.style.display='block';
+  resultEl.innerHTML=`✅ Relance envoyée à <strong>${envoyes}</strong> client(s) inactif(s) !${erreurs>0?` (${erreurs} erreur(s))`:''}`;
+
+  // Mettre à jour badges inactifs
+  document.getElementById('email-stat-inactifs').textContent=inactifs.length;
+  btn.disabled=false;btn.textContent='🔄 Relancer les inactifs';
+  showToast(`✅ ${envoyes} email(s) de relance envoyé(s) !`,'ok');
+}
+
+// ============================================================
+async function loadEmailStats(){
+  const{data:orders}=await sb.from('orders').select('user_id,created_at');
+  const cl=clients||[];
+  const or=orders||[];
+  document.getElementById('email-stat-total').textContent=cl.length;
+
+  // Clients inactifs : pas de commande depuis 30 jours
+  const il30=new Date();il30.setDate(il30.getDate()-30);
+  const actifsIds=new Set(or.filter(o=>new Date(o.created_at)>il30).map(o=>o.user_id));
+  const inactifs=cl.filter(c=>!actifsIds.has(c.id));
+  document.getElementById('email-stat-inactifs').textContent=inactifs.length;
+  document.getElementById('email-stat-actifs').textContent=actifsIds.size;
+}
+
+function setDest(mode,btn){
+  destMode=mode;
+  document.querySelectorAll('.dest-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const labels={
+    tous:'Tous les clients',
+    inactifs:'Clients inactifs (+30 jours)',
+    commandes:'Clients ayant commandé',
+    un:'Un client précis'
+  };
+  document.getElementById('email-dest-info').textContent='Destinataires : '+labels[mode];
+  document.getElementById('dest-un-wrap').style.display=mode==='un'?'block':'none';
+}
+
+function applyTemplate(type){
+  const templates={
+    promo:{
+      objet:'🔥 Promotion spéciale BabiPlay — Offre limitée !',
+      message:`Bonjour,
+
+Bonne nouvelle ! BabiPlay a une promotion spéciale pour vous aujourd'hui.
+
+🎮 Nos cartes PSN, Xbox, Steam et Nintendo sont disponibles en FCFA avec paiement Mobile Money.
+
+👉 Commandez maintenant sur babiplay.ci
+
+À très bientôt,
+L'équipe BabiPlay CI`
+    },
+    relance:{
+      objet:'👋 On vous manque ! Revenez jouer avec BabiPlay',
+      message:`Bonjour,
+
+Cela fait un moment qu'on ne vous a pas vu sur BabiPlay CI !
+
+Nous avons de nouveaux produits disponibles :
+🎮 Cartes PSN | Xbox | Steam | Nintendo
+💳 Paiement Mobile Money (Orange / MTN / Moov)
+⚡ Code reçu par email en quelques minutes
+
+Revenez nous voir sur babiplay.ci
+
+L'équipe BabiPlay CI`
+    },
+    nouveau:{
+      objet:'🆕 Nouveau produit disponible sur BabiPlay !',
+      message:`Bonjour,
+
+Un nouveau produit vient d'arriver sur BabiPlay CI !
+
+Découvrez-le maintenant sur babiplay.ci
+Paiement Mobile Money — Code livré par email instantanément.
+
+L'équipe BabiPlay CI`
+    },
+    fidelite:{
+      objet:'⭐ Vos points fidélité vous attendent !',
+      message:`Bonjour,
+
+Saviez-vous que vous accumulez des points à chaque achat sur BabiPlay CI ?
+
+⭐ 10 points gagnés par 1 000 FCFA dépensés
+🥉 100 points = Cadeau surprise
+🥇 500 points = Cadeau premium
+
+Connectez-vous sur babiplay.ci pour voir vos points !
+
+L'équipe BabiPlay CI`
+    },
+    vide:{objet:'',message:''}
+  };
+  const t=templates[type];
+  document.getElementById('email-objet').value=t.objet;
+  document.getElementById('email-message').value=t.message;
+}
+
+function previewEmail(){
+  const objet=document.getElementById('email-objet').value;
+  const message=document.getElementById('email-message').value;
+  if(!objet||!message){showToast('Remplissez l\'objet et le message','err');return;}
+  const box=document.getElementById('email-preview-box');
+  document.getElementById('email-preview-content').innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:16px;text-align:center">
+        <strong style="color:#000;font-size:18px">BabiPlay CI</strong>
+      </div>
+      <div style="padding:20px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Objet : <strong style="color:var(--text)">${objet}</strong></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+        <pre style="font-size:13px;color:var(--muted2);white-space:pre-wrap;font-family:'DM Sans',sans-serif;line-height:1.7">${message}</pre>
+      </div>
+    </div>`;
+  box.style.display='block';
+}
+
+async function envoyerEmailMarketing(){
+  const objet=document.getElementById('email-objet').value.trim();
+  const message=document.getElementById('email-message').value.trim();
+  if(!objet||!message){showToast('Remplissez l\'objet et le message','err');return;}
+
+  // Récupérer les destinataires
+  let destinataires=[];
+  const{data:clients}=await sb.from('profiles').select('*');
+  const cl=clients||[];
+
+  if(destMode==='tous'){
+    destinataires=cl.filter(c=>c.email);
+  }else if(destMode==='inactifs'){
+    const{data:orders}=await sb.from('orders').select('user_id,created_at');
+    const il30=new Date();il30.setDate(il30.getDate()-30);
+    const actifsIds=new Set((orders||[]).filter(o=>new Date(o.created_at)>il30).map(o=>o.user_id));
+    destinataires=cl.filter(c=>c.email&&!actifsIds.has(c.id));
+  }else if(destMode==='commandes'){
+    const{data:orders}=await sb.from('orders').select('user_id');
+    const ids=new Set((orders||[]).map(o=>o.user_id));
+    destinataires=cl.filter(c=>c.email&&ids.has(c.id));
+  }else if(destMode==='un'){
+    const email=document.getElementById('dest-email-unique').value.trim();
+    if(!email){showToast('Entrez l\'email du client','err');return;}
+    destinataires=[{email,prenom:'Client'}];
+  }
+
+  if(!destinataires.length){showToast('Aucun destinataire trouvé','err');return;}
+
+  showToast(`📨 Envoi en cours à ${destinataires.length} client(s)...`);
+
+  // Envoyer via Brevo API
+  let envoyes=0,erreurs=0;
+  for(const dest of destinataires){
+    try{
+      const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+        body:JSON.stringify({
+          sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+          to:[{email:dest.email,name:dest.prenom||'Client'}],
+          subject:objet,
+          htmlContent:`
+            <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
+              <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
+                <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:24px;text-align:center">
+                  <h1 style="color:#000;margin:0;font-size:24px;letter-spacing:2px">BabiPlay CI</h1>
+                </div>
+                <div style="padding:28px">
+                  <p style="color:#e6e6f0;font-size:15px">Bonjour ${dest.prenom||''},</p>
+                  <div style="color:#9a9ab8;font-size:14px;line-height:1.8;white-space:pre-wrap">${message}</div>
+                  <div style="margin-top:24px;text-align:center">
+                    <a href="https://voluble-truffle-a3020b.netlify.app" style="background:linear-gradient(100deg,#f5a623,#ff8c00);color:#000;padding:12px 28px;border-radius:8px;font-weight:700;text-decoration:none;font-size:15px">
+                      🎮 Visiter BabiPlay CI
+                    </a>
+                  </div>
+                  <p style="color:#6b6b88;font-size:12px;text-align:center;margin-top:20px">
+                    © 2026 BabiPlay CI — Abidjan, Côte d'Ivoire
+                  </p>
+                </div>
+              </div>
+            </div>`
+        })
+      });
+      if(res.ok)envoyes++;else erreurs++;
+    }catch(e){erreurs++;}
+    // Pause pour éviter de dépasser la limite API
+    await new Promise(r=>setTimeout(r,200));
+  }
+
+  // Afficher résultat
+  const resultEl=document.getElementById('email-result');
+  resultEl.style.display='block';
+  resultEl.innerHTML=`✅ Email envoyé à <strong>${envoyes}</strong> client(s) avec succès !${erreurs>0?` (${erreurs} erreur(s))`:''}`;
+
+  // Ajouter à l'historique
+  const now=new Date().toLocaleString('fr-FR');
+  const histEl=document.getElementById('email-historique');
+  const newItem=`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px">
+      <div>
+        <strong>${objet}</strong>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">${now} — ${destMode==='tous'?'Tous les clients':destMode==='inactifs'?'Clients inactifs':destMode==='commandes'?'Clients ayant commandé':'Client précis'}</div>
+      </div>
+      <span class="badge badge-green">✅ ${envoyes} envoyés</span>
+    </div>`;
+  if(histEl.textContent.includes('apparaîtront'))histEl.innerHTML='';
+  histEl.innerHTML=newItem+histEl.innerHTML;
+
+  showToast(`✅ ${envoyes} email(s) envoyé(s) !`,'ok');
+}
+
+// ============================================================
+const BREVO_KEY=''; // Clé supprimée
+const BREVO_TEMPLATE_CODE=1;
+
+async function envoyerEmailCode(email,prenom,produit,code,prix,points,commandeId){
+  try{
+    const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+      body:JSON.stringify({
+        templateId:BREVO_TEMPLATE_CODE,
+        to:[{email,name:prenom||'Client'}],
+        params:{
+          prenom:prenom||'Client',
+          produit,
+          code,
+          prix:fmt(prix),
+          points:points||0,
+          commande_id:(commandeId||'').substring(0,8).toUpperCase()
+        }
+      })
+    });
+    return res.ok;
+  }catch(e){
+    console.error('Erreur email Brevo:',e);
+    return false;
+  }
+}
+
+function updateCatOptions(){
+  const plat=document.getElementById('prod-plateforme').value;
+  const cats={
+    pc:['Steam','EA App','Epic Games','Battle.net','Ubisoft Connect','Microsoft Store'],
+    psn:['PS4','PS5'],
+    xbox:['Xbox One','Xbox Series X|S'],
+    nintendo:['Switch','Switch 2']
+  };
+  const sel=document.getElementById('prod-categorie');
+  sel.innerHTML=(cats[plat]||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+// ============================================================
+async function handleImageUpload(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  await uploadFile(file);
+}
+async function handleImageDrop(event){
+  event.preventDefault();
+  document.getElementById('upload-zone').style.borderColor='var(--border2)';
+  const file=event.dataTransfer.files[0];
+  if(!file)return;
+  await uploadFile(file);
+}
+async function uploadFile(file){
+  const isVideo=file.type.startsWith('video/');
+  const ext=file.name.split('.').pop();
+  const fileName=`${Date.now()}_${Math.random().toString(36).substring(2,8)}.${ext}`;
+  const folder=isVideo?'videos':'images';
+  const zone=document.getElementById('upload-zone');
+  zone.innerHTML=`<div style="font-size:13px;color:var(--muted2)">⬆️ Upload en cours...<br><small>${file.name}</small></div>`;
+  try{
+    const{data,error}=await sb.storage.from('babiplay-images').upload(`${folder}/${fileName}`,file,{cacheControl:'3600',upsert:false,contentType:file.type});
+    if(error){showToast('Erreur upload: '+error.message,'err');resetUploadZone();return;}
+    const{data:urlData}=sb.storage.from('babiplay-images').getPublicUrl(`${folder}/${fileName}`);
+    const url=urlData.publicUrl;
+    if(isVideo){document.getElementById('prod-video').value=url;showToast('✅ Vidéo uploadée !','ok');}
+    else{document.getElementById('prod-image').value=url;previewImage();showToast('✅ Image uploadée !','ok');}
+    resetUploadZone();
+  }catch(e){showToast('Erreur: '+e.message,'err');resetUploadZone();}
+}
+function resetUploadZone(){
+  const zone=document.getElementById('upload-zone');
+  if(!zone)return;
+  zone.innerHTML=`
+    <input type="file" id="prod-image-file" accept="image/*,video/mp4,video/webm" style="display:none" onchange="handleImageUpload(event)">
+    <div style="font-size:32px;margin-bottom:8px">📁</div>
+    <div style="font-size:13px;color:var(--muted2)">Clique pour choisir une image ou vidéo</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG, MP4 · Max 50Mo</div>`;
+  zone.onclick=()=>document.getElementById('prod-image-file').click();
+}
+
+// ============================================================
+// UTILITAIRES
+// ============================================================
+function platLabel(p){return{psn:'PSN',xbox:'Xbox',steam:'Steam',nintendo:'Nintendo'}[p]||p;}
+function platEmoji(p){return{psn:'🎮',xbox:'🕹️',steam:'🖥️',nintendo:'🔴'}[p]||'🎮';}
+function platDot(p){return{psn:'psn',xbox:'xbox',steam:'steam',nintendo:'nin'}[p]||'psn';}
+function fmt(n){return(n||0).toLocaleString('fr-FR');}
+
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// Fermer modal au clic overlay
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
+});
+</script>
+</body>
+</html>

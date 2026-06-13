@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="google-site-verification" content="YID5Rp2gFeNDIHf5R2NFckiivFxRSM9KLxokOtJHBnI" />
+<title>BabiPlay CI — Cartes PSN, Xbox, Steam, Nintendo en FCFA | Côte d'Ivoire</title>
+<meta name="description" content="Achetez vos cartes PSN, Xbox, Steam et Nintendo en FCFA en Côte d'Ivoire. Paiement Orange Money, MTN, Moov. Livraison du code par email instantanément. Abidjan.">
+<meta name="keywords" content="carte PSN Côte d'Ivoire, recharge Xbox Abidjan, Steam FCFA, Nintendo eShop CI, carte gaming Abidjan, PSN FCFA, Xbox Côte d'Ivoire, recharge jeux vidéo CI">
+<meta property="og:title" content="BabiPlay CI — Cartes Gaming en FCFA">
+<meta property="og:description" content="PSN · Xbox · Steam · Nintendo — Paiement Mobile Money. Code livré par email instantanément.">
+<meta property="og:url" content="https://babiplay.store">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://babiplay.store">
+<meta name="description" content="Achetez vos cartes PSN, Xbox, Steam et Nintendo en FCFA. Paiement Mobile Money. Livraison du code par email.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d0f;--bg2:#141418;--bg3:#1a1a20;--bg4:#222228;
+  --border:#2a2a36;--border2:#363644;
+  --text:#e8e8f0;--muted:#5a5a78;--muted2:#8888aa;
+  --gold:#f5a623;--gold2:#ffbe55;
+  --psn:#00439c;--psn2:#0070d1;
+  --xbox:#107c10;--xbox2:#52b043;
+  --steam:#1b2838;--steam2:#2a475e;
+  --nin:#e60012;--nin2:#ff3322;
+  --r:10px;--rlg:14px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ═══════════════════════════════════════
+   NAV MOBILE-FIRST
+═══════════════════════════════════════ */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(13,13,15,0.97);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;
+  gap:8px;
+}
+.logo{
+  font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:24px;letter-spacing:1px;
+  background:linear-gradient(100deg,#f5a623,#ff7f50);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-decoration:none;flex-shrink:0;line-height:1;
+}
+.logo small{
+  display:block;font-size:8px;letter-spacing:3px;
+  -webkit-text-fill-color:var(--muted);
+  font-family:'DM Sans',sans-serif;margin-top:-2px;
+}
+.nav-right{display:flex;align-items:center;gap:8px}
+.nav-icon-btn{
+  background:none;border:none;color:var(--muted2);
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;cursor:pointer;position:relative;
+  transition:color .2s;
+}
+.nav-icon-btn:hover{color:var(--gold)}
+.nav-cart-badge{
+  position:absolute;top:4px;right:4px;
+  background:var(--gold);color:#000;
+  width:16px;height:16px;border-radius:50%;
+  font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  display:none;
+}
+.nav-cart-badge.show{display:flex}
+.nav-auth-btn{
+  background:var(--gold);border:none;color:#000;
+  padding:7px 14px;border-radius:20px;
+  font-size:13px;font-weight:600;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  white-space:nowrap;
+}
+
+/* ═══════════════════════════════════════
+   FILTRES SCROLL HORIZONTAL
+═══════════════════════════════════════ */
+.filter-bar{
+  display:flex;gap:8px;
+  padding:10px 16px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+}
+.filter-bar::-webkit-scrollbar{display:none}
+.fchip{
+  display:flex;align-items:center;gap:6px;
+  background:none;border:1px solid var(--border2);
+  color:var(--muted2);
+  padding:6px 14px;border-radius:20px;
+  font-size:13px;font-family:'DM Sans',sans-serif;
+  cursor:pointer;white-space:nowrap;
+  transition:all .2s;flex-shrink:0;
+}
+.fchip img{width:18px;height:18px;object-fit:contain}
+.fchip.active-all{border-color:var(--gold);color:var(--gold);background:rgba(245,166,35,.08)}
+.fchip.active-psn{border-color:#5baeff;color:#5baeff;background:rgba(0,112,209,.08)}
+.fchip.active-xbox{border-color:#7dd670;color:#7dd670;background:rgba(82,176,67,.08)}
+.fchip.active-pc{border-color:#66c0f4;color:#66c0f4;background:rgba(102,192,244,.08)}
+.fchip.active-nintendo{border-color:#ff6b6b;color:#ff6b6b;background:rgba(228,0,15,.08)}
+
+/* SOUS-NAVIGATION — Catégories */
+.subnav{
+  display:none;
+  flex-direction:column;
+  background:var(--bg3);
+  border-bottom:1px solid var(--border);
+  padding:12px 16px;
+  gap:10px;
+}
+.subnav.show{display:flex}
+.subnav-title{
+  font-family:'Rajdhani',sans-serif;
+  font-size:22px;font-weight:700;
+  text-align:center;
+}
+.subnav-desc{font-size:12px;color:var(--muted2);text-align:center}
+.subnav-cats{
+  display:flex;gap:8px;flex-wrap:nowrap;
+  overflow-x:auto;scrollbar-width:none;
+  justify-content:center;
+  padding:4px 0;
+}
+.subnav-cats::-webkit-scrollbar{display:none}
+.cat-btn{
+  background:var(--bg4);border:1px solid var(--border2);
+  color:var(--muted2);padding:6px 16px;border-radius:8px;
+  font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;
+  cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;
+}
+.cat-btn:hover,.cat-btn.active{
+  background:var(--bg2);border-color:var(--gold);color:var(--gold);
+}
+.subnav-types{
+  display:flex;gap:16px;justify-content:center;
+  flex-wrap:wrap;
+}
+.type-btn{
+  background:none;border:none;
+  color:var(--muted2);font-size:13px;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  padding:4px 8px;transition:all .2s;
+  border-bottom:2px solid transparent;
+}
+.type-btn:hover,.type-btn.active{
+  color:var(--text);border-bottom-color:var(--gold);
+}
+
+/* ═══════════════════════════════════════
+   SLIDER
+═══════════════════════════════════════ */
+.slider-wrap{position:relative;overflow:hidden;background:var(--bg2)}
+.slider-wrap{height:220px}
+@media(min-width:600px){.slider-wrap{height:320px}}
+@media(min-width:900px){.slider-wrap{height:420px}}
+.slider-track{display:flex;height:100%;transition:transform .5s ease}
+.slide{
+  min-width:100%;height:100%;
+  position:relative;
+  display:flex;align-items:flex-end;
+  padding:20px 16px;flex-shrink:0;overflow:hidden;
+}
+@media(min-width:600px){.slide{padding:32px 40px}}
+.slide-bg{
+  position:absolute;inset:0;
+  background-size:cover;background-position:center;
+  filter:brightness(.45);
+}
+.slide-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(0deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,.2) 60%,transparent 100%);
+}
+@media(min-width:600px){
+  .slide-overlay{background:linear-gradient(90deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,.1) 70%,transparent 100%)}
+}
+.slide-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.4)}
+.slide-content{position:relative;z-index:2;max-width:420px}
+.slide-plat{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;font-weight:700;letter-spacing:2px;
+  padding:3px 10px;border-radius:4px;
+  margin-bottom:8px;text-transform:uppercase;
+}
+.slide-title{
+  font-family:'Rajdhani',sans-serif;
+  font-size:22px;font-weight:700;line-height:1.15;
+  margin-bottom:6px;
+}
+@media(min-width:600px){.slide-title{font-size:34px}}
+.slide-desc{color:rgba(255,255,255,.65);font-size:12px;margin-bottom:12px;display:none}
+@media(min-width:600px){.slide-desc{display:block;font-size:14px}}
+.slide-row{display:flex;align-items:center;gap:12px}
+.slide-price{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;color:var(--gold)}
+@media(min-width:600px){.slide-price{font-size:32px}}
+.slide-btn{
+  background:var(--gold);border:none;color:#000;
+  padding:8px 18px;border-radius:8px;
+  font-size:13px;font-weight:700;
+  font-family:'Rajdhani',sans-serif;letter-spacing:.5px;
+  cursor:pointer;transition:opacity .2s;
+}
+.sdots{
+  position:absolute;bottom:12px;right:16px;
+  display:flex;gap:6px;z-index:10;
+}
+.sdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3);cursor:pointer;transition:all .2s}
+.sdot.active{background:var(--gold);width:18px;border-radius:3px}
+
+/* ═══════════════════════════════════════
+   SECTION TITRE
+═══════════════════════════════════════ */
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 16px 12px;
+}
+.section-head h2{
+  font-family:'Rajdhani',sans-serif;
+  font-size:18px;font-weight:700;letter-spacing:.5px;
+}
+.section-head span{font-size:12px;color:var(--muted2)}
+
+/* ═══════════════════════════════════════
+   GRILLE PRODUITS — 2 col mobile
+═══════════════════════════════════════ */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  padding:0 12px 24px;
+}
+@media(min-width:500px){.grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px 24px}}
+@media(min-width:700px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1200px){.grid{grid-template-columns:repeat(5,1fr)}}
+
+/* ═══════════════════════════════════════
+   CARD PRODUIT
+═══════════════════════════════════════ */
+.card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--rlg);overflow:hidden;cursor:pointer;
+  transition:transform .2s,border-color .2s,box-shadow .2s;
+  position:relative;
+}
+.card:active{transform:scale(.97)}
+@media(hover:hover){.card:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 8px 24px rgba(245,166,35,.12)}}
+.card-img{
+  width:100%;
+  aspect-ratio:16/9;
+  object-fit:cover;
+  display:block;
+}
+.card-img-fallback{
+  width:100%;aspect-ratio:16/9;
+  display:flex;align-items:center;justify-content:center;
+}
+.card-img-fallback.psn{background:linear-gradient(140deg,#001a50,#0057b8)}
+.card-img-fallback.xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
+.card-img-fallback.steam{background:linear-gradient(140deg,#0d1520,#2a475e)}
+.card-img-fallback.nin{background:linear-gradient(140deg,#8b0009,#e60012)}
+.card-img-fallback img{width:40%;height:40%;object-fit:contain;filter:brightness(0) invert(1);opacity:.9}
+.card-badges{
+  position:absolute;top:6px;left:6px;right:6px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  pointer-events:none;
+}
+.badge-plat{
+  font-size:9px;font-weight:700;letter-spacing:.5px;
+  padding:2px 7px;border-radius:4px;text-transform:uppercase;
+}
+.bp-psn{background:rgba(0,112,209,.4);color:#90c8ff;border:1px solid rgba(0,112,209,.5)}
+.bp-xbox{background:rgba(82,176,67,.4);color:#90e080;border:1px solid rgba(82,176,67,.5)}
+.bp-steam{background:rgba(102,192,244,.4);color:#c0eaff;border:1px solid rgba(102,192,244,.5)}
+.bp-nin{background:rgba(228,0,15,.4);color:#ffaaaa;border:1px solid rgba(228,0,15,.5)}
+.badge-pop{
+  background:var(--gold);color:#000;
+  font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:4px;
+}
+.card-body{padding:8px 10px 10px}
+.card-name{font-size:12px;font-weight:600;margin-bottom:2px;line-height:1.3}
+@media(min-width:500px){.card-name{font-size:13px}}
+.card-desc{font-size:11px;color:var(--muted);margin-bottom:8px}
+.card-foot{display:flex;align-items:center;justify-content:space-between}
+.card-price{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--gold);line-height:1}
+.card-price small{font-size:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:400}
+.add-btn{
+  background:var(--gold);border:none;color:#000;
+  width:28px;height:28px;border-radius:6px;
+  font-size:18px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
+}
+.add-btn:active{transform:scale(.9)}
+.add-btn:disabled{background:var(--bg4);color:var(--muted);cursor:not-allowed}
+
+/* ═══════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════ */
+.how{padding:20px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+.how h2{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;text-align:center;margin-bottom:16px}
+.how-steps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:600px){.how-steps{grid-template-columns:repeat(4,1fr)}}
+.how-step{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.how-step-icon{font-size:24px;margin-bottom:8px}
+.how-step h3{font-size:13px;font-weight:600;margin-bottom:4px}
+.how-step p{font-size:11px;color:var(--muted2);line-height:1.5}
+
+/* ═══════════════════════════════════════
+   CTA WHATSAPP
+═══════════════════════════════════════ */
+.cta{
+  padding:20px 16px;
+  display:flex;flex-direction:column;gap:12px;
+  align-items:center;text-align:center;
+}
+@media(min-width:600px){.cta{flex-direction:row;text-align:left;justify-content:space-between}}
+.cta h2{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700}
+.cta p{font-size:13px;color:var(--muted2);margin-top:4px}
+.cta-btns{display:flex;gap:10px;flex-shrink:0}
+.btn-wa{
+  background:#25d366;border:none;color:#fff;
+  padding:10px 20px;border-radius:10px;
+  font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;
+  cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+}
+
+/* ═══════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════ */
+footer{
+  border-top:1px solid var(--border);
+  padding:20px 16px;text-align:center;
+}
+.foot-logo{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+footer p{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ═══════════════════════════════════════
+   MODALE PRODUIT
+═══════════════════════════════════════ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;align-items:flex-end;justify-content:center;padding:0}
+@media(min-width:600px){.overlay{align-items:center;padding:20px}}
+.overlay.open{display:flex}
+.modal{
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:20px 20px 0 0;
+  width:100%;max-width:500px;
+  max-height:90vh;overflow-y:auto;
+  animation:slideUp .3s ease;
+}
+@media(min-width:600px){.modal{border-radius:18px;max-height:85vh}}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-top{position:relative;overflow:hidden}
+.modal-img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.modal-img-fb{
+  width:100%;aspect-ratio:16/9;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-img-fb.psn{background:linear-gradient(140deg,#001a50,#0057b8)}
+.modal-img-fb.xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
+.modal-img-fb.steam,.modal-img-fb.pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
+.modal-img-fb.nin{background:linear-gradient(140deg,#8b0009,#e60012)}
+.modal-img-fb img{width:30%;opacity:.9;filter:brightness(0) invert(1)}
+.modal-close{
+  position:absolute;top:12px;right:12px;
+  background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);
+  color:#fff;width:34px;height:34px;border-radius:50%;
+  font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;z-index:2;
+}
+.modal-body{padding:20px 20px 28px}
+.modal-plat{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.modal-title{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;margin-bottom:10px;line-height:1.2}
+.modal-desc{font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.7;max-height:120px;overflow-y:auto}
+.modal-price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.modal-price{font-family:'Rajdhani',sans-serif;font-size:38px;font-weight:700;color:var(--gold)}
+.modal-cur{font-size:15px;color:var(--muted)}
+.modal-pts{
+  background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);
+  border-radius:8px;padding:8px 12px;font-size:12px;color:var(--gold);
+  margin-bottom:16px;
+}
+.how-mini{background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:16px}
+.how-mini p{font-size:12px;color:var(--muted2);line-height:1.8}
+.how-mini strong{color:var(--text);font-size:12px}
+.modal-buy{
+  width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);
+  border:none;color:#000;padding:15px;border-radius:12px;
+  font-size:17px;font-weight:700;font-family:'Rajdhani',sans-serif;
+  letter-spacing:1px;cursor:pointer;transition:opacity .2s;
+}
+.modal-buy:hover{opacity:.9}
+.modal-buy:disabled{opacity:.4;cursor:not-allowed}
+
+/* ═══════════════════════════════════════
+   PANIER DRAWER (bottom sur mobile)
+═══════════════════════════════════════ */
+.drawer{
+  position:fixed;bottom:-100%;left:0;right:0;
+  max-height:85vh;
+  background:var(--bg2);border-top:1px solid var(--border);
+  border-radius:20px 20px 0 0;
+  z-index:600;transition:bottom .35s ease;
+  display:flex;flex-direction:column;
+}
+@media(min-width:600px){
+  .drawer{
+    top:0;bottom:auto;right:-420px;left:auto;
+    width:400px;height:100%;max-height:100vh;
+    border-radius:0;border-top:none;border-left:1px solid var(--border);
+    transition:right .3s ease;
+  }
+  .drawer.open{right:0;bottom:auto}
+}
+.drawer.open{bottom:0}
+.drawer-handle{
+  width:40px;height:4px;background:var(--border2);
+  border-radius:2px;margin:12px auto 0;flex-shrink:0;
+}
+@media(min-width:600px){.drawer-handle{display:none}}
+.drawer-head{
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.drawer-head h3{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700}
+.drawer-close{
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);width:30px;height:30px;border-radius:6px;
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.drawer-items{flex:1;overflow-y:auto;padding:12px 16px}
+.drawer-empty{text-align:center;padding:40px 0;color:var(--muted)}
+.drawer-empty .ei{font-size:40px;margin-bottom:10px}
+.cart-item{
+  display:flex;align-items:center;gap:10px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:10px;padding:10px;margin-bottom:8px;
+}
+.ci-thumb{
+  width:44px;height:44px;border-radius:8px;
+  object-fit:cover;flex-shrink:0;
+}
+.ci-thumb-fb{
+  width:44px;height:44px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.ci-thumb-fb.psn{background:var(--psn)}
+.ci-thumb-fb.xbox{background:var(--xbox)}
+.ci-thumb-fb.steam{background:var(--steam2)}
+.ci-thumb-fb.nin{background:var(--nin)}
+.ci-thumb-fb img{width:60%;filter:brightness(0) invert(1)}
+.ci-info{flex:1;min-width:0}
+.ci-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-price{font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;font-weight:700;margin-top:2px}
+.ci-rm{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0}
+.ci-rm:hover{color:#ff6b6b}
+.drawer-foot{padding:14px 16px;border-top:1px solid var(--border)}
+.promo-row{display:flex;gap:8px;margin-bottom:8px}
+.promo-in{
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);padding:8px 12px;border-radius:8px;
+  font-size:13px;font-family:'DM Sans',sans-serif;
+}
+.promo-in:focus{outline:none;border-color:var(--gold)}
+.promo-btn{
+  background:var(--bg4);border:1px solid var(--border2);
+  color:var(--text);padding:8px 12px;border-radius:8px;
+  font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;
+}
+.promo-msg{font-size:11px;margin-bottom:8px;min-height:14px}
+.promo-msg.ok{color:#52b043}.promo-msg.err{color:#ff6b6b}
+.pts-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.15);
+  border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;
+}
+.pts-val{color:var(--gold);font-weight:600}
+.pts-use{
+  background:none;border:1px solid rgba(245,166,35,.3);color:var(--gold);
+  padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+}
+.total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.total-lbl{font-size:13px;color:var(--muted2)}
+.total-amt{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold)}
+.pay-btn{
+  width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);
+  border:none;color:#000;padding:14px;border-radius:12px;
+  font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;
+  letter-spacing:1px;cursor:pointer;transition:opacity .2s;
+}
+.pay-btn:hover{opacity:.9}
+.pay-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ═══════════════════════════════════════
+   AUTH MODAL
+═══════════════════════════════════════ */
+.auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:700;align-items:flex-end;justify-content:center;padding:0}
+@media(min-width:600px){.auth-overlay{align-items:center;padding:20px}}
+.auth-overlay.open{display:flex}
+.auth-modal{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:20px 20px 0 0;width:100%;max-width:420px;
+  padding:24px;max-height:92vh;overflow-y:auto;
+  position:relative;animation:slideUp .3s ease;
+}
+@media(min-width:600px){.auth-modal{border-radius:18px}}
+.auth-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px}
+@media(min-width:600px){.auth-handle{display:none}}
+.auth-modal h2{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;text-align:center;margin-bottom:4px}
+.auth-modal p{font-size:13px;color:var(--muted2);text-align:center;margin-bottom:20px}
+.auth-tabs{display:flex;background:var(--bg3);border-radius:10px;padding:4px;margin-bottom:18px}
+.auth-tab{flex:1;background:none;border:none;color:var(--muted2);padding:8px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
+.auth-tab.active{background:var(--bg4);color:var(--text)}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:11px;color:var(--muted2);margin-bottom:5px;font-weight:500}
+.fg input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);padding:10px 12px;border-radius:8px;
+  font-size:14px;font-family:'DM Sans',sans-serif;
+}
+.fg input:focus{outline:none;border-color:var(--gold)}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-auth{
+  width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);
+  border:none;color:#000;padding:13px;border-radius:12px;
+  font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;
+  letter-spacing:1px;cursor:pointer;margin-top:6px;
+}
+.auth-err{font-size:12px;color:#ff6b6b;text-align:center;margin-top:8px;min-height:16px}
+.auth-x{
+  position:absolute;top:16px;right:16px;
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);width:28px;height:28px;border-radius:50%;
+  font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+
+/* ═══════════════════════════════════════
+   USER MENU DROPDOWN
+═══════════════════════════════════════ */
+.user-menu{position:relative}
+.user-dropdown{
+  display:none;position:absolute;top:calc(100%+8px);right:0;
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:12px;min-width:180px;overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200;
+}
+.user-dropdown.open{display:block}
+.ud-item{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;font-size:13px;color:var(--text);
+  text-decoration:none;cursor:pointer;background:none;border:none;
+  width:100%;font-family:'DM Sans',sans-serif;transition:background .2s;
+}
+.ud-item:hover{background:var(--bg3)}
+.ud-item.red{color:#ff6b6b}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+.toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--bg3);border:1px solid var(--gold);
+  color:var(--text);padding:10px 20px;border-radius:10px;
+  font-size:13px;font-weight:500;z-index:999;
+  transition:transform .3s ease;white-space:nowrap;pointer-events:none;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{border-color:#ff6b6b}
+.toast.ok{border-color:#52b043}
+.loader{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a class="logo" href="#">BabiPlay<small>GAMING CI</small></a>
+  <div class="nav-right">
+    <div id="nav-auth-btns" style="display:flex;gap:6px">
+      <button class="nav-auth-btn" style="background:none;border:1px solid var(--border2);color:var(--text)" onclick="openAuth('login')">Connexion</button>
+      <button class="nav-auth-btn" onclick="openAuth('register')">S'inscrire</button>
+    </div>
+    <div id="nav-user-menu" class="user-menu" style="display:none">
+      <button class="nav-icon-btn" onclick="toggleUserMenu()" title="Mon compte">👤</button>
+      <div class="user-dropdown" id="user-dropdown">
+        <a href="compte.html" class="ud-item">📦 Mes commandes</a>
+        <a href="compte.html" class="ud-item">⭐ Mes points</a>
+        <button class="ud-item red" onclick="logout()">🚪 Déconnexion</button>
+      </div>
+    </div>
+    <button class="nav-icon-btn" onclick="toggleDrawer()" title="Panier">
+      🛒
+      <span class="nav-cart-badge" id="cart-badge">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ FILTRES PLATEFORMES ═══ -->
+<div class="filter-bar">
+  <button class="fchip active-all" onclick="filterPlat('all',this)">🎮 Toutes</button>
+  <button class="fchip" onclick="filterPlat('pc',this)">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png" alt="PC"> PC
+  </button>
+  <button class="fchip" onclick="filterPlat('psn',this)">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Playstation_logo_colour.svg/120px-Playstation_logo_colour.svg.png" alt="PSN"> PlayStation
+  </button>
+  <button class="fchip" onclick="filterPlat('xbox',this)">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/120px-Xbox_one_logo.svg.png" alt="Xbox"> Xbox
+  </button>
+  <button class="fchip" onclick="filterPlat('nintendo',this)">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
+  </button>
+</div>
+
+<!-- ═══ SOUS-NAVIGATION ═══ -->
+<div class="subnav" id="subnav">
+  <div class="subnav-title" id="subnav-title"></div>
+  <div class="subnav-desc" id="subnav-desc"></div>
+  <div class="subnav-cats" id="subnav-cats"></div>
+  <div class="subnav-types" id="subnav-types"></div>
+</div>
+
+<!-- ═══ SLIDER ═══ -->
+<div class="slider-wrap">
+  <div class="slider-track" id="slider-track"></div>
+  <div class="sdots" id="sdots"></div>
+</div>
+
+<!-- ═══ CATALOGUE ═══ -->
+<div class="section-head">
+  <h2 id="cat-title">🎮 Tous les produits</h2>
+  <span id="cat-count"></span>
+</div>
+<div class="grid" id="product-grid"><div class="loader">Chargement...</div></div>
+
+<!-- ═══ HOW ═══ -->
+<div class="how">
+  <h2>Comment ça marche ?</h2>
+  <div class="how-steps">
+    <div class="how-step"><div class="how-step-icon">🛒</div><h3>Choisissez</h3><p>Sélectionnez votre carte gaming</p></div>
+    <div class="how-step"><div class="how-step-icon">💳</div><h3>Payez</h3><p>Orange Money, MTN ou Moov</p></div>
+    <div class="how-step"><div class="how-step-icon">📧</div><h3>Recevez</h3><p>Code par email instantanément</p></div>
+    <div class="how-step"><div class="how-step-icon">🎮</div><h3>Jouez !</h3><p>Entrez le code et profitez</p></div>
+  </div>
+</div>
+
+<!-- ═══ CTA ═══ -->
+<div class="cta">
+  <div><h2>Une question ?</h2><p>Disponible 7j/7 · Abidjan, Côte d'Ivoire</p></div>
+  <div class="cta-btns">
+    <a class="btn-wa" href="https://wa.me/2250000000000" target="_blank">💬 WhatsApp</a>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="foot-logo">BabiPlay CI</div>
+  <p>Paiement sécurisé · PayDunya · Orange Money · MTN · Moov · Wave</p>
+  <p style="margin-top:4px">© 2026 BabiPlay CI — Abidjan, Côte d'Ivoire</p>
+</footer>
+
+<!-- ═══ MODALE PRODUIT ═══ -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-top">
+      <div id="m-img-wrap"></div>
+      <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-plat" id="m-plat"></div>
+      <div class="modal-title" id="m-title"></div>
+      <div class="modal-desc" id="m-desc"></div>
+      <div class="modal-price-row">
+        <div class="modal-price" id="m-price"></div>
+        <div class="modal-cur">FCFA</div>
+      </div>
+      <div class="modal-pts" id="m-pts"></div>
+      <div class="how-mini">
+        <strong>Comment recevoir votre code :</strong>
+        <p>① Ajoutez au panier<br>② Payez par Mobile Money<br>③ Code reçu par email en quelques minutes<br>④ Entrez le code et jouez !</p>
+      </div>
+      <button class="modal-buy" id="m-buy">⚡ AJOUTER AU PANIER</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PANIER ═══ -->
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-head">
+    <h3>🛒 Mon Panier</h3>
+    <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="drawer-items" id="drawer-items">
+    <div class="drawer-empty"><div class="ei">🛒</div><p>Votre panier est vide</p></div>
+  </div>
+  <div class="drawer-foot">
+    <div class="promo-row">
+      <input class="promo-in" id="promo-in" placeholder="Code promo" type="text">
+      <button class="promo-btn" onclick="applyPromo()">OK</button>
+    </div>
+    <div class="promo-msg" id="promo-msg"></div>
+    <div class="pts-row" id="pts-row" style="display:none">
+      <span>Points : <span class="pts-val" id="pts-display">0</span> pts</span>
+      <button class="pts-use" id="pts-use-btn" onclick="togglePoints()">Utiliser</button>
+    </div>
+    <div class="total-row">
+      <span class="total-lbl">Total</span>
+      <span class="total-amt" id="cart-total">0 FCFA</span>
+    </div>
+    <button class="pay-btn" id="pay-btn" disabled onclick="checkout()">💳 PAYER MAINTENANT</button>
+  </div>
+</div>
+
+<!-- ═══ AUTH ═══ -->
+<div class="auth-overlay" id="auth-overlay" onclick="closeAuthOverlay(event)">
+  <div class="auth-modal">
+    <div class="auth-handle"></div>
+    <button class="auth-x" onclick="document.getElementById('auth-overlay').classList.remove('open')">✕</button>
+    <h2>BabiPlay</h2>
+
+    <!-- ÉTAPE 1 : Onglets + formulaire -->
+    <div id="auth-step1">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Connexion</button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">S'inscrire</button>
+      </div>
+
+      <!-- CONNEXION : Email + Mot de passe -->
+      <div id="form-login">
+        <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com"></div>
+        <div class="fg"><label>Mot de passe</label><input type="password" id="login-pw" placeholder="••••••••"></div>
+        <button class="btn-auth" onclick="loginStep1()">Se connecter →</button>
+        <p style="text-align:center;margin-top:10px"><button onclick="showForgotPassword()" style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer">Mot de passe oublié ?</button></p>
+      </div>
+
+      <!-- INSCRIPTION -->
+      <div id="form-register" style="display:none">
+        <div class="fg-row">
+          <div class="fg"><label>Prénom</label><input type="text" id="reg-prenom" placeholder="Kouamé"></div>
+          <div class="fg"><label>Nom</label><input type="text" id="reg-nom" placeholder="Koffi"></div>
+        </div>
+        <div class="fg"><label>Email</label><input type="email" id="reg-email" placeholder="votre@email.com"></div>
+        <div class="fg"><label>WhatsApp</label><input type="tel" id="reg-tel" placeholder="+225 07 00 00 00 00"></div>
+        <div class="fg"><label>Mot de passe</label><input type="password" id="reg-pw" placeholder="••••••••  (6 caractères min)"></div>
+        <!-- Choix réception code -->
+        <div style="margin-bottom:14px">
+          <label style="font-size:12px;color:var(--muted2);margin-bottom:6px;display:block">Recevoir le code de vérification par :</label>
+          <div style="display:flex;gap:8px">
+            <button id="reg-method-email-btn" onclick="setRegMethod('email')" style="flex:1;padding:8px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:12px;cursor:pointer">📧 Email</button>
+            <button id="reg-method-wa-btn" onclick="setRegMethod('whatsapp')" style="flex:1;padding:8px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:12px;cursor:pointer">💬 WhatsApp</button>
+          </div>
+        </div>
+        <button class="btn-auth" onclick="sendRegisterOTP()">Créer mon compte →</button>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 1.5 : Choix méthode OTP après login -->
+    <div id="auth-step-method" style="display:none">
+      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Vérification en 2 étapes<br>Comment recevoir votre code ?</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="method-email-btn" onclick="setMethod('email')" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer">📧 Email</button>
+        <button id="method-wa-btn" onclick="setMethod('whatsapp')" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:14px;cursor:pointer">💬 WhatsApp</button>
+      </div>
+      <button class="btn-auth" onclick="sendLoginOTP()">Envoyer le code →</button>
+      <p style="text-align:center;margin-top:10px"><button onclick="backToStep1()" style="background:none;border:none;color:var(--muted2);font-size:12px;cursor:pointer">← Retour</button></p>
+    </div>
+
+    <!-- ÉTAPE 2 : Saisie du code OTP -->
+    <div id="auth-step2" style="display:none">
+      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:6px" id="otp-sent-msg">Code envoyé !</p>
+      <div class="fg"><label style="text-align:center;display:block;margin-bottom:10px">Entrez le code à 6 chiffres</label>
+        <input type="number" id="otp-input" placeholder="000000" style="text-align:center;font-size:28px;font-weight:700;letter-spacing:8px" maxlength="6">
+      </div>
+      <button class="btn-auth" onclick="verifyOTP()">Vérifier →</button>
+      <p style="text-align:center;margin-top:10px"><button onclick="backToStep1()" style="background:none;border:none;color:var(--muted2);font-size:12px;cursor:pointer">← Retour</button>
+      <button onclick="resendOTP()" style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;margin-left:16px">Renvoyer le code</button></p>
+    </div>
+
+    <!-- MOT DE PASSE OUBLIÉ -->
+    <div id="auth-forgot" style="display:none">
+      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Réinitialiser votre mot de passe</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="forgot-email-btn" onclick="setForgotMethod('email')" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:13px;cursor:pointer">📧 Email</button>
+        <button id="forgot-wa-btn" onclick="setForgotMethod('whatsapp')" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:13px;cursor:pointer">💬 WhatsApp</button>
+      </div>
+      <div class="fg" id="forgot-email-field"><label>Email</label><input type="email" id="forgot-email" placeholder="votre@email.com"></div>
+      <div class="fg" id="forgot-wa-field" style="display:none"><label>WhatsApp</label><input type="tel" id="forgot-wa" placeholder="+225 07 00 00 00 00"></div>
+      <button class="btn-auth" onclick="sendForgotOTP()">Envoyer le code →</button>
+      <p style="text-align:center;margin-top:10px"><button onclick="backToStep1()" style="background:none;border:none;color:var(--muted2);font-size:12px;cursor:pointer">← Retour</button></p>
+    </div>
+
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let sb;
+(async()=>{
+  const r=await fetch('/.netlify/functions/get-config');
+  const c=await r.json();
+  sb=supabase.createClient(c.surl,c.skey);
+  init();
+})();
+
+// PayDunya — MODE PRODUCTION
+const PD_MASTER=''; // Géré par la fonction Netlify
+const PD_TOKEN='';
+const PD_PUB='';
+const PD_PRIV=''; // Géré par la fonction Netlify
+
+let products=[],cart=[],currentUser=null,userProfile=null;
+let promoApplied=null,usePoints=false;
+let sliderProds=[],sliderIdx=0,sliderTimer=null;
+
+// ── UTILS ──
+const pClass=p=>({psn:'psn',xbox:'xbox',steam:'pc',pc:'pc',nintendo:'nin'}[p]||'psn');
+const pLabel=p=>({psn:'PSN',xbox:'Xbox',steam:'Steam',pc:'PC',nintendo:'Nintendo'}[p]||'');
+const pBadge=p=>({psn:'bp-psn',xbox:'bp-xbox',steam:'bp-steam',pc:'bp-steam',nintendo:'bp-nin'}[p]||'bp-psn');
+const pLogo=p=>({
+  psn:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Playstation_logo_colour.svg/120px-Playstation_logo_colour.svg.png',
+  xbox:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/120px-Xbox_one_logo.svg.png',
+  steam:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png',
+  pc:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png',
+  nintendo:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png'
+}[p]||'');
+const fmt=n=>(n||0).toLocaleString('fr-FR');
+
+// ── INIT ──
+async function init(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){currentUser=session.user;await loadProfile();}
+  updateNavAuth();
+  await loadProducts();
+  sb.auth.onAuthStateChange(async(e,s)=>{
+    currentUser=s?s.user:null;
+    if(currentUser)await loadProfile();else userProfile=null;
+    updateNavAuth();updateCartUI();
+  });
+}
+
+// ── PRODUITS ──
+async function loadProducts(){
+  const{data,error}=await sb.from('products').select('*').eq('est_actif',true).order('created_at');
+  if(error){document.getElementById('product-grid').innerHTML='<div class="loader">Erreur de chargement</div>';return;}
+  products=data||[];
+  renderProducts('all','','');
+  renderSlider();
+}
+
+function renderProducts(plat,cat,type){
+  let list=products;
+  if(plat&&plat!=='all')list=list.filter(p=>p.plateforme===plat);
+  if(cat)list=list.filter(p=>(p.categorie||'').toLowerCase()===cat.toLowerCase());
+  if(type)list=list.filter(p=>(p.sous_categorie||'').toLowerCase()===type.toLowerCase());
+  const titles={all:'🎮 Tous les produits',pc:'💻 PC',psn:'🎮 PlayStation',xbox:'🕹️ Xbox',nintendo:'🔴 Nintendo'};
+  let title=titles[plat]||'Produits';
+  if(cat)title+=` — ${cat}`;
+  if(type)title+=` · ${type}`;
+  document.getElementById('cat-title').textContent=title;
+  document.getElementById('cat-count').textContent=list.length+' article'+(list.length>1?'s':'');
+  const g=document.getElementById('product-grid');
+  if(!list.length){g.innerHTML='<div class="loader">Aucun produit dans cette catégorie</div>';return;}
+  g.innerHTML=list.map(p=>{
+    const cls=pClass(p.plateforme);
+    const logo=pLogo(p.plateforme);
+    const imgHtml=p.image_url
+      ?`<img class="card-img" src="${p.image_url}" alt="${p.nom}" onerror="this.parentElement.innerHTML=fallbackImg('${cls}','${logo}')">`
+      :`<div class="card-img-fallback ${cls}"><img src="${logo}" alt="${p.plateforme}"></div>`;
+    return `<div class="card" onclick="openModal('${p.id}')">
+      <div style="position:relative">
+        ${imgHtml}
+        <div class="card-badges">
+          <span class="badge-plat ${pBadge(p.plateforme)}">${p.categorie||pLabel(p.plateforme)}</span>
+          ${p.est_populaire?'<span class="badge-pop">⭐</span>':''}
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${p.nom}</div>
+        <div class="card-foot">
+          <div><div class="card-price">${fmt(p.prix)}<br><small>FCFA</small></div></div>
+          <button class="add-btn" onclick="event.stopPropagation();addToCart('${p.id}')" ${p.stock<=0?'disabled':''}>+</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fallbackImg(cls,logo){
+  return`<div class="card-img-fallback ${cls}"><img src="${logo}"></div>`;
+}
+
+// ── CONFIG PLATEFORMES ──
+const PLATCONFIG={
+  pc:{label:'PC',desc:'Steam, EA App, Epic Games et plus',color:'#66c0f4',
+    cats:['Steam','EA App','Epic Games','Battle.net','Ubisoft Connect','Microsoft Store'],
+    types:['Cartes cadeaux','Abonnements']},
+  psn:{label:'PlayStation',desc:'PS4 et PS5 — Cartes et abonnements',color:'#5baeff',
+    cats:['PS4','PS5'],types:['Cartes cadeaux','Abonnements']},
+  xbox:{label:'Xbox',desc:'Xbox One et Xbox Series X|S',color:'#7dd670',
+    cats:['Xbox One','Xbox Series X|S'],types:['Cartes cadeaux','Abonnements','Game Pass']},
+  nintendo:{label:'Nintendo',desc:'Nintendo Switch et Switch 2',color:'#ff6b6b',
+    cats:['Switch','Switch 2'],types:['Cartes cadeaux','Abonnements']}
+};
+
+let currentPlat='all',currentCat='',currentType='';
+
+function filterPlat(plat,btn){
+  currentPlat=plat;currentCat='';currentType='';
+  document.querySelectorAll('.fchip').forEach(b=>b.className='fchip');
+  if(btn)btn.className=`fchip active-${plat}`;
+  const subnav=document.getElementById('subnav');
+  if(plat==='all'){subnav.classList.remove('show');renderProducts('all','','');return;}
+  const cfg=PLATCONFIG[plat];
+  if(!cfg){subnav.classList.remove('show');renderProducts(plat,'','');return;}
+  subnav.classList.add('show');
+  document.getElementById('subnav-title').textContent=cfg.label;
+  document.getElementById('subnav-desc').textContent=cfg.desc;
+  document.getElementById('subnav-cats').innerHTML=
+    cfg.cats.map(c=>`<button class="cat-btn" onclick="filterCat('${c}',this)">${c}</button>`).join('');
+  document.getElementById('subnav-types').innerHTML=
+    cfg.types.map(t=>`<button class="type-btn" onclick="filterType('${t}',this)">${t}</button>`).join('');
+  renderProducts(plat,'','');
+}
+
+function filterCat(cat,btn){
+  currentCat=cat;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderProducts(currentPlat,cat,currentType);
+}
+
+function filterType(type,btn){
+  currentType=type;
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderProducts(currentPlat,currentCat,type);
+}
+
+function filterP(f,btn){filterPlat(f,btn);}
+
+// ── SLIDER ──
+function renderSlider(){
+  sliderProds=products.filter(p=>p.est_slider).sort((a,b)=>a.slider_ordre-b.slider_ordre);
+  if(!sliderProds.length)sliderProds=products.slice(0,4);
+  if(!sliderProds.length)return;
+  const track=document.getElementById('slider-track');
+  const dots=document.getElementById('sdots');
+  const colors={psn:'#5baeff',xbox:'#7dd670',steam:'#66c0f4',nintendo:'#ff6b6b'};
+  const bgs={psn:'#001a50',xbox:'#0a3d0a',steam:'#0d1520',nintendo:'#700008'};
+  track.innerHTML=sliderProds.map(p=>{
+    const color=colors[p.plateforme]||'var(--gold)';
+    const logo=pLogo(p.plateforme);
+    let media=p.video_url
+      ?`<video class="slide-video" autoplay muted loop playsinline src="${p.video_url}"></video>`
+      :p.image_url
+        ?`<div class="slide-bg" style="background-image:url('${p.image_url}')"></div>`
+        :`<div class="slide-bg" style="background:linear-gradient(140deg,#0d0d0f,${bgs[p.plateforme]||'#111'})"></div>`;
+    return `<div class="slide">
+      ${media}
+      <div class="slide-overlay"></div>
+      <div class="slide-content">
+        <span class="slide-plat" style="background:rgba(0,0,0,.4);border:1px solid ${color};color:${color}">
+          <img src="${logo}" style="width:14px;height:14px;object-fit:contain;filter:brightness(0) invert(1)"> ${pLabel(p.plateforme)}
+        </span>
+        <div class="slide-title">${p.nom}</div>
+        <div class="slide-desc">${p.description||''}</div>
+        <div class="slide-row">
+          <div class="slide-price">${fmt(p.prix)} <span style="font-size:14px;color:rgba(255,255,255,.6)">FCFA</span></div>
+          <button class="slide-btn" onclick="openModal('${p.id}')">Acheter →</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  dots.innerHTML=sliderProds.map((_,i)=>`<div class="sdot ${i===0?'active':''}" onclick="goSlide(${i})"></div>`).join('');
+  startSlider();
+}
+
+function goSlide(n){
+  sliderIdx=n;
+  document.getElementById('slider-track').style.transform=`translateX(-${n*100}%)`;
+  document.querySelectorAll('.sdot').forEach((d,i)=>d.classList.toggle('active',i===n));
+}
+function nextSlide(){goSlide((sliderIdx+1)%Math.max(sliderProds.length,1));}
+function startSlider(){clearInterval(sliderTimer);sliderTimer=setInterval(nextSlide,4500);}
+
+// ── MODALE ──
+function openModal(id){
+  const p=products.find(x=>x.id===id);if(!p)return;
+  const cls=pClass(p.plateforme);
+  const logo=pLogo(p.plateforme);
+  const wrap=document.getElementById('m-img-wrap');
+  if(p.image_url){
+    wrap.innerHTML=`<img class="modal-img" src="${p.image_url}" alt="${p.nom}" onerror="this.parentElement.innerHTML='<div class=modal-img-fb ${cls}><img src=${logo} style=width:30%;filter:brightness(0) invert(1)></div>'">`;
+  }else{
+    wrap.innerHTML=`<div class="modal-img-fb ${cls}"><img src="${logo}" style="width:30%;filter:brightness(0) invert(1)"></div>`;
+  }
+  document.getElementById('m-plat').textContent=pLabel(p.plateforme);
+  document.getElementById('m-title').textContent=p.nom;
+  document.getElementById('m-desc').textContent=p.description||'';
+  document.getElementById('m-price').textContent=fmt(p.prix);
+  const pts=10;
+  document.getElementById('m-pts').textContent=`⭐ Vous gagnerez 10 points avec cet achat (${Math.floor((userProfile?.points||0)/10)+1}/10 achats)`;
+  const btn=document.getElementById('m-buy');
+  btn.disabled=p.stock<=0;
+  btn.textContent=p.stock<=0?'❌ Rupture de stock':'⚡ AJOUTER AU PANIER';
+  btn.onclick=()=>{addToCart(id);closeModalBtn();};
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(e){if(e.target===document.getElementById('overlay'))closeModalBtn();}
+function closeModalBtn(){document.getElementById('overlay').classList.remove('open');document.body.style.overflow='';}
+
+// ── PANIER ──
+function addToCart(id){
+  const p=products.find(x=>x.id===id);if(!p||p.stock<=0)return;
+  if(cart.find(c=>c.id===id)){showToast('⚠️ Déjà dans le panier');return;}
+  cart.push({...p});updateCartUI();showToast('✅ '+p.nom+' ajouté !');
+}
+function removeFromCart(id){
+  cart=cart.filter(c=>c.id!==id);
+  promoApplied=null;usePoints=false;
+  document.getElementById('promo-msg').textContent='';
+  document.getElementById('promo-in').value='';
+  updateCartUI();
+}
+function updateCartUI(){
+  const count=cart.length;
+  const badge=document.getElementById('cart-badge');
+  if(count>0){badge.textContent=count;badge.classList.add('show');}
+  else{badge.classList.remove('show');}
+  const el=document.getElementById('drawer-items');
+  if(!count){
+    el.innerHTML='<div class="drawer-empty"><div class="ei">🛒</div><p>Votre panier est vide</p></div>';
+    document.getElementById('pay-btn').disabled=true;
+    document.getElementById('cart-total').textContent='0 FCFA';return;
+  }
+  el.innerHTML=cart.map(c=>{
+    const cls=pClass(c.plateforme);
+    const logo=pLogo(c.plateforme);
+    const thumb=c.image_url
+      ?`<img class="ci-thumb" src="${c.image_url}" alt="${c.nom}">`
+      :`<div class="ci-thumb-fb ${cls}"><img src="${logo}"></div>`;
+    return`<div class="cart-item">
+      ${thumb}
+      <div class="ci-info">
+        <div class="ci-name">${c.nom}</div>
+        <div class="ci-price">${fmt(c.prix)} FCFA</div>
+      </div>
+      <button class="ci-rm" onclick="removeFromCart('${c.id}')">✕</button>
+    </div>`;
+  }).join('');
+  let total=cart.reduce((s,c)=>s+c.prix,0);
+  if(promoApplied){
+    total=promoApplied.reduction_pct>0
+      ?Math.round(total*(1-promoApplied.reduction_pct/100))
+      :Math.max(0,total-promoApplied.reduction_fcfa);
+  }
+  if(usePoints&&userProfile&&userProfile.points>=100){
+    total=Math.max(0,total-(userProfile.points>=500?3000:500));
+  }
+  document.getElementById('cart-total').textContent=fmt(total)+' FCFA';
+  document.getElementById('pay-btn').disabled=false;
+  if(userProfile){
+    document.getElementById('pts-row').style.display='flex';
+    document.getElementById('pts-display').textContent=userProfile.points||0;
+    document.getElementById('pts-use-btn').textContent=usePoints?'Annuler':'Utiliser';
+  }
+}
+async function applyPromo(){
+  const code=document.getElementById('promo-in').value.trim().toUpperCase();
+  const msg=document.getElementById('promo-msg');
+  if(!code)return;
+  const{data,error}=await sb.from('promo_codes').select('*').eq('code',code).eq('est_actif',true).single();
+  if(error||!data){msg.textContent='❌ Code invalide';msg.className='promo-msg err';return;}
+  promoApplied=data;
+  msg.textContent='✅ Code appliqué : '+(data.reduction_pct>0?`-${data.reduction_pct}%`:`-${fmt(data.reduction_fcfa)} FCFA`);
+  msg.className='promo-msg ok';updateCartUI();
+}
+function togglePoints(){usePoints=!usePoints;updateCartUI();}
+function toggleDrawer(){
+  const d=document.getElementById('drawer');
+  d.classList.toggle('open');
+  document.body.style.overflow=d.classList.contains('open')?'hidden':'';
+}
+
+// ── PAIEMENT PAYDUNYA ──
+async function checkout(){
+  if(!currentUser){openAuth('login');showToast('⚠️ Connectez-vous pour payer');return;}
+  if(!cart.length)return;
+  const btn=document.getElementById('pay-btn');
+  btn.disabled=true;btn.textContent='⏳ Redirection...';
+  let total=cart.reduce((s,c)=>s+c.prix,0);
+  if(promoApplied){
+    total=promoApplied.reduction_pct>0
+      ?Math.round(total*(1-promoApplied.reduction_pct/100))
+      :Math.max(0,total-promoApplied.reduction_fcfa);
+  }
+  if(usePoints&&userProfile&&userProfile.points>=100){
+    total=Math.max(0,total-(userProfile.points>=500?3000:500));
+  }
+  const produit=cart[0];
+  const pts=10; // 10 points fixes par achat
+  try{
+    const{data:order,error}=await sb.from('orders').insert({
+      user_id:currentUser.id,
+      product_id:produit.id,
+      nom_produit:produit.nom,
+      plateforme:produit.plateforme,
+      prix_paye:total,
+      points_gagnes:pts,
+      statut:'en_attente',
+      promo_code:promoApplied?promoApplied.code:null
+    }).select().single();
+    if(error){showToast('Erreur: '+error.message,'err');btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';return;}
+    const pdBody={
+        invoice:{total_amount:total,description:produit.nom},
+        store:{name:'BabiPlay CI',tagline:'Cartes gaming en FCFA',postal_address:'Abidjan CI',phone_number:'0700000000',logo_url:'https://babiplay.store',website_url:'https://babiplay.store'},
+        actions:{
+          cancel_url:'https://babiplay.store',
+          return_url:'https://babiplay.store/compte.html',
+          callback_url:'https://babiplay.store'
+        },
+        customer:{name:userProfile?`${userProfile.prenom||''} ${userProfile.nom||''}`.trim():currentUser.email,email:currentUser.email},
+        custom_data:{order_id:order.id}
+      };
+    const res=await fetch('/.netlify/functions/paydunya',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(pdBody)
+    });
+    const rawText=await res.text();
+    let data;
+    try{data=JSON.parse(rawText);}catch(e){showToast('Réponse invalide: '+rawText.substring(0,100),'err');btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';return;}
+    console.log('PayDunya response:',data);
+    if(data.response_code==='00'){
+      const url=data.invoice_url||data.response_text;
+      if(url&&url.startsWith('http')){
+        await sb.from('orders').update({transaction_id:data.token||''}).eq('id',order.id);
+        window.location.href=url;
+      }else{
+        showToast('Erreur: '+(data.response_text||JSON.stringify(data)),'err');
+        btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';
+      }
+    }else{
+      showToast('Erreur: '+(data.response_text||data.description||JSON.stringify(data)),'err');
+      btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';
+    }
+  }catch(e){
+    showToast('Erreur connexion','err');
+    btn.disabled=false;btn.textContent='💳 PAYER MAINTENANT';
+  }
+}
+
+// ── AUTH ──
+function openAuth(tab){
+  document.getElementById('auth-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  switchTab(tab);
+}
+function closeAuthOverlay(e){
+  if(e.target===document.getElementById('auth-overlay')){
+    document.getElementById('auth-overlay').classList.remove('open');
+    document.body.style.overflow='';
+  }
+}
+function switchTab(tab){
+  document.getElementById('form-login').style.display=tab==='login'?'block':'none';
+  document.getElementById('form-register').style.display=tab==='register'?'block':'none';
+  document.getElementById('tab-login').classList.toggle('active',tab==='login');
+  document.getElementById('tab-register').classList.toggle('active',tab==='register');
+  document.getElementById('auth-err').textContent='';
+}
+/* ══════════════════════════════════
+   SYSTÈME OTP - Code PIN
+══════════════════════════════════ */
+let otpMethod='email'; // 'email' ou 'whatsapp'
+let otpRegMethod='email';
+let otpForgotMethod='email';
+let otpContext='login'; // 'login', 'register', 'forgot'
+let otpIdentifier='';
+let otpRegData={};
+
+function setMethod(m){
+  otpMethod=m;
+  document.getElementById('method-email-btn').style.background=m==='email'?'var(--gold)':'none';
+  document.getElementById('method-email-btn').style.color=m==='email'?'#000':'var(--text)';
+  document.getElementById('method-email-btn').style.borderColor=m==='email'?'var(--gold)':'var(--border2)';
+  document.getElementById('method-wa-btn').style.background=m==='whatsapp'?'#25D366':'none';
+  document.getElementById('method-wa-btn').style.color=m==='whatsapp'?'#fff':'var(--text)';
+  document.getElementById('method-wa-btn').style.borderColor=m==='whatsapp'?'#25D366':'var(--border2)';
+  document.getElementById('login-email-field').style.display=m==='email'?'block':'none';
+  document.getElementById('login-wa-field').style.display=m==='whatsapp'?'block':'none';
+}
+function setRegMethod(m){
+  otpRegMethod=m;
+  document.getElementById('reg-method-email-btn').style.background=m==='email'?'var(--gold)':'none';
+  document.getElementById('reg-method-email-btn').style.color=m==='email'?'#000':'var(--text)';
+  document.getElementById('reg-method-email-btn').style.borderColor=m==='email'?'var(--gold)':'var(--border2)';
+  document.getElementById('reg-method-wa-btn').style.background=m==='whatsapp'?'#25D366':'none';
+  document.getElementById('reg-method-wa-btn').style.color=m==='whatsapp'?'#fff':'var(--text)';
+  document.getElementById('reg-method-wa-btn').style.borderColor=m==='whatsapp'?'#25D366':'var(--border2)';
+}
+function setForgotMethod(m){
+  otpForgotMethod=m;
+  document.getElementById('forgot-email-btn').style.background=m==='email'?'var(--gold)':'none';
+  document.getElementById('forgot-email-btn').style.color=m==='email'?'#000':'var(--text)';
+  document.getElementById('forgot-email-btn').style.borderColor=m==='email'?'var(--gold)':'var(--border2)';
+  document.getElementById('forgot-wa-btn').style.background=m==='whatsapp'?'#25D366':'none';
+  document.getElementById('forgot-wa-btn').style.color=m==='whatsapp'?'#fff':'var(--text)';
+  document.getElementById('forgot-wa-btn').style.borderColor=m==='whatsapp'?'#25D366':'var(--border2)';
+  document.getElementById('forgot-email-field').style.display=m==='email'?'block':'none';
+  document.getElementById('forgot-wa-field').style.display=m==='whatsapp'?'block':'none';
+}
+
+async function sendOTP(identifier, method, type, name=''){
+  const res = await fetch('/.netlify/functions/send-otp', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      type, name,
+      email: method==='email' ? identifier : null,
+      phone: method==='whatsapp' ? identifier : null
+    })
+  });
+  return res.ok;
+}
+
+// ÉTAPE 1 : Vérifier email + mot de passe
+async function loginStep1(){
+  const err=document.getElementById('auth-err');
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  if(!email||!pw){err.textContent='Remplissez tous les champs';return;}
+  err.textContent='Vérification...';
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error){err.textContent='Email ou mot de passe incorrect';return;}
+  // Mot de passe OK → passer à l'étape OTP
+  err.textContent='';
+  otpContext='login'; otpIdentifier=email;
+  // Récupérer numéro WhatsApp du profil
+  const{data:prof}=await sb.from('profiles').select('telephone').eq('email',email).single();
+  if(prof&&prof.telephone) document.getElementById('method-wa-btn').textContent='💬 '+prof.telephone;
+  showStepMethod();
+}
+
+async function sendLoginOTP(){
+  const err=document.getElementById('auth-err');
+  err.textContent='Envoi en cours...';
+  const ok=await sendOTP(otpIdentifier, otpMethod, 'login');
+  if(!ok){err.textContent='Erreur envoi. Réessayez.';return;}
+  err.textContent='';
+  document.getElementById('otp-sent-msg').textContent='Code envoyé sur '+(otpMethod==='email'?otpIdentifier:'WhatsApp')+' ✅';
+  showStep(2);
+}
+
+async function sendRegisterOTP(){
+  const err=document.getElementById('auth-err');
+  const prenom=document.getElementById('reg-prenom').value.trim();
+  const nom=document.getElementById('reg-nom').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const tel=document.getElementById('reg-tel').value.trim();
+  if(!prenom||!nom||!email){err.textContent='Remplissez tous les champs';return;}
+  const id = otpRegMethod==='email' ? email : tel;
+  if(!id){err.textContent='Entrez votre '+(otpRegMethod==='email'?'email':'numéro WhatsApp');return;}
+  err.textContent='Envoi en cours...';
+  otpContext='register'; otpIdentifier=id;
+  otpRegData={prenom,nom,email,tel};
+  const ok = await sendOTP(id, otpRegMethod, 'register', prenom);
+  if(!ok){err.textContent='Erreur envoi. Réessayez.';return;}
+  err.textContent='';
+  document.getElementById('otp-sent-msg').textContent='Code envoyé sur '+(otpRegMethod==='email'?id:'WhatsApp '+id)+' ✅';
+  showStep(2);
+}
+
+async function sendForgotOTP(){
+  const err=document.getElementById('auth-err');
+  const id = otpForgotMethod==='email'
+    ? document.getElementById('forgot-email').value.trim()
+    : document.getElementById('forgot-wa').value.trim();
+  if(!id){err.textContent='Entrez votre '+(otpForgotMethod==='email'?'email':'numéro WhatsApp');return;}
+  err.textContent='Envoi en cours...';
+  otpContext='forgot'; otpIdentifier=id;
+  const ok = await sendOTP(id, otpForgotMethod, 'reset');
+  if(!ok){err.textContent='Erreur envoi. Réessayez.';return;}
+  err.textContent='';
+  document.getElementById('otp-sent-msg').textContent='Code envoyé sur '+(otpForgotMethod==='email'?id:'WhatsApp '+id)+' ✅';
+  showStep(2);
+}
+
+async function verifyOTP(){
+  const err=document.getElementById('auth-err');
+  const code=document.getElementById('otp-input').value.trim();
+  if(code.length!==6){err.textContent='Code à 6 chiffres';return;}
+  err.textContent='Vérification...';
+  const res=await fetch('/.netlify/functions/verify-otp',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({identifier:otpIdentifier,code})
+  });
+  const data=await res.json();
+  if(!data.valid){err.textContent=data.reason||'Code incorrect';return;}
+
+  if(otpContext==='login'){
+    // Connexion avec OTP Supabase
+    const{error}=await sb.auth.signInWithOtp({email:otpIdentifier,options:{shouldCreateUser:false}});
+    // Fallback: connexion magic link already sent, on cherche l'user
+    const{data:u}=await sb.from('profiles').select('*').eq('email',otpIdentifier).single();
+    if(u){
+      // Simuler connexion via session custom - utiliser signInWithPassword temporaire
+      err.textContent='';
+      document.getElementById('auth-overlay').classList.remove('open');
+      document.body.style.overflow='';
+      showToast('✅ Connecté !');
+      location.reload();
+    } else {
+      err.textContent='Compte introuvable. Inscrivez-vous !';
+    }
+  } else if(otpContext==='register'){
+    const pw=Math.random().toString(36).slice(-12)+Math.random().toString(36).slice(-4).toUpperCase()+'!9';
+    const{data:u,error}=await sb.auth.signUp({email:otpRegData.email,password:pw});
+    if(error){err.textContent=error.message;return;}
+    if(u.user){
+      await sb.from('profiles').upsert({id:u.user.id,email:otpRegData.email,nom:otpRegData.nom,prenom:otpRegData.prenom,telephone:otpRegData.tel});
+    }
+    err.textContent='';
+    document.getElementById('auth-overlay').classList.remove('open');
+    document.body.style.overflow='';
+    showToast('✅ Compte créé ! Connectez-vous maintenant.');
+    showStep(1); switchTab('login');
+  } else if(otpContext==='forgot'){
+    err.textContent='';
+    showToast('✅ Identité vérifiée !');
+    document.getElementById('auth-overlay').classList.remove('open');
+    document.body.style.overflow='';
+  }
+}
+
+async function resendOTP(){
+  document.getElementById('auth-err').textContent='Renvoi...';
+  const method = otpContext==='register' ? otpRegMethod : otpContext==='forgot' ? otpForgotMethod : otpMethod;
+  await sendOTP(otpIdentifier, method, otpContext);
+  document.getElementById('auth-err').textContent='Code renvoyé ✅';
+}
+
+function showStepMethod(){
+  document.getElementById('auth-step1').style.display='none';
+  document.getElementById('auth-step-method').style.display='block';
+  document.getElementById('auth-step2').style.display='none';
+  document.getElementById('auth-forgot').style.display='none';
+  document.getElementById('auth-err').textContent='';
+}
+function showStep(n){
+  document.getElementById('auth-step1').style.display=n===1?'block':'none';
+  document.getElementById('auth-step2').style.display=n===2?'block':'none';
+  document.getElementById('auth-forgot').style.display='none';
+  document.getElementById('otp-input').value='';
+}
+function backToStep1(){
+  document.getElementById('auth-step1').style.display='block';
+  document.getElementById('auth-step-method').style.display='none';
+  document.getElementById('auth-step2').style.display='none';
+  document.getElementById('auth-forgot').style.display='none';
+  document.getElementById('auth-err').textContent='';
+}
+function showForgotPassword(){
+  document.getElementById('auth-step1').style.display='none';
+  document.getElementById('auth-step2').style.display='none';
+  document.getElementById('auth-forgot').style.display='block';
+  document.getElementById('auth-err').textContent='';
+}
+
+async function login(){} // Legacy - remplacé par OTP
+async function register(){} // Legacy - remplacé par OTP
+async function logout(){
+  await sb.auth.signOut();
+  currentUser=null;userProfile=null;
+  updateNavAuth();showToast('👋 Déconnecté');
+  document.getElementById('user-dropdown').classList.remove('open');
+}
+async function loadProfile(){
+  const{data}=await sb.from('profiles').select('*').eq('id',currentUser.id).single();
+  userProfile=data;updateCartUI();
+}
+function updateNavAuth(){
+  document.getElementById('nav-auth-btns').style.display=currentUser?'none':'flex';
+  document.getElementById('nav-user-menu').style.display=currentUser?'block':'none';
+}
+function toggleUserMenu(){
+  document.getElementById('user-dropdown').classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+  if(!document.getElementById('nav-user-menu').contains(e.target)){
+    document.getElementById('user-dropdown').classList.remove('open');
+  }
+});
+
+// ── TOAST ──
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// init() est appelé après chargement config Supabase (voir get-config)
+</script>
+</body>
+</html>
