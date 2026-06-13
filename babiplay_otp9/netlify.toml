@@ -1,2 +1,4 @@
 [build]
-  functions = "netlify/functions"
+  base = "babiplay_otp9"
+  publish = "babiplay_otp9"
+  functions = "babiplay_otp9/netlify/fonctions"
