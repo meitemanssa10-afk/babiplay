@@ -1,26 +1,72 @@
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
   }
+
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Méthode interdite' }) };
+  }
+
   try {
     const body = JSON.parse(event.body);
-    const response = await fetch('https://app.paydunya.com/api/v1/checkout-invoice/create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_MASTER_KEY,
-        'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
-        'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN
-      },
-      body: JSON.stringify(body)
-    });
-    const data = await response.json();
+    console.log('📥 Webhook PayDunya reçu:', JSON.stringify(body));
+
+    // Vérifier que le paiement est confirmé
+    const statut = body.status || body.data?.status;
+    const token = body.token || body.data?.token;
+
+    if (statut !== 'completed') {
+      return { statusCode: 200, headers, body: JSON.stringify({ message: 'Statut ignoré' }) };
+    }
+
+    // Récupérer les infos de la commande
+    const customData = body.custom_data || body.data?.custom_data || {};
+    const clientEmail = customData.client_email || body.customer?.email;
+    const clientNom = customData.client_nom || body.customer?.name || 'Client';
+    const produitNom = customData.produit_nom || 'Produit Gaming';
+    const montant = body.amount || body.data?.amount || 0;
+
+    // Créer la commande dans Supabase
+    const { data, error } = await supabase.from('commandes').insert({
+      statut: 'payee',
+      livraison_auto: false,
+      client_email: clientEmail,
+      client_nom: clientNom,
+      produit_nom: produitNom,
+      montant: montant,
+      paydunya_token: token,
+      created_at: new Date().toISOString()
+    }).select().single();
+
+    if (error) throw error;
+
+    console.log(`✅ Commande créée : ${data.id}`);
+
     return {
       statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify(data)
+      headers,
+      body: JSON.stringify({ success: true, commande_id: data.id })
     };
+
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    console.error('❌ Erreur webhook:', err.message);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: err.message })
+    };
   }
 };
