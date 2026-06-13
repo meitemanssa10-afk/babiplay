@@ -867,7 +867,7 @@ async function saveProduct(){
   if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
   let error;
   if(id){({error}=await sb.from('products').update(data).eq('id',id));}
-  else{({error}=await sb.from('products').insert(data));}
+  else{({error}=await sb.from('products').insert({...data,stock:999}));}
   if(error){showToast('Erreur : '+error.message,'err');return;}
   closeModal('modal-product');showToast('✅ Produit enregistré !','ok');
   await loadProducts();populateProductSelects();
