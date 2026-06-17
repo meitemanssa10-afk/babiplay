@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const puppeteer = require('puppeteer');
 const { Resend } = require('resend');
 
 const supabase = createClient(
@@ -7,72 +6,100 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-console.log('🤖 BabiPlay Agent démarré...');
+const KINGUIN_KEY = process.env.KINGUIN_API_KEY;
+const KINGUIN_BASE = 'https://gateway.kinguin.net/esa/api';
 
-async function acheterSurInstantGaming(produitNom) {
-  console.log(`🛒 Achat en cours : ${produitNom}`);
-  
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
+
+// ─────────────────────────────────────────────
+// 1. Rechercher un produit sur Kinguin par nom
+// ─────────────────────────────────────────────
+async function chercherProduitKinguin(nomProduit) {
+  const url = `${KINGUIN_BASE}/v1/products?name=${encodeURIComponent(nomProduit)}`;
+  const res = await fetch(url, {
+    headers: { 'X-Api-Key': KINGUIN_KEY }
   });
-
-  try {
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-
-    // 1. Connexion
-    await page.goto('https://www.instant-gaming.com/fr/login/', { waitUntil: 'networkidle2' });
-    await page.type('#email', process.env.INSTANT_GAMING_EMAIL);
-    await page.type('#password', process.env.INSTANT_GAMING_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    console.log('✅ Connecté !');
-
-    // 2. Recherche
-    await page.goto(`https://www.instant-gaming.com/fr/recherche/?query=${encodeURIComponent(produitNom)}`, { waitUntil: 'networkidle2' });
-    const premierProduit = await page.$('.item-inner a');
-    if (!premierProduit) throw new Error('Produit non trouvé');
-    const urlProduit = await page.evaluate(el => el.href, premierProduit);
-
-    // 3. Page produit
-    await page.goto(urlProduit, { waitUntil: 'networkidle2' });
-    const btnAcheter = await page.$('.buying-btn');
-    if (!btnAcheter) throw new Error('Bouton achat non trouvé');
-    await btnAcheter.click();
-    await new Promise(r => setTimeout(r, 2000));
-
-    // 4. Panier → Paiement
-    await page.goto('https://www.instant-gaming.com/fr/panier/', { waitUntil: 'networkidle2' });
-    const btnCommander = await page.$('.checkout-btn');
-    if (!btnCommander) throw new Error('Bouton commander non trouvé');
-    await btnCommander.click();
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-    // 5. PayPal
-    const paypalOption = await page.$('[data-payment="paypal"]');
-    if (paypalOption) await paypalOption.click();
-    await new Promise(r => setTimeout(r, 1000));
-    const btnConfirmer = await page.$('.confirm-order');
-    if (!btnConfirmer) throw new Error('Bouton confirmer non trouvé');
-    await btnConfirmer.click();
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
-
-    // 6. Récupérer le code
-    await page.goto('https://www.instant-gaming.com/fr/mes-achats/', { waitUntil: 'networkidle2' });
-    const code = await page.evaluate(() => {
-      const el = document.querySelector('.serial-key, .game-key, .key-value');
-      return el ? el.textContent.trim() : null;
-    });
-    if (!code) throw new Error('Code non trouvé');
-    
-    return code;
-
-  } finally {
-    await browser.close();
+  if (!res.ok) throw new Error(`Kinguin search error: ${res.status}`);
+  const data = await res.json();
+  if (!data.results || !data.results.length) {
+    throw new Error(`Aucun produit Kinguin trouvé pour "${nomProduit}"`);
   }
+  // Prendre le moins cher disponible
+  const produit = data.results.sort((a, b) => (a.price || 999999) - (b.price || 999999))[0];
+  return produit;
 }
 
+// ─────────────────────────────────────────────
+// 2. Passer une commande sur Kinguin
+// ─────────────────────────────────────────────
+async function passerCommandeKinguin(productId, prix) {
+  const res = await fetch(`${KINGUIN_BASE}/v2/order`, {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': KINGUIN_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      products: [{ productId, qty: 1, price: prix }]
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Erreur commande Kinguin: ${JSON.stringify(data)}`);
+  return data; // contient orderId
+}
+
+// ─────────────────────────────────────────────
+// 3. Récupérer la clé une fois livrée
+// ─────────────────────────────────────────────
+async function recupererCleCommande(orderId, tentativesMax = 10) {
+  for (let i = 0; i < tentativesMax; i++) {
+    const res = await fetch(`${KINGUIN_BASE}/v1/order?orderId=${orderId}`, {
+      headers: { 'X-Api-Key': KINGUIN_KEY }
+    });
+    const data = await res.json();
+    const order = data.results && data.results[0];
+    if (order && order.products) {
+      const keys = order.products.flatMap(p => p.keys || []);
+      const delivered = keys.find(k => k.status === 'DELIVERED');
+      if (delivered) {
+        // Récupérer le contenu réel de la clé
+        const keyRes = await fetch(`${KINGUIN_BASE}/v2/order/${orderId}/keys/return`, {
+          method: 'POST',
+          headers: { 'X-Api-Key': KINGUIN_KEY }
+        });
+        const keyData = await keyRes.json();
+        if (Array.isArray(keyData) && keyData.length) {
+          return keyData[0].serial;
+        }
+      }
+    }
+    await new Promise(r => setTimeout(r, 3000)); // attendre 3s avant nouvelle tentative
+  }
+  throw new Error('Délai dépassé : clé non livrée par Kinguin');
+}
+
+// ─────────────────────────────────────────────
+// 4. Acheter automatiquement via Kinguin
+// ─────────────────────────────────────────────
+async function acheterViaKinguin(produitNom) {
+  console.log(`🔍 Recherche Kinguin : ${produitNom}`);
+  const produit = await chercherProduitKinguin(produitNom);
+  console.log(`📦 Produit trouvé : ${produit.name} — ${produit.price}€`);
+
+  console.log('🛒 Passage de commande...');
+  const commande = await passerCommandeKinguin(produit.productId || produit.kinguinId, produit.price);
+  console.log(`✅ Commande Kinguin créée : ${commande.orderId}`);
+
+  console.log('🔑 Récupération de la clé...');
+  const code = await recupererCleCommande(commande.orderId);
+  console.log('✅ Clé récupérée !');
+
+  return code;
+}
+
+// ─────────────────────────────────────────────
+// 5. Envoyer le code au client par email
+// ─────────────────────────────────────────────
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
@@ -95,37 +122,66 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   console.log(`📧 Code envoyé à ${clientEmail}`);
 }
 
+// ─────────────────────────────────────────────
+// 6. Traiter une commande BabiPlay
+// ─────────────────────────────────────────────
 async function traiterCommande(commande) {
+  console.log(`🔄 Traitement commande ${commande.id}...`);
   try {
     await supabase.from('commandes').update({ statut: 'en_cours' }).eq('id', commande.id);
-    const code = await acheterSurInstantGaming(commande.produit_nom);
-    await envoyerCodeParEmail(commande.client_email, commande.client_nom, commande.produit_nom, code);
+
+    const code = await acheterViaKinguin(commande.produit_nom || commande.nom_produit);
+
+    if (commande.client_email) {
+      await envoyerCodeParEmail(
+        commande.client_email,
+        commande.client_nom || 'Client',
+        commande.produit_nom || commande.nom_produit,
+        code
+      );
+    }
+
     await supabase.from('commandes').update({
       statut: 'livree',
       livraison_auto: true,
       livre_le: new Date().toISOString(),
-      codes_livres: [code]
+      codes_livres: [code],
+      code_jeu: code
     }).eq('id', commande.id);
-    console.log(`✅ Commande ${commande.id} livrée !`);
+
+    console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
-    console.error(`❌ Erreur:`, err.message);
-    await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
+    console.error(`❌ Erreur commande ${commande.id}:`, err.message);
+    await supabase.from('commandes').update({
+      statut: 'erreur',
+      erreur_message: err.message
+    }).eq('id', commande.id);
   }
 }
 
+// ─────────────────────────────────────────────
+// 7. Boucle de vérification
+// ─────────────────────────────────────────────
 async function checkCommandes() {
   try {
     const { data: commandes, error } = await supabase
-      .from('commandes').select('*')
-      .eq('statut', 'payee').eq('livraison_auto', false);
+      .from('commandes')
+      .select('*')
+      .eq('statut', 'payee')
+      .eq('livraison_auto', false);
+
     if (error) throw error;
+
     if (commandes && commandes.length > 0) {
-      for (const commande of commandes) await traiterCommande(commande);
+      console.log(`📦 ${commandes.length} commande(s) à traiter...`);
+      for (const commande of commandes) {
+        await traiterCommande(commande);
+      }
     } else {
       console.log('✅ Aucune commande en attente.');
     }
   } catch (err) {
-    console.error('Erreur:', err.message);
+    console.error('Erreur checkCommandes:', err.message);
   }
 }
 
@@ -133,4 +189,7 @@ checkCommandes();
 setInterval(checkCommandes, 30000);
 
 const http = require('http');
-http.createServer((req, res) => { res.writeHead(200); res.end('OK'); }).listen(process.env.PORT || 3000);
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('BabiPlay Agent (Kinguin) OK');
+}).listen(process.env.PORT || 3000);
