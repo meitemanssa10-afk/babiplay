@@ -809,6 +809,14 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
       <p style="text-align:center;margin-top:10px"><button onclick="backToStep1()" style="background:none;border:none;color:var(--muted2);font-size:12px;cursor:pointer">← Retour</button></p>
     </div>
 
+    <!-- NOUVEAU MOT DE PASSE (après vérification OTP du "mot de passe oublié") -->
+    <div id="auth-newpw" style="display:none">
+      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Identité vérifiée ✅<br>Choisissez votre nouveau mot de passe</p>
+      <div class="fg"><label>Nouveau mot de passe</label><input type="password" id="newpw-1" placeholder="•••••••• (6 caractères min)"></div>
+      <div class="fg"><label>Confirmer le mot de passe</label><input type="password" id="newpw-2" placeholder="••••••••"></div>
+      <button class="btn-auth" onclick="submitNewPassword()">Valider →</button>
+    </div>
+
     <div class="auth-err" id="auth-err"></div>
   </div>
 </div>
@@ -1201,6 +1209,7 @@ let otpForgotMethod='email';
 let otpContext='login'; // 'login', 'register', 'forgot'
 let otpIdentifier='';
 let otpRegData={};
+let forgotEmailVerified='';
 
 function setMethod(m){
   otpMethod=m;
@@ -1345,9 +1354,15 @@ async function verifyOTP(){
     showStep(1); switchTab('login');
   } else if(otpContext==='forgot'){
     err.textContent='';
-    showToast('✅ Identité vérifiée !');
-    document.getElementById('auth-overlay').classList.remove('open');
-    document.body.style.overflow='';
+    forgotEmailVerified=otpRegMethod==='email'?otpIdentifier:document.getElementById('forgot-email').value.trim();
+    // Si l'identifiant utilisé était le WhatsApp, on a quand même besoin de l'email du compte
+    // pour réinitialiser le mot de passe Supabase (qui est toujours basé sur l'email).
+    if(otpForgotMethod==='whatsapp'){
+      const{data:prof}=await sb.from('profiles').select('email').eq('telephone',otpIdentifier).single();
+      forgotEmailVerified=prof?.email||forgotEmailVerified;
+    }
+    document.getElementById('auth-step2').style.display='none';
+    document.getElementById('auth-newpw').style.display='block';
   }
 }
 
@@ -1356,6 +1371,29 @@ async function resendOTP(){
   const method = otpContext==='register' ? otpRegMethod : otpContext==='forgot' ? otpForgotMethod : otpMethod;
   await sendOTP(otpIdentifier, method, otpContext);
   document.getElementById('auth-err').textContent='Code renvoyé ✅';
+}
+
+async function submitNewPassword(){
+  const err=document.getElementById('auth-err');
+  const p1=document.getElementById('newpw-1').value;
+  const p2=document.getElementById('newpw-2').value;
+  if(!p1||!p2){err.textContent='Remplissez les deux champs';return;}
+  if(p1.length<6){err.textContent='Minimum 6 caractères';return;}
+  if(p1!==p2){err.textContent='Les mots de passe ne correspondent pas';return;}
+  if(!forgotEmailVerified){err.textContent='Erreur : email introuvable, recommencez la procédure';return;}
+  err.textContent='Mise à jour...';
+  const res=await fetch('/.netlify/functions/reset-password',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:forgotEmailVerified,newPassword:p1,otpAlreadyVerified:true})
+  });
+  const data=await res.json();
+  if(!data.success){err.textContent=data.error||'Erreur lors de la réinitialisation';return;}
+  err.textContent='';
+  document.getElementById('auth-newpw').style.display='none';
+  document.getElementById('auth-overlay').classList.remove('open');
+  document.body.style.overflow='';
+  showToast('✅ Mot de passe modifié ! Connectez-vous.');
+  showStep(1); switchTab('login');
 }
 
 function showStepMethod(){
@@ -1369,6 +1407,7 @@ function showStep(n){
   document.getElementById('auth-step1').style.display=n===1?'block':'none';
   document.getElementById('auth-step2').style.display=n===2?'block':'none';
   document.getElementById('auth-forgot').style.display='none';
+  document.getElementById('auth-newpw').style.display='none';
   document.getElementById('otp-input').value='';
 }
 function backToStep1(){
@@ -1376,11 +1415,13 @@ function backToStep1(){
   document.getElementById('auth-step-method').style.display='none';
   document.getElementById('auth-step2').style.display='none';
   document.getElementById('auth-forgot').style.display='none';
+  document.getElementById('auth-newpw').style.display='none';
   document.getElementById('auth-err').textContent='';
 }
 function showForgotPassword(){
   document.getElementById('auth-step1').style.display='none';
   document.getElementById('auth-step2').style.display='none';
+  document.getElementById('auth-newpw').style.display='none';
   document.getElementById('auth-forgot').style.display='block';
   document.getElementById('auth-err').textContent='';
 }
