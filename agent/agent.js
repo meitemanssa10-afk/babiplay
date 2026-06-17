@@ -12,7 +12,18 @@ const KINGUIN_BASE = 'https://gateway.kinguin.net/esa/api';
 console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
 
 // ─────────────────────────────────────────────
-// 1. Rechercher un produit sur Kinguin par nom
+// 1. Récupérer le détail d'un produit Kinguin par son ID exact
+// ─────────────────────────────────────────────
+async function obtenirProduitKinguinParId(productId) {
+  const res = await fetch(`${KINGUIN_BASE}/v1/products/${productId}`, {
+    headers: { 'X-Api-Key': KINGUIN_KEY }
+  });
+  if (!res.ok) throw new Error(`Produit Kinguin introuvable pour l'ID ${productId} (status ${res.status})`);
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 1b. Rechercher un produit sur Kinguin par nom (fallback si pas d'ID configuré)
 // ─────────────────────────────────────────────
 async function chercherProduitKinguin(nomProduit) {
   const url = `${KINGUIN_BASE}/v1/products?name=${encodeURIComponent(nomProduit)}`;
@@ -80,10 +91,19 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
 
 // ─────────────────────────────────────────────
 // 4. Acheter automatiquement via Kinguin
+//    Utilise l'ID Kinguin exact configuré sur le produit BabiPlay si dispo,
+//    sinon retombe sur une recherche par nom (moins fiable).
 // ─────────────────────────────────────────────
-async function acheterViaKinguin(produitNom) {
-  console.log(`🔍 Recherche Kinguin : ${produitNom}`);
-  const produit = await chercherProduitKinguin(produitNom);
+async function acheterViaKinguin(produitNom, kinguinProductId) {
+  let produit;
+  if (kinguinProductId) {
+    console.log(`🔗 Utilisation de l'ID Kinguin configuré : ${kinguinProductId}`);
+    produit = await obtenirProduitKinguinParId(kinguinProductId);
+    produit.productId = kinguinProductId;
+  } else {
+    console.log(`⚠️ Aucun ID Kinguin configuré pour "${produitNom}" — recherche par nom (moins fiable)`);
+    produit = await chercherProduitKinguin(produitNom);
+  }
   console.log(`📦 Produit trouvé : ${produit.name} — ${produit.price}€`);
 
   console.log('🛒 Passage de commande...');
@@ -130,7 +150,19 @@ async function traiterCommande(commande) {
   try {
     await supabase.from('commandes').update({ statut: 'en_cours' }).eq('id', commande.id);
 
-    const code = await acheterViaKinguin(commande.produit_nom || commande.nom_produit);
+    // Récupérer le produit BabiPlay lié pour avoir son kinguin_product_id
+    let kinguinProductId = null;
+    const produitId = commande.product_id || commande.produit_id;
+    if (produitId) {
+      const { data: produitBabiPlay } = await supabase
+        .from('products')
+        .select('kinguin_product_id')
+        .eq('id', produitId)
+        .single();
+      kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
+    }
+
+    const code = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
 
     if (commande.client_email) {
       await envoyerCodeParEmail(
