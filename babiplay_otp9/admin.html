@@ -527,7 +527,17 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="form-group"><label>Description</label><textarea id="prod-desc" placeholder="20€ de crédit PlayStation Store..."></textarea></div>
       <div class="form-row">
         <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="prod-prix" placeholder="14500"></div>
-        <div class="form-group"><label>Stock initial de codes</label><input type="number" id="prod-stock" placeholder="0" value="0" readonly style="opacity:.6"></div>
+        <div class="form-group"><label>Stock (illimité, géré par fournisseur)</label><input type="number" id="prod-stock" placeholder="999" value="999" readonly style="opacity:.6"></div>
+      </div>
+      <div class="form-group" style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:14px">
+        <label style="color:var(--gold)">🔗 ID Produit Kinguin (fournisseur)</label>
+        <input type="text" id="prod-kinguin-id" placeholder="Ex: 5c9b68662539a4e8f17ae2fe">
+        <small style="color:var(--muted2);font-size:12px;display:block;margin-top:6px">
+          Colle ici l'ID exact du produit Kinguin correspondant. Cherche-le sur
+          <a href="https://www.kinguin.net" target="_blank" style="color:var(--gold)">kinguin.net</a>,
+          ouvre la fiche produit, et copie l'ID dans l'URL ou via l'API (/v1/products?name=...).
+          Sans cet ID, l'agent ne pourra pas acheter automatiquement ce produit précis.
+        </small>
       </div>
       <div class="form-group">
         <label>Image du produit</label>
@@ -835,6 +845,7 @@ function openProductModal(p=null){
   document.getElementById('prod-slider-ordre').value=p?p.slider_ordre:1;
   document.getElementById('prod-populaire').checked=p?p.est_populaire:false;
   document.getElementById('prod-actif').checked=p?p.est_actif:true;
+  document.getElementById('prod-kinguin-id').value=p?p.kinguin_product_id||'':'';
   previewImage();
   document.getElementById('modal-product').classList.add('open');
 }
@@ -863,6 +874,7 @@ async function saveProduct(){
     slider_ordre:parseInt(document.getElementById('prod-slider-ordre').value)||1,
     est_populaire:document.getElementById('prod-populaire').checked,
     est_actif:document.getElementById('prod-actif').checked,
+    kinguin_product_id:document.getElementById('prod-kinguin-id').value.trim(),
   };
   if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
   let error;
