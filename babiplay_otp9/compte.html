@@ -22,8 +22,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
-
-/* NAV */
 nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:12px}
 .logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;letter-spacing:2px;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;flex-shrink:0}
 .logo-sub{font-size:10px;letter-spacing:4px;-webkit-text-fill-color:var(--muted);font-family:'DM Sans',sans-serif;display:block;margin-top:-6px}
@@ -32,27 +30,19 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .btn-nav:hover{border-color:var(--gold);color:var(--gold)}
 .btn-danger-sm{background:rgba(228,0,15,.1);border:1px solid rgba(228,0,15,.3);color:#ff6b6b;padding:7px 14px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
 .btn-danger-sm:hover{background:rgba(228,0,15,.2)}
-
-/* ECRAN NON CONNECTÉ */
 .not-logged{display:flex;align-items:center;justify-content:center;min-height:80vh;padding:20px}
 .not-logged-box{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;padding:48px;text-align:center;max-width:400px;width:100%}
 .not-logged-box h2{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;margin-bottom:8px}
 .not-logged-box p{color:var(--muted2);font-size:14px;margin-bottom:24px}
 .btn-gold{background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;text-decoration:none;display:inline-block;transition:opacity .2s}
 .btn-gold:hover{opacity:.88}
-
-/* LAYOUT COMPTE */
 .compte-wrap{display:none;max-width:1100px;margin:0 auto;padding:32px 24px;gap:24px}
 .compte-wrap.show{display:grid;grid-template-columns:280px 1fr;align-items:start}
-
-/* SIDEBAR PROFIL */
 .profile-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;position:sticky;top:88px}
 .avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#f5a623,#ff7f50);display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;color:#000;margin:0 auto 16px}
 .profile-name{text-align:center;font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px}
 .profile-email{text-align:center;font-size:13px;color:var(--muted2);margin-bottom:20px}
 .profile-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
-
-/* POINTS CARD */
 .points-card{background:linear-gradient(135deg,rgba(245,166,35,.12),rgba(255,127,80,.08));border:1px solid rgba(245,166,35,.25);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
 .points-value{font-family:'Rajdhani',sans-serif;font-size:42px;font-weight:700;color:var(--gold);line-height:1}
 .points-label{font-size:12px;color:var(--muted2);margin-top:4px}
@@ -61,8 +51,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .points-bar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
 .points-bar-fill{height:100%;background:linear-gradient(90deg,#f5a623,#ff7f50);border-radius:3px;transition:width .5s ease}
 .points-next{font-size:12px;color:var(--gold);margin-top:8px;text-align:center}
-
-/* PALIERS */
 .paliers{margin-bottom:16px}
 .palier{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:6px;border:1px solid var(--border)}
 .palier.atteint{background:rgba(82,176,67,.08);border-color:rgba(82,176,67,.3);color:var(--green)}
@@ -73,27 +61,17 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .reclamer-btn:hover{opacity:.88}
 .reclamer-btn:disabled{opacity:.5;cursor:not-allowed}
 .palier-reward{font-size:11px;opacity:.8}
-
-/* SIDEBAR NAV */
 .sidebar-nav{display:flex;flex-direction:column;gap:4px}
 .sidebar-nav-btn{background:none;border:none;color:var(--muted2);padding:10px 12px;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;text-align:left;display:flex;align-items:center;gap:8px;width:100%}
 .sidebar-nav-btn:hover{background:var(--bg3);color:var(--text)}
 .sidebar-nav-btn.active{background:rgba(245,166,35,.1);color:var(--gold);border:1px solid rgba(245,166,35,.2)}
-
-/* MAIN CONTENT */
 .main-content{display:flex;flex-direction:column;gap:20px}
-
-/* TABS */
 .tabs-wrap{display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:4px}
 .tab-btn{flex:1;background:none;border:none;color:var(--muted2);padding:10px;border-radius:8px;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
 .tab-btn.active{background:var(--bg4);color:var(--text)}
-
-/* SECTION */
 .content-section{display:none}
 .content-section.active{display:block}
 .section-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;margin-bottom:16px}
-
-/* COMMANDES */
 .order-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:12px;transition:border-color .2s}
 .order-card:hover{border-color:var(--border2)}
 .order-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
@@ -121,8 +99,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .badge-blue{background:rgba(0,112,209,.15);color:#5baeff;border:1px solid rgba(0,112,209,.3)}
 .badge-gray{background:var(--bg4);color:var(--muted2);border:1px solid var(--border2)}
 .order-points{font-size:12px;color:var(--gold)}
-
-/* PROFIL FORM */
 .profile-form{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px}
 .form-group{margin-bottom:16px}
 .form-group label{display:block;font-size:12px;color:var(--muted2);margin-bottom:6px;font-weight:500}
@@ -132,8 +108,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .btn-save{background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;transition:opacity .2s}
 .btn-save:hover{opacity:.88}
-
-/* HISTORIQUE POINTS */
 .points-history{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
 .points-history-head{padding:16px 20px;border-bottom:1px solid var(--border);font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600}
 .pts-row{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px}
@@ -141,21 +115,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .pts-row-desc{color:var(--muted2)}
 .pts-row-date{font-size:11px;color:var(--muted);margin-top:2px}
 .pts-gained{color:var(--gold);font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700}
-
-/* EMPTY */
 .empty{text-align:center;padding:48px 20px;color:var(--muted)}
 .empty-icon{font-size:44px;margin-bottom:12px}
 .empty p{font-size:14px;margin-bottom:16px}
-
-/* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--gold);color:var(--text);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:999;transform:translateY(80px);transition:transform .3s;pointer-events:none}
 .toast.show{transform:translateY(0)}
 .toast.ok{border-color:var(--green)}
 .toast.err{border-color:#ff6b6b}
-
-/* LOADER */
 .loader{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);font-size:14px}
-
 @media(max-width:768px){
   .compte-wrap.show{grid-template-columns:1fr}
   .profile-card{position:static}
@@ -165,7 +132,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
   <a class="logo" href="index.html">BabiPlay<span class="logo-sub">GAMING CI</span></a>
   <div class="nav-right">
@@ -174,8 +140,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
   </div>
 </nav>
 
-<!-- NON CONNECTÉ -->
-<div class="not-logged" id="not-logged">
+<div class="not-logged" id="not-logged" style="display:none">
   <div class="not-logged-box">
     <div style="font-size:48px;margin-bottom:16px">🔒</div>
     <h2>Accès réservé</h2>
@@ -184,17 +149,16 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
   </div>
 </div>
 
-<!-- ESPACE CLIENT -->
+<div class="loader" id="initial-loader" style="min-height:60vh">Chargement de votre espace...</div>
+
 <div class="compte-wrap" id="compte-wrap">
 
-  <!-- SIDEBAR PROFIL -->
   <div>
     <div class="profile-card">
       <div class="avatar" id="avatar-initiales">?</div>
       <div class="profile-name" id="profile-name">Chargement...</div>
       <div class="profile-email" id="profile-email">—</div>
 
-      <!-- POINTS -->
       <div class="points-card">
         <div class="points-value" id="points-value">0</div>
         <div class="points-label">⭐ Points fidélité</div>
@@ -207,7 +171,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
         </div>
       </div>
 
-      <!-- PALIERS -->
       <div class="paliers">
         <div class="palier" id="palier-1">
           <span class="palier-icon">🥉</span>
@@ -229,9 +192,8 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 
       <hr class="profile-divider">
 
-      <!-- NAV SIDEBAR -->
       <div class="sidebar-nav">
-        <button class="sidebar-nav-btn" onclick="showTab('commandes',this)">📦 Mes commandes</button>
+        <button class="sidebar-nav-btn active" onclick="showTab('commandes',this)">📦 Mes commandes</button>
         <button class="sidebar-nav-btn" onclick="showTab('cadeaux',this)">🎁 Mes cadeaux</button>
         <button class="sidebar-nav-btn" onclick="showTab('points',this)">⭐ Mes points</button>
         <button class="sidebar-nav-btn" onclick="showTab('profil',this)">👤 Mon profil</button>
@@ -239,26 +201,21 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
     </div>
   </div>
 
-  <!-- MAIN -->
   <div class="main-content">
 
-    <!-- COMMANDES -->
     <div class="content-section active" id="tab-commandes">
       <div class="section-title">📦 Mes commandes</div>
       <div id="orders-list"><div class="loader">Chargement...</div></div>
     </div>
 
-    <!-- CADEAUX -->
     <div class="content-section" id="tab-cadeaux">
       <div class="section-title">🎁 Mes cadeaux</div>
       <div id="rewards-list"><div class="loader">Chargement...</div></div>
     </div>
 
-    <!-- POINTS -->
     <div class="content-section" id="tab-points">
       <div class="section-title">⭐ Mes points fidélité</div>
 
-      <!-- RÉSUMÉ POINTS -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px" id="points-stats">
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center">
           <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;color:var(--gold)" id="pts-total">0</div>
@@ -274,7 +231,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
         </div>
       </div>
 
-      <!-- COMMENT GAGNER -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
         <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;margin-bottom:14px">Comment gagner des points ?</div>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
@@ -297,14 +253,12 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
         </div>
       </div>
 
-      <!-- HISTORIQUE POINTS -->
       <div class="points-history">
         <div class="points-history-head">Historique des points</div>
         <div id="points-history-list"><div class="loader">Chargement...</div></div>
       </div>
     </div>
 
-    <!-- PROFIL -->
     <div class="content-section" id="tab-profil">
       <div class="section-title">👤 Mon profil</div>
       <div class="profile-form">
@@ -327,23 +281,31 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
       </div>
     </div>
 
-  </div><!-- /main-content -->
-</div><!-- /compte-wrap -->
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const SURL=''; // Chargé via get-config
-const SKEY=''; // Chargé via get-config
-const sb=supabase.createClient(SURL,SKEY);
-
+let sb;
 let currentUser=null,userProfile=null,userOrders=[];
 
-// ============================================================
-// INIT
-// ============================================================
+(async()=>{
+  try{
+    const r=await fetch('/.netlify/functions/get-config');
+    const c=await r.json();
+    sb=supabase.createClient(c.surl,c.skey);
+    await init();
+  }catch(e){
+    console.error('Erreur de chargement de la config Supabase :',e);
+    document.getElementById('initial-loader').style.display='none';
+    document.getElementById('not-logged').style.display='flex';
+  }
+})();
+
 async function init(){
   const{data:{session}}=await sb.auth.getSession();
+  document.getElementById('initial-loader').style.display='none';
   if(!session){
     document.getElementById('not-logged').style.display='flex';
     return;
@@ -352,11 +314,15 @@ async function init(){
   document.getElementById('not-logged').style.display='none';
   document.getElementById('compte-wrap').classList.add('show');
   await Promise.all([loadProfile(),loadOrders(),loadRewards()]);
+
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(!session){
+      document.getElementById('compte-wrap').classList.remove('show');
+      document.getElementById('not-logged').style.display='flex';
+    }
+  });
 }
 
-// ============================================================
-// PROFIL
-// ============================================================
 async function loadProfile(){
   const{data}=await sb.from('profiles').select('*').eq('id',currentUser.id).single();
   userProfile=data||{};
@@ -378,10 +344,8 @@ function updatePointsUI(pts,totalOrders){
   document.getElementById('pts-total').textContent=pts;
   document.getElementById('pts-commandes').textContent=totalOrders;
 
-  // Nombre d'achats = points / 10
   const achats=Math.floor(pts/10);
 
-  // Palier 1 : 50 pts (5 achats) / Palier 2 : 100 pts (10 achats)
   let nextPalier=50,pct=0;
   if(pts>=100){pct=100;nextPalier=100;}
   else if(pts>=50){pct=Math.min(100,((pts-50)/50)*100);nextPalier=100;}
@@ -397,7 +361,6 @@ function updatePointsUI(pts,totalOrders){
     pts>=50?`Encore ${restAchats} achat(s) pour le cadeau premium !`:
     `Encore ${restAchats} achat(s) pour votre premier cadeau !`;
 
-  // Palier 1 — 50 pts (5 achats)
   const p1=document.getElementById('palier-1');
   const btn1=document.getElementById('reclamer-1');
   if(pts>=50){
@@ -408,7 +371,6 @@ function updatePointsUI(pts,totalOrders){
     btn1.style.display='none';
   }
 
-  // Palier 2 — 100 pts (10 achats)
   const p2=document.getElementById('palier-2');
   const btn2=document.getElementById('reclamer-2');
   if(pts>=100){
@@ -422,7 +384,6 @@ function updatePointsUI(pts,totalOrders){
 
 async function reclamerCadeau(palier){
   if(!currentUser||!userProfile){showToast('Connectez-vous d\'abord','err');return;}
-  // Vérifier si déjà réclamé pour ce palier
   const{data:existing}=await sb.from('rewards')
     .select('*')
     .eq('user_id',currentUser.id)
@@ -431,7 +392,6 @@ async function reclamerCadeau(palier){
   if(existing&&existing.length>0){
     showToast('⚠️ Vous avez déjà réclamé ce cadeau !','err');return;
   }
-  // Créer la demande
   const{error}=await sb.from('rewards').insert({
     user_id:currentUser.id,
     email:currentUser.email,
@@ -442,7 +402,6 @@ async function reclamerCadeau(palier){
   });
   if(error){showToast('Erreur : '+error.message,'err');return;}
   showToast('🎁 Demande envoyée ! L\'admin vous prépare votre cadeau.','ok');
-  // Désactiver le bouton
   const btn=document.getElementById('reclamer-'+( palier===100?'1':'2'));
   if(btn){btn.textContent='✅ Demande envoyée';btn.disabled=true;}
 }
@@ -469,15 +428,11 @@ async function changePassword(){
   showToast('✅ Mot de passe modifié !','ok');
 }
 
-// ============================================================
-// COMMANDES
-// ============================================================
 async function loadOrders(){
   const{data}=await sb.from('orders').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false});
   userOrders=data||[];
   renderOrders();
 
-  // Points gagnés total
   const totalPts=userOrders.reduce((s,o)=>s+(o.points_gagnes||0),0);
   document.getElementById('pts-gagnes').textContent=totalPts;
   renderPointsHistory();
@@ -491,7 +446,10 @@ function statusBadge(s){
   return{
     en_attente:'<span class="badge badge-gold">⏳ En attente</span>',
     paye:'<span class="badge badge-blue">💳 Payé</span>',
+    en_cours:'<span class="badge badge-blue">⚙️ Traitement en cours</span>',
     code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',
+    livree:'<span class="badge badge-green">✅ Code envoyé</span>',
+    erreur:'<span class="badge badge-red">⚠️ Problème — contactez le support</span>',
     annule:'<span class="badge badge-red">❌ Annulé</span>'
   }[s]||`<span class="badge badge-gray">${s}</span>`;
 }
@@ -515,6 +473,7 @@ function renderOrders(){
   el.innerHTML=userOrders.map(o=>{
     const logo=platLogoImg(o.plateforme);
     const logoHtml=logo?`<img src="${logo}" style="width:32px;height:32px;object-fit:contain;filter:brightness(0) invert(1)">`:'🎮';
+    const code=o.code_jeu||(Array.isArray(o.codes_livres)&&o.codes_livres[0])||null;
     return `
     <div class="order-card">
       <div class="order-header">
@@ -535,13 +494,15 @@ function renderOrders(){
       </div>
       <div class="order-footer">
         <div>${statusBadge(o.statut)}</div>
-        ${o.code_jeu?`
+        ${code?`
           <div class="code-box">
-            🔑 <span id="code-${o.id}">${o.code_jeu}</span>
-            <button class="copy-btn" onclick="copyCode('${o.id}','${o.code_jeu}')">📋 Copier</button>
+            🔑 <span id="code-${o.id}">${code}</span>
+            <button class="copy-btn" onclick="copyCode('${o.id}','${code}')">📋 Copier</button>
           </div>`
-        :o.statut==='en_attente'||o.statut==='paye'?
+        :o.statut==='en_attente'||o.statut==='paye'||o.statut==='en_cours'?
           '<span style="font-size:12px;color:var(--muted2)">⏳ Code en cours de traitement...</span>':
+          o.statut==='erreur'?
+          '<span style="font-size:12px;color:#ff6b6b">⚠️ Un problème est survenu, contactez le support</span>':
           '<span style="font-size:12px;color:var(--muted)">—</span>'}
       </div>
     </div>`;
@@ -556,9 +517,6 @@ function copyCode(orderId,code){
   });
 }
 
-// ============================================================
-// HISTORIQUE POINTS
-// ============================================================
 function renderPointsHistory(){
   const el=document.getElementById('points-history-list');
   const ordersWithPts=userOrders.filter(o=>o.points_gagnes>0);
@@ -612,7 +570,6 @@ async function loadRewards(){
     </div>`).join('');
 }
 
-// ============================================================
 function showTab(name,btn){
   document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.sidebar-nav-btn').forEach(b=>b.classList.remove('active'));
@@ -620,27 +577,16 @@ function showTab(name,btn){
   if(btn)btn.classList.add('active');
 }
 
-// ============================================================
-// AUTH
-// ============================================================
 async function logout(){
   await sb.auth.signOut();
   window.location.href='index.html';
 }
 
-// ============================================================
-// TOAST
-// ============================================================
 function showToast(msg,type){
   const t=document.getElementById('toast');
   t.textContent=msg;t.className='toast show'+(type?' '+type:'');
   setTimeout(()=>t.classList.remove('show'),3000);
 }
-
-// ============================================================
-// DÉMARRAGE
-// ============================================================
-init();
 </script>
 </body>
 </html>
