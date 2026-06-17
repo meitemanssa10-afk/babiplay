@@ -900,7 +900,7 @@ function renderProducts(plat,cat,type){
         <div class="card-name">${p.nom}</div>
         <div class="card-foot">
           <div><div class="card-price">${fmt(p.prix)}<br><small>FCFA</small></div></div>
-          <button class="add-btn" onclick="event.stopPropagation();addToCart('${p.id}')">+</button>
+          <button class="add-btn" onclick="event.stopPropagation();addToCart('${p.id}')" ${p.stock<=0?'disabled':''}>+</button>
         </div>
       </div>
     </div>`;
@@ -1023,8 +1023,8 @@ function openModal(id){
   const pts=10;
   document.getElementById('m-pts').textContent=`⭐ Vous gagnerez 10 points avec cet achat (${Math.floor((userProfile?.points||0)/10)+1}/10 achats)`;
   const btn=document.getElementById('m-buy');
-  btn.disabled=false;
-  btn.textContent='⚡ AJOUTER AU PANIER';
+  btn.disabled=p.stock<=0;
+  btn.textContent=p.stock<=0?'❌ Rupture de stock':'⚡ AJOUTER AU PANIER';
   btn.onclick=()=>{addToCart(id);closeModalBtn();};
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow='hidden';
@@ -1281,12 +1281,14 @@ async function sendRegisterOTP(){
   const nom=document.getElementById('reg-nom').value.trim();
   const email=document.getElementById('reg-email').value.trim();
   const tel=document.getElementById('reg-tel').value.trim();
+  const pw=document.getElementById('reg-pw').value;
   if(!prenom||!nom||!email){err.textContent='Remplissez tous les champs';return;}
+  if(!pw||pw.length<6){err.textContent='Mot de passe : 6 caractères minimum';return;}
   const id = otpRegMethod==='email' ? email : tel;
   if(!id){err.textContent='Entrez votre '+(otpRegMethod==='email'?'email':'numéro WhatsApp');return;}
   err.textContent='Envoi en cours...';
   otpContext='register'; otpIdentifier=id;
-  otpRegData={prenom,nom,email,tel};
+  otpRegData={prenom,nom,email,tel,pw};
   const ok = await sendOTP(id, otpRegMethod, 'register', prenom);
   if(!ok){err.textContent='Erreur envoi. Réessayez.';return;}
   err.textContent='';
@@ -1322,22 +1324,15 @@ async function verifyOTP(){
   if(!data.valid){err.textContent=data.reason||'Code incorrect';return;}
 
   if(otpContext==='login'){
-    // Connexion avec OTP Supabase
-    const{error}=await sb.auth.signInWithOtp({email:otpIdentifier,options:{shouldCreateUser:false}});
-    // Fallback: connexion magic link already sent, on cherche l'user
-    const{data:u}=await sb.from('profiles').select('*').eq('email',otpIdentifier).single();
-    if(u){
-      // Simuler connexion via session custom - utiliser signInWithPassword temporaire
-      err.textContent='';
-      document.getElementById('auth-overlay').classList.remove('open');
-      document.body.style.overflow='';
-      showToast('✅ Connecté !');
-      location.reload();
-    } else {
-      err.textContent='Compte introuvable. Inscrivez-vous !';
-    }
+    // Le mot de passe a déjà été vérifié à l'étape 1 (loginStep1 → signInWithPassword).
+    // L'OTP n'est qu'une 2e vérification : la session Supabase existe déjà, on continue simplement.
+    err.textContent='';
+    document.getElementById('auth-overlay').classList.remove('open');
+    document.body.style.overflow='';
+    showToast('✅ Connecté !');
+    location.reload();
   } else if(otpContext==='register'){
-    const pw=Math.random().toString(36).slice(-12)+Math.random().toString(36).slice(-4).toUpperCase()+'!9';
+    const pw=otpRegData.pw;
     const{data:u,error}=await sb.auth.signUp({email:otpRegData.email,password:pw});
     if(error){err.textContent=error.message;return;}
     if(u.user){
