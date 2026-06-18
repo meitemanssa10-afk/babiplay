@@ -699,7 +699,13 @@ let allOrders=[],allClients=[],allProducts=[],allCodes=[],allPromos=[];
     // Vérification OTP admin aussi
     const otpOk=sessionStorage.getItem('admin_otp_ok');
     if(otpOk==='1') showAdmin();
-    else showAdminOTP(session.user.email);
+    else{
+      await fetch('/.netlify/functions/send-otp',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'admin',email:session.user.email,name:'Admin'})
+      });
+      showAdminOTP(session.user.email);
+    }
   }
 })();
 
@@ -1497,6 +1503,7 @@ async function relancerInactifs(){
 
 // ============================================================
 async function loadEmailStats(){
+  const{data:clients}=await sb.from('profiles').select('*');
   const{data:orders}=await sb.from('orders').select('user_id,created_at');
   const cl=clients||[];
   const or=orders||[];
