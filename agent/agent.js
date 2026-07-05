@@ -162,7 +162,7 @@ setInterval(async () => {
 }, 4 * 60 * 1000);
 
 // ═════════════════════════════════════════════════════════════
-// IMPORT EN MASSE DU CATALOGUE KINGUIN (vendable en France)
+// IMPORT EN MASSE DU CATALOGUE KINGUIN
 // ═════════════════════════════════════════════════════════════
 const IMPORT_SECRET = crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
@@ -173,9 +173,6 @@ const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.25');
 const EUR_TO_XOF = 655.957;
-
-// Prix minimum acceptable en EUR pour éviter les données aberrantes
-// (précommandes sans prix fixé, produits épuisés avec prix à 0, etc.)
 const PRIX_MIN_EUR = 0.5;
 
 let importEnCours = false;
@@ -187,10 +184,12 @@ function isSellableInFrance(product) {
   return !(product.countryLimitation || []).includes('FR');
 }
 
-// Récupère la meilleure image disponible :
-// priorité à cover.url, sinon premier screenshot, sinon vide
+// Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
 function getImageUrl(product) {
+  if (product.coverImageOriginal) return product.coverImageOriginal;
+  if (product.coverImage) return product.coverImage;
   if (product.images?.cover?.url) return product.images.cover.url;
+  if (Array.isArray(product.screenshots) && product.screenshots[0]) return product.screenshots[0];
   if (product.images?.screenshots?.[0]?.url) return product.images.screenshots[0].url;
   return '';
 }
@@ -277,7 +276,6 @@ async function runImportKinguin() {
       for (const product of results) {
         if (!isSellableInFrance(product)) { totalSkippedFR++; continue; }
         if (!product.productId || existingIds.has(product.productId)) { totalSkippedDoublon++; continue; }
-        // Filtrer les prix aberrants (0, négatifs, ou inférieurs au minimum)
         const eurPrice = product.price || 0;
         if (eurPrice < PRIX_MIN_EUR) { totalSkippedPrix++; continue; }
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
@@ -317,7 +315,7 @@ async function runImportKinguin() {
 async function runFixKinguinProducts() {
   if (fixEnCours) { console.log('⚠️ Correction déjà en cours.'); return; }
   fixEnCours = true;
-  console.log('🛠️ Correction des produits Kinguin (description FR + photos + prix)...');
+  console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
     const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
     if (error) throw new Error('Lecture produits: ' + error.message);
@@ -337,10 +335,8 @@ async function runFixKinguinProducts() {
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
         const fields = { description: genererDescriptionFR(plateforme, categorie, sousCategorie) };
-        // Corriger l'image
         const nouvelleImage = getImageUrl(product);
         if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
-        // Corriger le prix si aberrant
         const eurPrice = product.price || 0;
         if (eurPrice >= PRIX_MIN_EUR) {
           const nouveauPrix = priceToFCFA(eurPrice);
