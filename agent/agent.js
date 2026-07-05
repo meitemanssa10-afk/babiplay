@@ -151,7 +151,6 @@ setInterval(checkCommandes, 30000);
 
 // ─────────────────────────────────────────────
 // Auto-ping : empêche Render (plan gratuit) de s'endormir
-// Se pingue lui-même toutes les 4 minutes
 // ─────────────────────────────────────────────
 setInterval(async () => {
   try {
@@ -168,12 +167,16 @@ setInterval(async () => {
 const IMPORT_SECRET = crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
 console.log(`👉 Import : https://babiplay-agent.onrender.com/import-kinguin-products?secret=${IMPORT_SECRET}`);
-console.log(`👉 Fix FR  : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
+console.log(`👉 Fix    : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.25');
 const EUR_TO_XOF = 655.957;
+
+// Prix minimum acceptable en EUR pour éviter les données aberrantes
+// (précommandes sans prix fixé, produits épuisés avec prix à 0, etc.)
+const PRIX_MIN_EUR = 0.5;
 
 let importEnCours = false;
 let fixEnCours = false;
@@ -182,6 +185,14 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function isSellableInFrance(product) {
   return !(product.countryLimitation || []).includes('FR');
+}
+
+// Récupère la meilleure image disponible :
+// priorité à cover.url, sinon premier screenshot, sinon vide
+function getImageUrl(product) {
+  if (product.images?.cover?.url) return product.images.cover.url;
+  if (product.images?.screenshots?.[0]?.url) return product.images.screenshots[0].url;
+  return '';
 }
 
 function mapPlatform(kinguinPlatform, productName) {
@@ -250,11 +261,11 @@ async function insertProducts(rows) {
 async function runImportKinguin() {
   if (importEnCours) { console.log('⚠️ Import déjà en cours.'); return; }
   importEnCours = true;
-  console.log(`🚀 Import Kinguin → Supabase | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA`);
+  console.log(`🚀 Import Kinguin | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA | prix min: ${PRIX_MIN_EUR}€`);
   try {
     const existingIds = await getExistingKinguinIds();
     console.log(`   ${existingIds.size} produit(s) déjà en base.`);
-    let page = 1, totalCount = null, totalImported = 0, totalSkippedExclu = 0, totalSkippedDoublon = 0;
+    let page = 1, totalCount = null, totalImported = 0, totalSkippedFR = 0, totalSkippedDoublon = 0, totalSkippedPrix = 0;
     while (true) {
       let data;
       try { data = await fetchKinguinPage(page); }
@@ -264,16 +275,20 @@ async function runImportKinguin() {
       if (!results.length) break;
       const rowsToInsert = [];
       for (const product of results) {
-        if (!isSellableInFrance(product)) { totalSkippedExclu++; continue; }
+        if (!isSellableInFrance(product)) { totalSkippedFR++; continue; }
         if (!product.productId || existingIds.has(product.productId)) { totalSkippedDoublon++; continue; }
+        // Filtrer les prix aberrants (0, négatifs, ou inférieurs au minimum)
+        const eurPrice = product.price || 0;
+        if (eurPrice < PRIX_MIN_EUR) { totalSkippedPrix++; continue; }
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
-        const prix = priceToFCFA(product.price || 0);
-        if (!prix || prix <= 0) continue;
+        const prix = priceToFCFA(eurPrice);
         rowsToInsert.push({
           nom: product.name || 'Produit Kinguin', plateforme, categorie, sous_categorie: sousCategorie,
           description: genererDescriptionFR(plateforme, categorie, sousCategorie),
-          prix, image_url: product.images?.cover?.url || '', video_url: '',
+          prix,
+          image_url: getImageUrl(product),
+          video_url: '',
           est_slider: false, slider_ordre: 1, est_populaire: false, est_actif: true,
           kinguin_product_id: product.productId, stock: 999
         });
@@ -283,12 +298,12 @@ async function runImportKinguin() {
         try { await insertProducts(rowsToInsert); totalImported += rowsToInsert.length; }
         catch (e) { console.error(`⚠️ Erreur insertion page ${page}: ${e.message}`); }
       }
-      console.log(`Page ${page} traitée — importés: ${totalImported} | exclus FR: ${totalSkippedExclu} | doublons: ${totalSkippedDoublon}`);
+      console.log(`Page ${page} — importés: ${totalImported} | exclus FR: ${totalSkippedFR} | prix invalides: ${totalSkippedPrix} | doublons: ${totalSkippedDoublon}`);
       if (page * PAGE_LIMIT >= totalCount) break;
       page++;
       await sleep(300);
     }
-    console.log(`✅ Import Kinguin terminé ! Importés: ${totalImported} | Exclus FR: ${totalSkippedExclu} | Doublons: ${totalSkippedDoublon}`);
+    console.log(`✅ Import terminé ! Importés: ${totalImported} | Exclus FR: ${totalSkippedFR} | Prix invalides: ${totalSkippedPrix} | Doublons: ${totalSkippedDoublon}`);
   } catch (e) {
     console.error('❌ Erreur fatale import Kinguin:', e);
   } finally {
@@ -297,14 +312,14 @@ async function runImportKinguin() {
 }
 
 // ─────────────────────────────────────────────
-// CORRECTION : description FR + vraies photos
+// CORRECTION : description FR + vraies photos + prix corrigés
 // ─────────────────────────────────────────────
 async function runFixKinguinProducts() {
   if (fixEnCours) { console.log('⚠️ Correction déjà en cours.'); return; }
   fixEnCours = true;
-  console.log('🛠️ Correction des produits Kinguin (description FR + photos)...');
+  console.log('🛠️ Correction des produits Kinguin (description FR + photos + prix)...');
   try {
-    const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url').not('kinguin_product_id', 'is', null);
+    const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
     if (error) throw new Error('Lecture produits: ' + error.message);
     const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
     console.log(`   ${existingMap.size} produit(s) à corriger.`);
@@ -322,8 +337,15 @@ async function runFixKinguinProducts() {
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
         const fields = { description: genererDescriptionFR(plateforme, categorie, sousCategorie) };
-        const nouvelleImage = product.images?.cover?.url || '';
+        // Corriger l'image
+        const nouvelleImage = getImageUrl(product);
         if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
+        // Corriger le prix si aberrant
+        const eurPrice = product.price || 0;
+        if (eurPrice >= PRIX_MIN_EUR) {
+          const nouveauPrix = priceToFCFA(eurPrice);
+          if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
+        }
         const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
         if (!updateErr) totalCorriges++;
       }
