@@ -12,9 +12,6 @@ const KINGUIN_BASE = 'https://gateway.kinguin.net/esa/api';
 
 console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
 
-// ─────────────────────────────────────────────
-// 1. Récupérer le détail d'un produit Kinguin par son ID exact
-// ─────────────────────────────────────────────
 async function obtenirProduitKinguinParId(productId) {
   const res = await fetch(`${KINGUIN_BASE}/v1/products/${productId}`, {
     headers: { 'X-Api-Key': KINGUIN_KEY }
@@ -23,46 +20,26 @@ async function obtenirProduitKinguinParId(productId) {
   return await res.json();
 }
 
-// ─────────────────────────────────────────────
-// 1b. Rechercher un produit sur Kinguin par nom (fallback si pas d'ID configuré)
-// ─────────────────────────────────────────────
 async function chercherProduitKinguin(nomProduit) {
   const url = `${KINGUIN_BASE}/v1/products?name=${encodeURIComponent(nomProduit)}`;
-  const res = await fetch(url, {
-    headers: { 'X-Api-Key': KINGUIN_KEY }
-  });
+  const res = await fetch(url, { headers: { 'X-Api-Key': KINGUIN_KEY } });
   if (!res.ok) throw new Error(`Kinguin search error: ${res.status}`);
   const data = await res.json();
-  if (!data.results || !data.results.length) {
-    throw new Error(`Aucun produit Kinguin trouvé pour "${nomProduit}"`);
-  }
-  // Prendre le moins cher disponible
-  const produit = data.results.sort((a, b) => (a.price || 999999) - (b.price || 999999))[0];
-  return produit;
+  if (!data.results || !data.results.length) throw new Error(`Aucun produit Kinguin trouvé pour "${nomProduit}"`);
+  return data.results.sort((a, b) => (a.price || 999999) - (b.price || 999999))[0];
 }
 
-// ─────────────────────────────────────────────
-// 2. Passer une commande sur Kinguin
-// ─────────────────────────────────────────────
 async function passerCommandeKinguin(productId, prix) {
   const res = await fetch(`${KINGUIN_BASE}/v2/order`, {
     method: 'POST',
-    headers: {
-      'X-Api-Key': KINGUIN_KEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      products: [{ productId, qty: 1, price: prix }]
-    })
+    headers: { 'X-Api-Key': KINGUIN_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ products: [{ productId, qty: 1, price: prix }] })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`Erreur commande Kinguin: ${JSON.stringify(data)}`);
-  return data; // contient orderId
+  return data;
 }
 
-// ─────────────────────────────────────────────
-// 3. Récupérer la clé une fois livrée
-// ─────────────────────────────────────────────
 async function recupererCleCommande(orderId, tentativesMax = 10) {
   for (let i = 0; i < tentativesMax; i++) {
     const res = await fetch(`${KINGUIN_BASE}/v1/order?orderId=${orderId}`, {
@@ -74,27 +51,19 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
       const keys = order.products.flatMap(p => p.keys || []);
       const delivered = keys.find(k => k.status === 'DELIVERED');
       if (delivered) {
-        // Récupérer le contenu réel de la clé
         const keyRes = await fetch(`${KINGUIN_BASE}/v2/order/${orderId}/keys/return`, {
           method: 'POST',
           headers: { 'X-Api-Key': KINGUIN_KEY }
         });
         const keyData = await keyRes.json();
-        if (Array.isArray(keyData) && keyData.length) {
-          return keyData[0].serial;
-        }
+        if (Array.isArray(keyData) && keyData.length) return keyData[0].serial;
       }
     }
-    await new Promise(r => setTimeout(r, 3000)); // attendre 3s avant nouvelle tentative
+    await new Promise(r => setTimeout(r, 3000));
   }
   throw new Error('Délai dépassé : clé non livrée par Kinguin');
 }
 
-// ─────────────────────────────────────────────
-// 4. Acheter automatiquement via Kinguin
-//    Utilise l'ID Kinguin exact configuré sur le produit BabiPlay si dispo,
-//    sinon retombe sur une recherche par nom (moins fiable).
-// ─────────────────────────────────────────────
 async function acheterViaKinguin(produitNom, kinguinProductId) {
   let produit;
   if (kinguinProductId) {
@@ -102,25 +71,17 @@ async function acheterViaKinguin(produitNom, kinguinProductId) {
     produit = await obtenirProduitKinguinParId(kinguinProductId);
     produit.productId = kinguinProductId;
   } else {
-    console.log(`⚠️ Aucun ID Kinguin configuré pour "${produitNom}" — recherche par nom (moins fiable)`);
+    console.log(`⚠️ Aucun ID Kinguin configuré pour "${produitNom}" — recherche par nom`);
     produit = await chercherProduitKinguin(produitNom);
   }
   console.log(`📦 Produit trouvé : ${produit.name} — ${produit.price}€`);
-
-  console.log('🛒 Passage de commande...');
   const commande = await passerCommandeKinguin(produit.productId || produit.kinguinId, produit.price);
   console.log(`✅ Commande Kinguin créée : ${commande.orderId}`);
-
-  console.log('🔑 Récupération de la clé...');
   const code = await recupererCleCommande(commande.orderId);
   console.log('✅ Clé récupérée !');
-
   return code;
 }
 
-// ─────────────────────────────────────────────
-// 5. Envoyer le code au client par email
-// ─────────────────────────────────────────────
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
@@ -129,7 +90,7 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
     subject: `✅ Votre code ${produitNom} - BabiPlay`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-        <h1 style="color:#6c63ff;">🎮 BabiPlay</h1>
+        <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
         <h2>Bonjour ${clientNom} !</h2>
         <p>Voici votre code d'activation :</p>
         <div style="background:#1a1a2e;color:#fff;padding:20px;border-radius:10px;text-align:center;font-size:24px;letter-spacing:3px;font-weight:bold;">
@@ -143,73 +104,40 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   console.log(`📧 Code envoyé à ${clientEmail}`);
 }
 
-// ─────────────────────────────────────────────
-// 6. Traiter une commande BabiPlay
-// ─────────────────────────────────────────────
 async function traiterCommande(commande) {
   console.log(`🔄 Traitement commande ${commande.id}...`);
   try {
     await supabase.from('commandes').update({ statut: 'en_cours' }).eq('id', commande.id);
-
-    // Récupérer le produit BabiPlay lié pour avoir son kinguin_product_id
     let kinguinProductId = null;
     const produitId = commande.product_id || commande.produit_id;
     if (produitId) {
       const { data: produitBabiPlay } = await supabase
-        .from('products')
-        .select('kinguin_product_id')
-        .eq('id', produitId)
-        .single();
+        .from('products').select('kinguin_product_id').eq('id', produitId).single();
       kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
     }
-
     const code = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
-
     if (commande.client_email) {
-      await envoyerCodeParEmail(
-        commande.client_email,
-        commande.client_nom || 'Client',
-        commande.produit_nom || commande.nom_produit,
-        code
-      );
+      await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
     }
-
     await supabase.from('commandes').update({
-      statut: 'livree',
-      livraison_auto: true,
-      livre_le: new Date().toISOString(),
-      codes_livres: [code],
-      code_jeu: code
+      statut: 'livree', livraison_auto: true,
+      livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code
     }).eq('id', commande.id);
-
     console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
-    await supabase.from('commandes').update({
-      statut: 'erreur',
-      erreur_message: err.message
-    }).eq('id', commande.id);
+    await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
   }
 }
 
-// ─────────────────────────────────────────────
-// 7. Boucle de vérification
-// ─────────────────────────────────────────────
 async function checkCommandes() {
   try {
     const { data: commandes, error } = await supabase
-      .from('commandes')
-      .select('*')
-      .eq('statut', 'payee')
-      .eq('livraison_auto', false);
-
+      .from('commandes').select('*').eq('statut', 'payee').eq('livraison_auto', false);
     if (error) throw error;
-
     if (commandes && commandes.length > 0) {
       console.log(`📦 ${commandes.length} commande(s) à traiter...`);
-      for (const commande of commandes) {
-        await traiterCommande(commande);
-      }
+      for (const commande of commandes) await traiterCommande(commande);
     } else {
       console.log('✅ Aucune commande en attente.');
     }
@@ -221,40 +149,50 @@ async function checkCommandes() {
 checkCommandes();
 setInterval(checkCommandes, 30000);
 
+// ─────────────────────────────────────────────
+// Auto-ping : empêche Render (plan gratuit) de s'endormir
+// Se pingue lui-même toutes les 4 minutes
+// ─────────────────────────────────────────────
+setInterval(async () => {
+  try {
+    await fetch('https://babiplay-agent.onrender.com');
+    console.log('🏓 Auto-ping OK — service maintenu éveillé');
+  } catch (e) {
+    console.log('⚠️ Auto-ping échoué:', e.message);
+  }
+}, 4 * 60 * 1000);
+
 // ═════════════════════════════════════════════════════════════
 // IMPORT EN MASSE DU CATALOGUE KINGUIN (vendable en France)
-// Déclenché une seule fois via une URL secrète (voir tout en bas).
 // ═════════════════════════════════════════════════════════════
 const IMPORT_SECRET = crypto.randomBytes(8).toString('hex');
-console.log(`🔐 Code secret pour lancer l'import Kinguin : ${IMPORT_SECRET}`);
-console.log(`👉 Visite : https://babiplay-agent.onrender.com/import-kinguin-products?secret=${IMPORT_SECRET}`);
+console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
+console.log(`👉 Import : https://babiplay-agent.onrender.com/import-kinguin-products?secret=${IMPORT_SECRET}`);
+console.log(`👉 Fix FR  : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.25');
-const EUR_TO_XOF = 655.957; // taux fixe officiel CFA/EUR
+const EUR_TO_XOF = 655.957;
 
 let importEnCours = false;
+let fixEnCours = false;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function isSellableInFrance(product) {
-  const excluded = product.countryLimitation || [];
-  return !excluded.includes('FR');
+  return !(product.countryLimitation || []).includes('FR');
 }
 
 function mapPlatform(kinguinPlatform, productName) {
   const p = (kinguinPlatform || '').toLowerCase();
   const n = (productName || '').toLowerCase();
-  if (p.includes('playstation') || p.includes('psn')) {
+  if (p.includes('playstation') || p.includes('psn'))
     return { plateforme: 'psn', categorie: n.includes('ps5') ? 'PS5' : 'PS4' };
-  }
-  if (p.includes('xbox')) {
+  if (p.includes('xbox'))
     return { plateforme: 'xbox', categorie: p.includes('series') || n.includes('series') ? 'Xbox Series X|S' : 'Xbox One' };
-  }
-  if (p.includes('nintendo') || p.includes('switch') || p === '2ds' || p === '3ds') {
+  if (p.includes('nintendo') || p.includes('switch') || p === '2ds' || p === '3ds')
     return { plateforme: 'nintendo', categorie: 'Switch' };
-  }
   let categorie = 'Steam';
   if (p.includes('epic')) categorie = 'Epic Games';
   else if (p.includes('battle.net') || p.includes('battlenet')) categorie = 'Battle.net';
@@ -263,7 +201,6 @@ function mapPlatform(kinguinPlatform, productName) {
   else if (p.includes('rockstar')) categorie = 'Rockstar Games';
   else if (p.includes('gog')) categorie = 'GOG';
   else if (p.includes('microsoft store')) categorie = 'Microsoft Store';
-  else if (p.includes('steam')) categorie = 'Steam';
   return { plateforme: 'pc', categorie };
 }
 
@@ -276,13 +213,19 @@ function guessSousCategorie(product) {
   return '';
 }
 
-function stripHtml(str) {
-  return (str || '').replace(/<[^>]*>/g, '').slice(0, 2000);
+function genererDescriptionFR(plateforme, categorie, sousCategorie) {
+  const storeLabel = { psn: 'PlayStation Store', xbox: 'Xbox', pc: categorie || 'PC', nintendo: 'Nintendo eShop' }[plateforme] || 'la plateforme';
+  if (sousCategorie === 'Cartes cadeaux')
+    return `Carte cadeau numérique ${storeLabel} — le code est envoyé par email immédiatement après le paiement. À utiliser sur un compte enregistré dans la région correspondante.`;
+  if (sousCategorie === 'Game Pass')
+    return `Abonnement Xbox Game Pass — accès à la bibliothèque de jeux Xbox et PC. Code d'activation envoyé par email après achat.`;
+  if (sousCategorie === 'Abonnements')
+    return `Abonnement premium ${storeLabel} — profitez du jeu en ligne et d'avantages exclusifs. Code envoyé par email après achat.`;
+  return `Clé d'activation officielle pour ${storeLabel}. Téléchargement et activation immédiats après réception du code par email.`;
 }
 
 function priceToFCFA(eurPrice) {
-  const withMargin = eurPrice * (1 + MARGIN);
-  return Math.round(withMargin * EUR_TO_XOF);
+  return Math.round(eurPrice * (1 + MARGIN) * EUR_TO_XOF);
 }
 
 async function fetchKinguinPage(page) {
@@ -293,10 +236,7 @@ async function fetchKinguinPage(page) {
 }
 
 async function getExistingKinguinIds() {
-  const { data, error } = await supabase
-    .from('products')
-    .select('kinguin_product_id')
-    .not('kinguin_product_id', 'is', null);
+  const { data, error } = await supabase.from('products').select('kinguin_product_id').not('kinguin_product_id', 'is', null);
   if (error) throw new Error('Impossible de lire les produits existants: ' + error.message);
   return new Set((data || []).map(r => r.kinguin_product_id).filter(Boolean));
 }
@@ -308,90 +248,47 @@ async function insertProducts(rows) {
 }
 
 async function runImportKinguin() {
-  if (importEnCours) {
-    console.log('⚠️ Import déjà en cours, requête ignorée.');
-    return;
-  }
+  if (importEnCours) { console.log('⚠️ Import déjà en cours.'); return; }
   importEnCours = true;
   console.log(`🚀 Import Kinguin → Supabase | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA`);
-
   try {
-    console.log('📥 Lecture des produits déjà importés...');
     const existingIds = await getExistingKinguinIds();
     console.log(`   ${existingIds.size} produit(s) déjà en base.`);
-
-    let page = 1;
-    let totalCount = null;
-    let totalImported = 0;
-    let totalSkippedExclu = 0;
-    let totalSkippedDoublon = 0;
-
+    let page = 1, totalCount = null, totalImported = 0, totalSkippedExclu = 0, totalSkippedDoublon = 0;
     while (true) {
       let data;
-      try {
-        data = await fetchKinguinPage(page);
-      } catch (e) {
-        console.error(`⚠️ Erreur page ${page}: ${e.message} — nouvelle tentative dans 5s`);
-        await sleep(5000);
-        continue;
-      }
-
-      if (totalCount === null) {
-        totalCount = data.item_count;
-        console.log(`📦 ${totalCount} produits au total chez Kinguin.`);
-      }
-
+      try { data = await fetchKinguinPage(page); }
+      catch (e) { console.error(`⚠️ Erreur page ${page}: ${e.message} — retry dans 5s`); await sleep(5000); continue; }
+      if (totalCount === null) { totalCount = data.item_count; console.log(`📦 ${totalCount} produits au total chez Kinguin.`); }
       const results = data.results || [];
       if (!results.length) break;
-
       const rowsToInsert = [];
       for (const product of results) {
         if (!isSellableInFrance(product)) { totalSkippedExclu++; continue; }
         if (!product.productId || existingIds.has(product.productId)) { totalSkippedDoublon++; continue; }
-
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
+        const sousCategorie = guessSousCategorie(product);
         const prix = priceToFCFA(product.price || 0);
         if (!prix || prix <= 0) continue;
-
         rowsToInsert.push({
-          nom: product.name || 'Produit Kinguin',
-          plateforme,
-          categorie,
-          sous_categorie: guessSousCategorie(product),
-          description: stripHtml(product.description),
-          prix,
-          image_url: product.images?.cover?.url || '',
-          video_url: '',
-          est_slider: false,
-          slider_ordre: 1,
-          est_populaire: false,
-          est_actif: true,
-          kinguin_product_id: product.productId,
-          stock: 999
+          nom: product.name || 'Produit Kinguin', plateforme, categorie, sous_categorie: sousCategorie,
+          description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+          prix, image_url: product.images?.cover?.url || '', video_url: '',
+          est_slider: false, slider_ordre: 1, est_populaire: false, est_actif: true,
+          kinguin_product_id: product.productId, stock: 999
         });
         existingIds.add(product.productId);
       }
-
       if (rowsToInsert.length) {
-        try {
-          await insertProducts(rowsToInsert);
-          totalImported += rowsToInsert.length;
-        } catch (e) {
-          console.error(`⚠️ Erreur insertion page ${page}: ${e.message}`);
-        }
+        try { await insertProducts(rowsToInsert); totalImported += rowsToInsert.length; }
+        catch (e) { console.error(`⚠️ Erreur insertion page ${page}: ${e.message}`); }
       }
-
       console.log(`Page ${page} traitée — importés: ${totalImported} | exclus FR: ${totalSkippedExclu} | doublons: ${totalSkippedDoublon}`);
-
       if (page * PAGE_LIMIT >= totalCount) break;
       page++;
       await sleep(300);
     }
-
-    console.log('✅ Import Kinguin terminé !');
-    console.log(`   Produits importés : ${totalImported}`);
-    console.log(`   Exclus (non vendables en France) : ${totalSkippedExclu}`);
-    console.log(`   Déjà existants (ignorés) : ${totalSkippedDoublon}`);
+    console.log(`✅ Import Kinguin terminé ! Importés: ${totalImported} | Exclus FR: ${totalSkippedExclu} | Doublons: ${totalSkippedDoublon}`);
   } catch (e) {
     console.error('❌ Erreur fatale import Kinguin:', e);
   } finally {
@@ -400,28 +297,75 @@ async function runImportKinguin() {
 }
 
 // ─────────────────────────────────────────────
-// Serveur HTTP (santé Render + déclencheur d'import)
+// CORRECTION : description FR + vraies photos
+// ─────────────────────────────────────────────
+async function runFixKinguinProducts() {
+  if (fixEnCours) { console.log('⚠️ Correction déjà en cours.'); return; }
+  fixEnCours = true;
+  console.log('🛠️ Correction des produits Kinguin (description FR + photos)...');
+  try {
+    const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url').not('kinguin_product_id', 'is', null);
+    if (error) throw new Error('Lecture produits: ' + error.message);
+    const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
+    console.log(`   ${existingMap.size} produit(s) à corriger.`);
+    let page = 1, totalCount = null, totalCorriges = 0;
+    while (true) {
+      let pageData;
+      try { pageData = await fetchKinguinPage(page); }
+      catch (e) { console.error(`⚠️ Erreur page ${page}: ${e.message} — retry dans 5s`); await sleep(5000); continue; }
+      if (totalCount === null) { totalCount = pageData.item_count; console.log(`📦 ${totalCount} produits chez Kinguin.`); }
+      const results = pageData.results || [];
+      if (!results.length) break;
+      for (const product of results) {
+        const row = existingMap.get(product.productId);
+        if (!row) continue;
+        const { plateforme, categorie } = mapPlatform(product.platform, product.name);
+        const sousCategorie = guessSousCategorie(product);
+        const fields = { description: genererDescriptionFR(plateforme, categorie, sousCategorie) };
+        const nouvelleImage = product.images?.cover?.url || '';
+        if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
+        const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
+        if (!updateErr) totalCorriges++;
+      }
+      console.log(`Page ${page} traitée — corrigés: ${totalCorriges}`);
+      if (page * PAGE_LIMIT >= totalCount) break;
+      page++;
+      await sleep(300);
+    }
+    console.log(`✅ Correction terminée ! ${totalCorriges} produits mis à jour.`);
+  } catch (e) {
+    console.error('❌ Erreur fatale correction:', e);
+  } finally {
+    fixEnCours = false;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Serveur HTTP
 // ─────────────────────────────────────────────
 const http = require('http');
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  const secret = url.searchParams.get('secret');
+
   if (url.pathname === '/import-kinguin-products') {
-    const secret = url.searchParams.get('secret');
-    if (secret !== IMPORT_SECRET) {
-      res.writeHead(403);
-      res.end('Code secret invalide.');
-      return;
-    }
-    if (importEnCours) {
-      res.writeHead(200);
-      res.end('Un import est déjà en cours — regarde les logs Render pour suivre la progression.');
-      return;
-    }
-    runImportKinguin(); // lancé en arrière-plan, pas attendu ici
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (importEnCours) { res.writeHead(200); res.end('Import déjà en cours — voir logs Render.'); return; }
+    runImportKinguin();
     res.writeHead(200);
-    res.end('✅ Import démarré ! Va dans Render → Logs pour suivre la progression en direct.');
+    res.end('✅ Import démarré ! Va dans Render → Logs pour suivre la progression.');
     return;
   }
+
+  if (url.pathname === '/fix-kinguin-products') {
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (fixEnCours) { res.writeHead(200); res.end('Correction déjà en cours — voir logs Render.'); return; }
+    runFixKinguinProducts();
+    res.writeHead(200);
+    res.end('✅ Correction démarrée ! Va dans Render → Logs pour suivre la progression.');
+    return;
+  }
+
   res.writeHead(200);
   res.end('BabiPlay Agent (Kinguin) OK');
 }).listen(process.env.PORT || 3000);
