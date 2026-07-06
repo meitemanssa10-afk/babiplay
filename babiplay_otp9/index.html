@@ -56,13 +56,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .ud-item:hover{background:var(--bg3)}
 .ud-item.red{color:#ff6b6b}
 
-/* FILTRES PLATEFORMES — capsule arrondie unique */
-.filter-bar-outer{display:flex;justify-content:center;padding:14px 16px;background:var(--bg2);border-bottom:1px solid var(--border)}
-.filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:var(--bg3);border:1px solid var(--border2);max-width:100%;overflow-x:auto;scrollbar-width:none}
+/* FILTRES PLATEFORMES — capsule flottante par-dessus le slider */
+.hero-wrap{position:relative}
+.filter-bar-overlay{position:absolute;top:14px;left:0;right:0;z-index:20;display:flex;justify-content:center;padding:0 16px;pointer-events:none}
+.filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:rgba(17,17,22,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);max-width:100%;overflow-x:auto;scrollbar-width:none;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .filter-bar::-webkit-scrollbar{display:none}
-.fchip{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted2);padding:8px 16px;border-radius:999px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.fchip{display:flex;align-items:center;gap:6px;background:none;border:none;color:#fff;opacity:.8;padding:8px 16px;border-radius:999px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
 .fchip img{width:16px;height:16px;object-fit:contain}
-.fchip.active{background:var(--fc,var(--gold));color:#0b0b0e;font-weight:600}
+.fchip.active{background:var(--fc,var(--gold));color:#0b0b0e;font-weight:600;opacity:1}
 .fchip.active img{filter:brightness(0) invert(1)}
 
 /* EN-TÊTE DE CATÉGORIE (façon Instant Gaming, adapté à BabiPlay) */
@@ -255,29 +256,31 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
   </div>
 </nav>
 
-<!-- FILTRES -->
-<div class="filter-bar-outer">
-<div class="filter-bar" id="filter-bar">
-  <button class="fchip active" onclick="setFilter('all',this)" data-filter="all">🎮 Tout</button>
-  <button class="fchip" onclick="setFilter('psn',this)" data-filter="psn">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Playstation_logo_colour.svg/120px-Playstation_logo_colour.svg.png" alt="PSN"> PlayStation
-  </button>
-  <button class="fchip" onclick="setFilter('xbox',this)" data-filter="xbox">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/120px-Xbox_one_logo.svg.png" alt="Xbox"> Xbox
-  </button>
-  <button class="fchip" onclick="setFilter('pc',this)" data-filter="pc">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png" alt="PC"> PC
-  </button>
-  <button class="fchip" onclick="setFilter('nintendo',this)" data-filter="nintendo">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
-  </button>
-</div>
-</div>
+<!-- HERO : slider + capsule de plateformes flottante par-dessus -->
+<div class="hero-wrap">
+  <div class="filter-bar-overlay">
+    <div class="filter-bar" id="filter-bar">
+      <button class="fchip active" onclick="setFilter('all',this)" data-filter="all">🎮 Tout</button>
+      <button class="fchip" onclick="setFilter('psn',this)" data-filter="psn">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Playstation_logo_colour.svg/120px-Playstation_logo_colour.svg.png" alt="PSN"> PlayStation
+      </button>
+      <button class="fchip" onclick="setFilter('xbox',this)" data-filter="xbox">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/120px-Xbox_one_logo.svg.png" alt="Xbox"> Xbox
+      </button>
+      <button class="fchip" onclick="setFilter('pc',this)" data-filter="pc">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/120px-Steam_icon_logo.svg.png" alt="PC"> PC
+      </button>
+      <button class="fchip" onclick="setFilter('nintendo',this)" data-filter="nintendo">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
+      </button>
+    </div>
+  </div>
 
-<!-- SLIDER -->
-<div class="slider-wrap" id="slider-wrap">
-  <div class="slider-track" id="slider-track"></div>
-  <div class="sdots" id="sdots"></div>
+  <!-- SLIDER -->
+  <div class="slider-wrap" id="slider-wrap">
+    <div class="slider-track" id="slider-track"></div>
+    <div class="sdots" id="sdots"></div>
+  </div>
 </div>
 
 <!-- CATALOGUE PAR SECTIONS -->
@@ -449,10 +452,20 @@ async function loadProducts() {
 // SLIDER
 function renderSlider() {
   sliderProds = products.filter(p => p.est_slider).sort((a, b) => (a.slider_ordre || 99) - (b.slider_ordre || 99));
-  if (!sliderProds.length) { document.getElementById('slider-wrap').style.display = 'none'; return; }
-  document.getElementById('slider-wrap').style.display = 'block';
   const track = document.getElementById('slider-track');
   const dots = document.getElementById('sdots');
+  if (!sliderProds.length) {
+    track.innerHTML = `<div class="slide" style="cursor:default">
+      <div class="slide-bg" style="background:linear-gradient(135deg,#1a1035,#2a1547,#3d1f1f)"></div>
+      <div class="slide-overlay"></div>
+      <div class="slide-content">
+        <div class="slide-title">BabiPlay CI</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.7)">Cartes gaming & jeux en FCFA — Orange Money, MTN, Moov</div>
+      </div>
+    </div>`;
+    dots.innerHTML = '';
+    return;
+  }
   track.innerHTML = sliderProds.map(p => {
     const color = pColor(p.plateforme);
     let media = p.video_url
