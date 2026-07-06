@@ -3,473 +3,319 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BabiPlay CI — Produit</title>
+<title>Produit — BabiPlay CI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{
-  --bg:#0b0b0e;--bg2:#111116;--bg3:#18181f;--bg4:#1e1e28;
-  --border:#2a2a36;--border2:#363644;
-  --text:#e8e8f0;--muted:#5a5a78;--muted2:#8888aa;
-  --gold:#f5a623;--gold2:#ffbe55;
-  --r:10px;--rlg:14px;
-}
-html{scroll-behavior:smooth}
+:root{--bg:#0b0b0e;--bg2:#111116;--bg3:#18181f;--bg4:#1e1e28;--border:#2a2a36;--border2:#363644;--text:#e8e8f0;--muted:#5a5a78;--muted2:#8888aa;--gold:#f5a623;--gold2:#ffbe55;--r:10px}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:var(--bg2)}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-/* NAV */
-nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;gap:8px}
-.logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:24px;letter-spacing:1px;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;flex-shrink:0}
-.logo small{display:block;font-size:8px;letter-spacing:3px;-webkit-text-fill-color:var(--muted);font-family:'DM Sans',sans-serif;margin-top:-2px}
-.nav-right{display:flex;align-items:center;gap:8px}
-.nav-icon-btn{background:none;border:none;color:var(--muted2);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;position:relative;transition:color .2s;text-decoration:none}
-.nav-icon-btn:hover{color:var(--gold)}
-.nav-cart-badge{position:absolute;top:4px;right:4px;background:var(--gold);color:#000;width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center}
-.nav-cart-badge.show{display:flex}
-.btn-back{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);color:var(--muted2);padding:7px 14px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;text-decoration:none;transition:all .2s}
-.btn-back:hover{color:var(--text);border-color:var(--gold)}
+nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 16px;gap:12px}
+.logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none}
+.back-btn{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s;font-family:'DM Sans',sans-serif}
+.back-btn:hover{color:var(--text);border-color:var(--border2)}
 
-/* HERO PRODUIT */
-.product-hero{position:relative;overflow:hidden;min-height:320px;display:flex;align-items:flex-end}
-@media(min-width:768px){.product-hero{min-height:420px}}
-.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.35)}
-.hero-gradient{position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,11,14,1) 0%,rgba(11,11,14,.6) 50%,rgba(11,11,14,.1) 100%)}
-.hero-content{position:relative;z-index:2;width:100%;max-width:1100px;margin:0 auto;padding:24px 16px 32px;display:flex;flex-direction:column;gap:16px}
-@media(min-width:768px){.hero-content{flex-direction:row;align-items:flex-end;gap:32px}}
+/* HERO */
+.hero{position:relative;min-height:220px;display:flex;align-items:flex-end;overflow:hidden}
+@media(min-width:700px){.hero{min-height:320px}}
+.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.3)}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,.5) 50%,transparent 100%)}
+.hero-content{position:relative;z-index:2;padding:20px 16px;width:100%}
+@media(min-width:700px){.hero-content{padding:32px 40px;max-width:700px}}
+.hero-plat{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;border-radius:4px;margin-bottom:10px;text-transform:uppercase}
+.hero-title{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;line-height:1.2;margin-bottom:6px}
+@media(min-width:700px){.hero-title{font-size:38px}}
+.hero-meta{font-size:12px;color:var(--muted2);display:flex;align-items:center;gap:10px}
 
-.hero-img-wrap{flex-shrink:0}
-.hero-img{width:180px;height:135px;object-fit:cover;border-radius:12px;border:2px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.6)}
-@media(min-width:768px){.hero-img{width:240px;height:180px}}
-.hero-img-fb{width:180px;height:135px;border-radius:12px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:40px}
-@media(min-width:768px){.hero-img-fb{width:240px;height:180px}}
-
-.hero-info{flex:1}
-.hero-plat{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.hero-title{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;line-height:1.15;margin-bottom:12px}
-@media(min-width:768px){.hero-title{font-size:38px}}
-.hero-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.badge-item{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:20px;font-size:12px;color:var(--muted2)}
-
-/* CONTENU PRINCIPAL */
-.main-wrap{max-width:1100px;margin:0 auto;padding:0 16px;display:grid;grid-template-columns:1fr;gap:24px}
-@media(min-width:900px){.main-wrap{grid-template-columns:1fr 380px;align-items:start}}
+/* LAYOUT */
+.product-layout{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+@media(min-width:900px){.product-layout{flex-direction:row;align-items:flex-start}}
 
 /* COLONNE GAUCHE */
-.left-col{display:flex;flex-direction:column;gap:20px;padding-top:24px}
+.product-main{flex:1;display:flex;flex-direction:column;gap:14px}
 
-/* COLONNE DROITE — ACHAT */
-.buy-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rlg);padding:20px;position:sticky;top:72px;margin-top:24px}
-@media(min-width:900px){.buy-box{margin-top:24px}}
-.buy-box-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:4px}
-.buy-box-sub{font-size:12px;color:var(--muted2);margin-bottom:16px;display:flex;align-items:center;gap:6px}
-.price-block{margin-bottom:16px}
-.price-fcfa{font-family:'Rajdhani',sans-serif;font-size:36px;font-weight:700;color:var(--gold);line-height:1}
-.price-eur{font-size:13px;color:var(--muted);margin-top:4px}
-.btn-add{width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:14px;border-radius:12px;font-size:17px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;transition:opacity .2s;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-add:hover{opacity:.9}
-.btn-add:disabled{opacity:.4;cursor:not-allowed}
-.buy-features{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-.buy-feature{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2)}
-.buy-feature span:first-child{font-size:16px;flex-shrink:0}
+/* GALERIE */
+.gallery-main{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;border:1px solid var(--border)}
+.gallery-fb{width:100%;aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:60px}
+.fb-psn{background:linear-gradient(140deg,#001a50,#0057b8)}
+.fb-xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
+.fb-pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
+.fb-nintendo{background:linear-gradient(140deg,#8b0009,#e60012)}
 
-/* SECTIONS INFO */
-.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden}
-.info-card-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.info-card-head h3{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600;letter-spacing:.5px}
-.info-card-body{padding:16px}
-.info-card-body p{font-size:13px;color:var(--muted2);line-height:1.8}
+/* INFOS PRODUIT */
+.info-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px}
+.info-box h3{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.info-desc{font-size:13px;color:var(--muted2);line-height:1.7}
 
-/* STEPS */
-.steps{display:flex;flex-direction:column;gap:12px}
+/* ACTIVATION STEPS */
+.steps{display:flex;flex-direction:column;gap:10px}
 .step{display:flex;align-items:flex-start;gap:12px}
-.step-num{width:28px;height:28px;border-radius:50%;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);color:var(--gold);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.step-text{font-size:13px;color:var(--muted2);line-height:1.7}
-.step-text strong{color:var(--text)}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-content h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.step-content p{font-size:12px;color:var(--muted2);line-height:1.5}
+
+/* TABS ACTIVATION */
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:5px 12px;border-radius:16px;font-size:12px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
+.tab.active{border-color:var(--gold);color:var(--gold);background:rgba(245,166,35,.08)}
 
 /* AUTRES ÉDITIONS */
-.editions-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(min-width:500px){.editions-grid{grid-template-columns:repeat(3,1fr)}}
-@media(min-width:768px){.editions-grid{grid-template-columns:repeat(4,1fr)}}
-.edition-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
-.edition-card:hover{border-color:var(--gold);background:var(--bg4)}
-.edition-card.active{border-color:var(--gold);background:rgba(245,166,35,.06)}
-.edition-img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;margin-bottom:8px}
-.edition-img-fb{width:100%;aspect-ratio:16/9;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:24px}
-.edition-name{font-size:12px;font-weight:600;margin-bottom:4px;line-height:1.3}
-.edition-price{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--gold)}
+.editions-grid{display:flex;gap:8px;flex-wrap:wrap}
+.edition-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
+.edition-card:hover,.edition-card.active{border-color:var(--gold);background:rgba(245,166,35,.06)}
+.edition-card .ec-name{font-size:12px;font-weight:600;margin-bottom:2px}
+.edition-card .ec-price{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--gold)}
 
-/* PRODUITS SIMILAIRES */
-.similar-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(min-width:500px){.similar-grid{grid-template-columns:repeat(3,1fr)}}
-@media(min-width:768px){.similar-grid{grid-template-columns:repeat(4,1fr)}}
-.sim-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
-.sim-card:hover{transform:translateY(-3px);border-color:var(--gold);box-shadow:0 8px 24px rgba(245,166,35,.1)}
-.sim-img{width:100%;aspect-ratio:16/9;object-fit:cover}
-.sim-img-fb{width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-size:32px}
-.sim-body{padding:8px 10px 10px}
-.sim-name{font-size:12px;font-weight:600;margin-bottom:4px;line-height:1.3}
-.sim-price{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--gold)}
-.sim-price small{font-size:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:400}
+/* COLONNE DROITE — ACHAT */
+.buy-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;position:sticky;top:72px}
+@media(min-width:900px){.buy-box{min-width:280px;max-width:300px}}
+.buy-img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;margin-bottom:4px}
+.buy-img-fb{width:100%;aspect-ratio:16/9;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:40px}
+.buy-name{font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;line-height:1.3}
+.buy-price{font-family:'Rajdhani',sans-serif;font-size:34px;font-weight:700;color:var(--gold);line-height:1}
+.buy-price small{display:block;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--muted2);font-weight:400}
+.buy-stock{font-size:12px;color:var(--muted2);display:flex;align-items:center;gap:5px}
+.buy-stock-dot{width:7px;height:7px;border-radius:50%;background:#52b043;flex-shrink:0}
+.btn-add{width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:14px;border-radius:12px;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;transition:opacity .2s}
+.btn-add:active{opacity:.85}
+.buy-perks{display:flex;flex-direction:column;gap:7px}
+.perk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted2)}
+.perk-icon{font-size:16px;flex-shrink:0}
 
-/* SECTION TITRE */
-.section-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+/* SIMILAIRES */
+.sim-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:500px){.sim-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:700px){.sim-grid{grid-template-columns:repeat(4,1fr)}}
+.sim-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;text-decoration:none;display:block;color:var(--text);transition:border-color .2s}
+.sim-card:hover{border-color:var(--gold)}
+.sim-card img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.sim-card-fb{width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-size:24px}
+.sim-info{padding:8px 10px}
+.sim-name{font-size:12px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sim-price{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--gold)}
 
-/* PANIER DRAWER */
-.drawer{position:fixed;bottom:-100%;left:0;right:0;max-height:85vh;background:var(--bg2);border-top:1px solid var(--border);border-radius:20px 20px 0 0;z-index:600;transition:bottom .35s ease;display:flex;flex-direction:column}
-@media(min-width:600px){.drawer{top:0;bottom:auto;right:-420px;left:auto;width:400px;height:100%;max-height:100vh;border-radius:0;border-top:none;border-left:1px solid var(--border);transition:right .3s ease}}
-.drawer.open{bottom:0}
-@media(min-width:600px){.drawer.open{right:0;bottom:auto}}
-.drawer-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
-@media(min-width:600px){.drawer-handle{display:none}}
-.drawer-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.drawer-head h3{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700}
-.drawer-close{background:var(--bg3);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.drawer-items{flex:1;overflow-y:auto;padding:12px 16px}
-.drawer-empty{text-align:center;padding:40px 0;color:var(--muted)}
-.cart-item{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
-.ci-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0}
-.ci-thumb-fb{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--bg4);font-size:20px}
-.ci-info{flex:1;min-width:0}
-.ci-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ci-price{font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;font-weight:700;margin-top:2px}
-.ci-rm{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0}
-.drawer-foot{padding:14px 16px;border-top:1px solid var(--border)}
-.total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
-.total-lbl{font-size:13px;color:var(--muted2)}
-.total-amt{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold)}
-.pay-btn{width:100%;background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:14px;border-radius:12px;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;transition:opacity .2s}
-.pay-btn:disabled{opacity:.4;cursor:not-allowed}
+.section-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:14px;padding:0 16px}
+@media(min-width:900px){.section-title{padding:0}}
 
-/* TOAST */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);border:1px solid var(--gold);color:var(--text);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;transition:transform .3s ease;white-space:nowrap;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:#52b043}
-.toast.err{border-color:#ff6b6b}
 
-/* LOADER */
-.loader{display:flex;align-items:center;justify-content:center;min-height:60vh;font-size:14px;color:var(--muted)}
-.skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+.skeleton{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:10px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:20px 16px;text-align:center;margin-top:40px}
-.foot-logo{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;background:linear-gradient(100deg,#f5a623,#ff7f50);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-footer p{font-size:11px;color:var(--muted);margin-top:4px}
-
-.plat-color-psn{background:linear-gradient(140deg,#001a50,#0057b8)}
-.plat-color-xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
-.plat-color-pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
-.plat-color-nintendo{background:linear-gradient(140deg,#8b0009,#e60012)}
 </style>
 </head>
 <body>
 
 <nav>
-  <a class="logo" href="index.html">BabiPlay<small>GAMING CI</small></a>
-  <div class="nav-right">
-    <a href="index.html" class="btn-back">← Retour</a>
-    <button class="nav-icon-btn" onclick="toggleDrawer()" title="Panier">
-      🛒<span class="nav-cart-badge" id="cart-badge">0</span>
-    </button>
-  </div>
+  <a class="back-btn" href="index.html">← Retour</a>
+  <a class="logo" href="index.html">BabiPlay</a>
 </nav>
 
-<div id="page-content"><div class="loader">Chargement...</div></div>
-
-<!-- PANIER -->
-<div class="drawer" id="drawer">
-  <div class="drawer-handle"></div>
-  <div class="drawer-head">
-    <h3>🛒 Mon Panier</h3>
-    <button class="drawer-close" onclick="toggleDrawer()">✕</button>
-  </div>
-  <div class="drawer-items" id="drawer-items">
-    <div class="drawer-empty">🛒<br>Votre panier est vide</div>
-  </div>
-  <div class="drawer-foot">
-    <div class="total-row">
-      <span class="total-lbl">Total</span>
-      <span class="total-amt" id="cart-total">0 FCFA</span>
-    </div>
-    <button class="pay-btn" id="pay-btn" disabled onclick="checkout()">💳 PAYER MAINTENANT</button>
+<div id="page-content">
+  <!-- Chargement skeleton -->
+  <div style="padding:20px 16px;display:flex;flex-direction:column;gap:14px">
+    <div class="skeleton" style="height:220px;border-radius:14px"></div>
+    <div class="skeleton" style="height:60px;border-radius:8px;max-width:300px"></div>
+    <div class="skeleton" style="height:180px;border-radius:14px"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-let sb, currentProduct = null, allProducts = [], cart = [];
+let sb, produit = null, allProducts = [];
+const params = new URLSearchParams(location.search);
+const prodId = params.get('id');
+
+const fmt = n => (n || 0).toLocaleString('fr-FR');
+const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴' }[p] || '🎮');
+const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo' }[p] || p);
+const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#66c0f4', nintendo:'#ff6b6b' }[p] || '#f5a623');
+const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo' }[p] || 'fb-pc');
+
+const STEPS = {
+  psn: [
+    { t: 'Connectez-vous au PlayStation Store', d: "Depuis votre PS4, PS5 ou via store.playstation.com" },
+    { t: 'Accédez au porte-monnaie', d: "Profil → PlayStation Store → Alimenter le porte-monnaie" },
+    { t: 'Entrez votre code', d: "Saisissez les 12 caractères du code reçu par email" },
+    { t: 'C\'est crédité !', d: "Les fonds sont immédiatement disponibles sur votre compte" },
+  ],
+  xbox: [
+    { t: 'Allumez votre console Xbox ou ouvrez Xbox.com', d: "Connectez-vous à votre compte Microsoft" },
+    { t: 'Accédez à "Utiliser un code"', d: "Menu → Microsoft Store → Utiliser un code" },
+    { t: 'Entrez votre code à 25 caractères', d: "Format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" },
+    { t: 'Confirmez et profitez !', d: "Le crédit ou l'abonnement est activé instantanément" },
+  ],
+  nintendo: [
+    { t: 'Accédez au Nintendo eShop', d: "Depuis votre Switch, ouvrez le Nintendo eShop" },
+    { t: 'Cliquez sur votre profil', d: "En haut à droite → Entrer un code" },
+    { t: 'Saisissez votre code à 16 caractères', d: "Format XXXX-XXXX-XXXX-XXXX" },
+    { t: 'Confirmez !', d: "Le crédit est ajouté à votre compte Nintendo immédiatement" },
+  ],
+  pc: [
+    { t: 'Ouvrez Steam / Epic / Battle.net', d: "Lancez l'application correspondante sur votre PC" },
+    { t: 'Accédez à \"Activer un produit\"', d: "Steam : Jeux → Activer un produit | Epic : Compte → Codes" },
+    { t: 'Entrez votre code', d: "Copiez-collez le code reçu par email" },
+    { t: 'Téléchargez et jouez !', d: "Le jeu ou le crédit est ajouté à votre bibliothèque" },
+  ],
+};
 
 (async () => {
   const r = await fetch('/.netlify/functions/get-config');
   const c = await r.json();
   sb = supabase.createClient(c.surl, c.skey);
-  const id = new URLSearchParams(location.search).get('id');
-  if (!id) { location.href = 'index.html'; return; }
-  await loadProduct(id);
+
+  if (!prodId) { render404(); return; }
+
+  const [{ data: p }, { data: all }] = await Promise.all([
+    sb.from('products').select('*').eq('id', prodId).single(),
+    sb.from('products').select('*').eq('est_actif', true)
+  ]);
+
+  if (!p) { render404(); return; }
+  produit = p;
+  allProducts = all || [];
+  document.title = p.nom + ' — BabiPlay CI';
+  renderPage();
 })();
 
-const fmt = n => (n || 0).toLocaleString('fr-FR');
-const pClass = p => ({ psn:'psn', xbox:'xbox', pc:'pc', steam:'pc', nintendo:'nin' }[p] || 'psn');
-const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo' }[p] || p);
-const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴' }[p] || '🎮');
-const pBg = p => ({ psn:'plat-color-psn', xbox:'plat-color-xbox', pc:'plat-color-pc', nintendo:'plat-color-nintendo' }[p] || 'plat-color-pc');
-const pEurApprox = fcfa => (fcfa / (655.957 * 1.25)).toFixed(2);
+function renderPage() {
+  const p = produit;
+  const color = pColor(p.plateforme);
+  const steps = STEPS[p.plateforme] || STEPS.pc;
+  const editions = allProducts.filter(x => x.plateforme === p.plateforme && x.sous_categorie === p.sous_categorie && x.id !== p.id).slice(0, 6);
+  const similaires = allProducts.filter(x => x.plateforme === p.plateforme && x.id !== p.id && x.sous_categorie !== p.sous_categorie).slice(0, 8);
 
-async function loadProduct(id) {
-  const [{ data: product }, { data: all }] = await Promise.all([
-    sb.from('products').select('*').eq('id', id).single(),
-    sb.from('products').select('*').eq('est_actif', true).order('est_populaire', { ascending: false })
-  ]);
-  if (!product) { location.href = 'index.html'; return; }
-  currentProduct = product;
-  allProducts = all || [];
-  document.title = `${product.nom} — BabiPlay CI`;
-  renderPage(product);
-  updateCartUI();
-}
-
-function renderPage(p) {
   const imgHtml = p.image_url
-    ? `<img class="hero-img" src="${p.image_url}" alt="${p.nom}" onerror="this.outerHTML='<div class=hero-img-fb>${pEmoji(p.plateforme)}</div>'">`
-    : `<div class="hero-img-fb ${pBg(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
+    ? `<img src="${p.image_url}" alt="${p.nom}" class="gallery-main">`
+    : `<div class="gallery-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
 
-  // Produits de la même plateforme + catégorie (éditions)
-  const editions = allProducts.filter(x => x.plateforme === p.plateforme && x.categorie === p.categorie && x.id !== p.id).slice(0, 8);
-  // Produits similaires (même plateforme, différente catégorie)
-  const similaires = allProducts.filter(x => x.plateforme === p.plateforme && x.id !== p.id && !editions.find(e => e.id === x.id)).slice(0, 8);
+  const buyImgHtml = p.image_url
+    ? `<img src="${p.image_url}" alt="${p.nom}" class="buy-img">`
+    : `<div class="buy-img-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
 
-  // Description + instructions d'activation selon plateforme
-  const activation = {
-    psn: [
-      { t: 'Connectez-vous', d: 'Ouvrez le PlayStation Store sur votre console PS4/PS5 ou via <strong>store.playstation.com</strong>' },
-      { t: 'Accédez à "Utiliser un code"', d: 'Dans le menu du PlayStation Store, cliquez sur votre avatar → <strong>Utiliser un code promo</strong>' },
-      { t: 'Entrez votre code', d: 'Saisissez le code reçu par email et confirmez. Le crédit est <strong>ajouté instantanément</strong> à votre portefeuille PSN' },
-      { t: 'Jouez !', d: 'Utilisez votre crédit pour acheter des jeux, DLC, abonnements et plus encore sur le PlayStation Store' },
-    ],
-    xbox: [
-      { t: 'Connectez-vous', d: 'Rendez-vous sur <strong>redeem.microsoft.com</strong> ou ouvrez l\'application Xbox' },
-      { t: 'Entrez votre code', d: 'Saisissez le code à 25 caractères reçu par email et cliquez sur <strong>Suivant</strong>' },
-      { t: 'Confirmez', d: 'Votre crédit ou abonnement est <strong>activé immédiatement</strong> sur votre compte Microsoft' },
-      { t: 'Profitez', d: 'Accédez à vos jeux Game Pass ou utilisez votre crédit Xbox sur le Microsoft Store' },
-    ],
-    nintendo: [
-      { t: 'Connectez-vous', d: 'Ouvrez le <strong>Nintendo eShop</strong> sur votre Nintendo Switch' },
-      { t: 'Entrez votre code', d: 'Faites défiler vers le bas → <strong>Saisir un code de téléchargement</strong> → entrez le code reçu' },
-      { t: 'Confirmez', d: 'Le crédit est <strong>ajouté instantanément</strong> à votre compte Nintendo' },
-      { t: 'Achetez', d: 'Utilisez votre crédit pour acheter jeux, DLC et contenu additionnel sur le Nintendo eShop' },
-    ],
-    pc: [
-      { t: 'Ouvrez Steam / votre launcher', d: `Lancez <strong>${p.categorie || 'Steam'}</strong> sur votre PC et connectez-vous à votre compte` },
-      { t: 'Accédez à "Activer un code"', d: 'Dans Steam : Menu → <strong>Jeux → Activer un produit sur Steam</strong>. Sur Epic : cliquez sur votre profil → <strong>Utiliser un code</strong>' },
-      { t: 'Entrez votre code', d: 'Saisissez le code reçu par email et confirmez. Le jeu ou le crédit est <strong>ajouté immédiatement</strong>' },
-      { t: 'Téléchargez et jouez !', d: 'Le jeu apparaît dans votre bibliothèque. Lancez le téléchargement et profitez !' },
-    ],
-  };
-  const steps = activation[p.plateforme] || activation.pc;
+  const editionsHtml = editions.length > 0 ? `
+    <div class="info-box">
+      <h3>📦 Autres montants / éditions</h3>
+      <div class="editions-grid">
+        ${editions.map(e => `
+          <a class="edition-card" href="produit.html?id=${e.id}">
+            <div class="ec-name">${e.nom}</div>
+            <div class="ec-price">${fmt(e.prix)} FCFA</div>
+          </a>`).join('')}
+      </div>
+    </div>` : '';
+
+  const similairesHtml = similaires.length > 0 ? `
+    <div style="padding:0 16px 32px;max-width:1100px;margin:0 auto">
+      <div class="section-title" style="padding:0">🎮 Vous aimerez aussi</div>
+      <div class="sim-grid">
+        ${similaires.map(s => `
+          <a class="sim-card" href="produit.html?id=${s.id}">
+            ${s.image_url
+              ? `<img src="${s.image_url}" alt="${s.nom}" loading="lazy">`
+              : `<div class="sim-card-fb ${pFbClass(s.plateforme)}">${pEmoji(s.plateforme)}</div>`}
+            <div class="sim-info">
+              <div class="sim-name">${s.nom}</div>
+              <div class="sim-price">${fmt(s.prix)} FCFA</div>
+            </div>
+          </a>`).join('')}
+      </div>
+    </div>` : '';
 
   document.getElementById('page-content').innerHTML = `
     <!-- HERO -->
-    <div class="product-hero">
-      ${p.image_url ? `<div class="hero-bg" style="background-image:url('${p.image_url}')"></div>` : `<div class="hero-bg ${pBg(p.plateforme)}" style="opacity:.5"></div>`}
-      <div class="hero-gradient"></div>
+    <div class="hero">
+      ${p.image_url ? `<div class="hero-bg" style="background-image:url('${p.image_url}')"></div>` : `<div class="hero-bg ${pFbClass(p.plateforme)}" style="opacity:.5"></div>`}
+      <div class="hero-overlay"></div>
       <div class="hero-content">
-        ${imgHtml}
-        <div class="hero-info">
-          <div class="hero-plat">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)} ${p.categorie ? '· '+p.categorie : ''}${p.sous_categorie ? ' · '+p.sous_categorie : ''}</div>
-          <h1 class="hero-title">${p.nom}</h1>
-          <div class="hero-badges">
-            <div class="badge-item">✅ <span>Code numérique</span></div>
-            <div class="badge-item">📧 <span>Livraison par email</span></div>
-            <div class="badge-item">⚡ <span>Instantané</span></div>
-            ${p.stock > 50 ? '<div class="badge-item">📦 <span>En stock</span></div>' : ''}
-          </div>
+        <span class="hero-plat" style="background:rgba(0,0,0,.5);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
+        <div class="hero-title">${p.nom}</div>
+        <div class="hero-meta">
+          <span>${p.categorie || ''}</span>
+          ${p.sous_categorie ? `<span>·</span><span>${p.sous_categorie}</span>` : ''}
+          ${p.est_populaire ? '<span>·</span><span>⭐ Populaire</span>' : ''}
         </div>
       </div>
     </div>
 
-    <!-- MAIN GRID -->
-    <div class="main-wrap">
+    <!-- LAYOUT -->
+    <div class="product-layout">
+      <!-- GAUCHE -->
+      <div class="product-main">
+        ${imgHtml}
 
-      <!-- COLONNE GAUCHE -->
-      <div class="left-col">
-
-        <!-- DESCRIPTION -->
-        <div class="info-card">
-          <div class="info-card-head">
-            <span>📋</span>
-            <h3>À propos de ce produit</h3>
-          </div>
-          <div class="info-card-body">
-            <p>${p.description || genererDesc(p)}</p>
-          </div>
+        <!-- Description -->
+        <div class="info-box">
+          <h3>📋 À propos de ce produit</h3>
+          <p class="info-desc">${p.description || 'Code numérique livré par email après paiement.'}</p>
         </div>
 
-        <!-- COMMENT ACTIVER -->
-        <div class="info-card">
-          <div class="info-card-head">
-            <span>🔑</span>
-            <h3>Comment activer votre code</h3>
-          </div>
-          <div class="info-card-body">
-            <div class="steps">
-              ${steps.map((s, i) => `
-                <div class="step">
-                  <div class="step-num">${i + 1}</div>
-                  <div class="step-text"><strong>${s.t}</strong><br>${s.d}</div>
+        <!-- Activation -->
+        <div class="info-box">
+          <h3>🚀 Comment activer votre code ?</h3>
+          <div class="steps">
+            ${steps.map((s, i) => `
+              <div class="step">
+                <div class="step-num">${i + 1}</div>
+                <div class="step-content">
+                  <h4>${s.t}</h4>
+                  <p>${s.d}</p>
                 </div>
-              `).join('')}
-            </div>
+              </div>`).join('')}
           </div>
         </div>
 
-        <!-- AUTRES ÉDITIONS -->
-        ${editions.length ? `
-        <div>
-          <div class="section-title">🗂️ Autres éditions</div>
-          <div class="editions-grid">
-            ${editions.map(e => {
-              const eImgHtml = e.image_url
-                ? `<img class="edition-img" src="${e.image_url}" alt="${e.nom}" onerror="this.outerHTML='<div class=edition-img-fb>${pEmoji(e.plateforme)}</div>'">`
-                : `<div class="edition-img-fb ${pBg(e.plateforme)}">${pEmoji(e.plateforme)}</div>`;
-              return `<a class="edition-card" href="produit.html?id=${e.id}">
-                ${eImgHtml}
-                <div class="edition-name">${e.nom}</div>
-                <div class="edition-price">${fmt(e.prix)} <small style="font-size:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:400">FCFA</small></div>
-              </a>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-
-        <!-- PRODUITS SIMILAIRES -->
-        ${similaires.length ? `
-        <div>
-          <div class="section-title">🎮 Vous aimerez aussi</div>
-          <div class="similar-grid">
-            ${similaires.map(s => {
-              const sImgHtml = s.image_url
-                ? `<img class="sim-img" src="${s.image_url}" alt="${s.nom}" onerror="this.outerHTML='<div class=sim-img-fb ${pBg(s.plateforme)}>${pEmoji(s.plateforme)}</div>'">`
-                : `<div class="sim-img-fb ${pBg(s.plateforme)}">${pEmoji(s.plateforme)}</div>`;
-              return `<a class="sim-card" href="produit.html?id=${s.id}">
-                ${sImgHtml}
-                <div class="sim-body">
-                  <div class="sim-name">${s.nom}</div>
-                  <div class="sim-price">${fmt(s.prix)}<br><small>FCFA</small></div>
-                </div>
-              </a>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-
-      </div><!-- /left-col -->
-
-      <!-- COLONNE DROITE — ACHAT -->
-      <div>
-        <div class="buy-box">
-          <div class="buy-box-title">${p.nom}</div>
-          <div class="buy-box-sub">
-            <span>${pEmoji(p.plateforme)}</span>
-            <span>${pLabel(p.plateforme)} ${p.categorie ? '· '+p.categorie : ''}</span>
-            <span>·</span>
-            <span style="color:#52b043">✓ En stock</span>
-          </div>
-          <div class="price-block">
-            <div class="price-fcfa">${fmt(p.prix)} <span style="font-size:18px;color:var(--muted2)">FCFA</span></div>
-            <div class="price-eur">≈ ${pEurApprox(p.prix)} € (taux officiel)</div>
-          </div>
-          <button class="btn-add" id="btn-add" onclick="addToCart('${p.id}')">
-            🛒 Ajouter au panier
-          </button>
-          <div class="buy-features">
-            <div class="buy-feature"><span>📧</span><span>Code reçu par email en quelques minutes</span></div>
-            <div class="buy-feature"><span>💳</span><span>Paiement Orange Money · MTN · Moov · Wave</span></div>
-            <div class="buy-feature"><span>🔒</span><span>Paiement sécurisé via PayDunya</span></div>
-            <div class="buy-feature"><span>💬</span><span>Support WhatsApp 7j/7</span></div>
-            <div class="buy-feature"><span>⭐</span><span>Gagnez 10 points de fidélité</span></div>
-          </div>
-        </div>
+        ${editionsHtml}
       </div>
 
-    </div><!-- /main-wrap -->
+      <!-- DROITE — ACHAT -->
+      <div class="buy-box">
+        ${buyImgHtml}
+        <div class="buy-name">${p.nom}</div>
+        <div>
+          <div class="buy-price">${fmt(p.prix)} <small>FCFA</small></div>
+        </div>
+        <div class="buy-stock"><div class="buy-stock-dot"></div> En stock — livraison immédiate</div>
+        <button class="btn-add" onclick="addToCart()">🛒 Ajouter au panier</button>
+        <div class="buy-perks">
+          <div class="perk"><span class="perk-icon">📧</span><span>Code envoyé par email instantanément</span></div>
+          <div class="perk"><span class="perk-icon">📱</span><span>Orange Money · MTN · Moov · Wave</span></div>
+          <div class="perk"><span class="perk-icon">💬</span><span>Support WhatsApp disponible</span></div>
+          <div class="perk"><span class="perk-icon">🔒</span><span>Paiement 100% sécurisé PayDunya</span></div>
+        </div>
+      </div>
+    </div>
 
-    <footer>
-      <div class="foot-logo">BabiPlay CI</div>
-      <p>Paiement sécurisé · PayDunya · Orange Money · MTN · Moov · Wave</p>
-      <p style="margin-top:4px">© 2026 BabiPlay CI — Abidjan, Côte d'Ivoire</p>
-    </footer>
+    <!-- SIMILAIRES -->
+    ${similairesHtml}
   `;
 }
 
-function genererDesc(p) {
-  const s = { psn:'PlayStation Store', xbox:'Xbox', pc:p.categorie||'PC', nintendo:'Nintendo eShop' }[p.plateforme] || 'la plateforme';
-  if (p.sous_categorie === 'Cartes cadeaux') return `Carte cadeau numérique officielle pour le ${s}. Rechargez votre portefeuille et achetez des jeux, DLC, films et bien plus encore. Le code est livré par email immédiatement après votre paiement. Valable uniquement sur les comptes enregistrés dans la région correspondante.`;
-  if (p.sous_categorie === 'Game Pass') return `Accédez à une bibliothèque de plus de 500 jeux avec le Xbox Game Pass Ultimate. Jouez sur console Xbox, PC et en streaming sur mobile. Inclut Xbox Live Gold, EA Play et des avantages exclusifs. Code livré par email après paiement.`;
-  if (p.sous_categorie === 'Abonnements') return `Abonnement premium ${s}. Profitez du jeu en ligne multijoueur, de jeux offerts chaque mois et de réductions exclusives. Code d'activation livré par email immédiatement après votre paiement.`;
-  return `Clé d'activation officielle pour ${p.nom} sur ${s}. Téléchargez et jouez immédiatement après avoir activé votre code. Livraison instantanée par email après paiement.`;
+function addToCart() {
+  showToast('✅ Ajouté au panier !', 'ok');
+  // Redirige vers accueil avec le produit dans le panier
+  sessionStorage.setItem('add_to_cart', prodId);
+  window.location.href = 'index.html?cart=1';
 }
 
-// PANIER
-function addToCart(id) {
-  const p = allProducts.find(x => x.id === id) || currentProduct;
-  if (!p) return;
-  if (cart.find(c => c.id === id)) { showToast('⚠️ Déjà dans le panier'); return; }
-  cart.push({ ...p });
-  updateCartUI();
-  showToast('✅ ' + p.nom + ' ajouté !', 'ok');
-  toggleDrawer();
-}
-
-function removeFromCart(id) {
-  cart = cart.filter(c => c.id !== id);
-  updateCartUI();
-}
-
-function updateCartUI() {
-  const count = cart.length;
-  const badge = document.getElementById('cart-badge');
-  if (badge) { if (count > 0) { badge.textContent = count; badge.classList.add('show'); } else { badge.classList.remove('show'); } }
-  const el = document.getElementById('drawer-items');
-  const pay = document.getElementById('pay-btn');
-  const total = document.getElementById('cart-total');
-  if (!el) return;
-  if (!count) {
-    el.innerHTML = '<div class="drawer-empty">🛒<br>Votre panier est vide</div>';
-    if (pay) pay.disabled = true;
-    if (total) total.textContent = '0 FCFA';
-    return;
-  }
-  el.innerHTML = cart.map(c => `
-    <div class="cart-item">
-      ${c.image_url ? `<img class="ci-thumb" src="${c.image_url}" alt="${c.nom}">` : `<div class="ci-thumb-fb">${pEmoji(c.plateforme)}</div>`}
-      <div class="ci-info">
-        <div class="ci-name">${c.nom}</div>
-        <div class="ci-price">${fmt(c.prix)} FCFA</div>
-      </div>
-      <button class="ci-rm" onclick="removeFromCart('${c.id}')">✕</button>
-    </div>`).join('');
-  const t = cart.reduce((s, c) => s + c.prix, 0);
-  if (total) total.textContent = fmt(t) + ' FCFA';
-  if (pay) pay.disabled = false;
-}
-
-function toggleDrawer() {
-  const d = document.getElementById('drawer');
-  d.classList.toggle('open');
-}
-
-async function checkout() {
-  showToast('Redirection vers le paiement...', 'ok');
+function render404() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="text-align:center;padding:60px 20px">
+      <div style="font-size:48px;margin-bottom:12px">😕</div>
+      <h2 style="font-family:'Rajdhani',sans-serif;font-size:22px;margin-bottom:8px">Produit introuvable</h2>
+      <p style="color:var(--muted2);margin-bottom:20px">Ce produit n'existe pas ou a été retiré.</p>
+      <a href="index.html" style="background:var(--gold);color:#000;padding:10px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-family:'Rajdhani',sans-serif">← Retour à l'accueil</a>
+    </div>`;
 }
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (type ? ' ' + type : '');
+  t.textContent = msg; t.className = 'toast show' + (type ? ' ' + type : '');
   setTimeout(() => t.classList.remove('show'), 2800);
 }
 </script>
