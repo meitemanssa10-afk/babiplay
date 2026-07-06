@@ -56,12 +56,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .ud-item:hover{background:var(--bg3)}
 .ud-item.red{color:#ff6b6b}
 
-/* FILTRES PLATEFORMES */
-.filter-bar{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg2)}
+/* FILTRES PLATEFORMES — capsule arrondie unique */
+.filter-bar-outer{display:flex;justify-content:center;padding:14px 16px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:var(--bg3);border:1px solid var(--border2);max-width:100%;overflow-x:auto;scrollbar-width:none}
 .filter-bar::-webkit-scrollbar{display:none}
-.fchip{display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--border2);color:var(--muted2);padding:6px 14px;border-radius:20px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.fchip{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted2);padding:8px 16px;border-radius:999px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
 .fchip img{width:16px;height:16px;object-fit:contain}
-.fchip.active{border-color:var(--fc,var(--gold));color:var(--fc,var(--gold));background:var(--fcbg,rgba(245,166,35,.08))}
+.fchip.active{background:var(--fc,var(--gold));color:#0b0b0e;font-weight:600}
+.fchip.active img{filter:brightness(0) invert(1)}
 
 /* EN-TÊTE DE CATÉGORIE (façon Instant Gaming, adapté à BabiPlay) */
 .cat-hero{padding:28px 16px 0;text-align:center}
@@ -254,6 +256,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 </nav>
 
 <!-- FILTRES -->
+<div class="filter-bar-outer">
 <div class="filter-bar" id="filter-bar">
   <button class="fchip active" onclick="setFilter('all',this)" data-filter="all">🎮 Tout</button>
   <button class="fchip" onclick="setFilter('psn',this)" data-filter="psn">
@@ -268,6 +271,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
   <button class="fchip" onclick="setFilter('nintendo',this)" data-filter="nintendo">
     <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
   </button>
+</div>
 </div>
 
 <!-- SLIDER -->
