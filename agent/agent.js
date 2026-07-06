@@ -215,8 +215,16 @@ let fixEnCours = false;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function isSellableInFrance(product) {
-  return !(product.countryLimitation || []).includes('FR');
+// Kinguin fournit "regionalLimitations" (ex: "Region free", "Europe", "United States"...)
+// et "countryLimitation" qui est la LISTE DES PAYS OÙ LE PRODUIT FONCTIONNE (pas une liste d'exclusion).
+function estCompatibleEurope(product) {
+  const rl = (product.regionalLimitations || '').toLowerCase().trim();
+  if (rl.includes('region free') || rl.includes('worldwide')) return true;
+  if (rl.includes('europe')) return true;
+
+  const liste = product.countryLimitation || [];
+  if (rl === '' && liste.length === 0) return true; // aucune info de restriction → considéré compatible
+  return liste.includes('FR');
 }
 
 // Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
@@ -332,7 +340,7 @@ async function runImportParCategories() {
       if (!results.length) break;
 
       for (const product of results) {
-        if (!isSellableInFrance(product)) continue;
+        if (!estCompatibleEurope(product)) continue;
         if (!product.productId || existingIds.has(product.productId)) continue;
         const eurPrice = product.price || 0;
         if (eurPrice < PRIX_MIN_EUR) continue;
@@ -413,6 +421,7 @@ async function runImportParCategories() {
     }
 
     console.log(`\n🎉 Import terminé ! ${totalImportes} produits importés au total (max ${CAP_PAR_CATEGORIE} × ${CATEGORIES.length} catégories).`);
+    await marquerSliderPourHomepage();
   } catch (e) {
     console.error('❌ Erreur fatale import par catégories:', e);
   } finally {
@@ -423,6 +432,29 @@ async function runImportParCategories() {
 // ─────────────────────────────────────────────
 // CORRECTION : description FR + vraies photos + prix corrigés (produits déjà importés)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SLIDER DE LA PAGE D'ACCUEIL : met en avant 2 produits populaires par plateforme
+// ─────────────────────────────────────────────
+async function marquerSliderPourHomepage() {
+  const PLATEFORMES = ['psn', 'xbox', 'pc', 'nintendo'];
+  let ordre = 1;
+  for (const plateforme of PLATEFORMES) {
+    const { data, error } = await supabase.from('products')
+      .select('id')
+      .eq('plateforme', plateforme)
+      .eq('est_populaire', true)
+      .eq('est_actif', true)
+      .order('id', { ascending: true })
+      .limit(2);
+    if (error) { console.error(`   ⚠️ Erreur sélection slider (${plateforme}):`, error.message); continue; }
+    for (const row of data || []) {
+      await supabase.from('products').update({ est_slider: true, slider_ordre: ordre }).eq('id', row.id);
+      ordre++;
+    }
+  }
+  console.log(`🎞️ ${ordre - 1} produit(s) mis en avant dans le slider de la page d'accueil.`);
+}
+
 async function runFixKinguinProducts() {
   if (fixEnCours) { console.log('⚠️ Correction déjà en cours.'); return; }
   fixEnCours = true;
@@ -483,6 +515,14 @@ http.createServer((req, res) => {
     runImportParCategories();
     res.writeHead(200);
     res.end(`✅ Import par catégories démarré (max ${CAP_PAR_CATEGORIE}/catégorie, ${CATEGORIES.length} catégories) ! Va dans Render → Logs pour suivre la progression.`);
+    return;
+  }
+
+  if (url.pathname === '/update-slider') {
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    marquerSliderPourHomepage();
+    res.writeHead(200);
+    res.end('✅ Mise à jour du slider démarrée ! Va dans Render → Logs.');
     return;
   }
 
