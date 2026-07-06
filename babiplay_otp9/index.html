@@ -61,7 +61,18 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .filter-bar::-webkit-scrollbar{display:none}
 .fchip{display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--border2);color:var(--muted2);padding:6px 14px;border-radius:20px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
 .fchip img{width:16px;height:16px;object-fit:contain}
-.fchip.active{border-color:var(--gold);color:var(--gold);background:rgba(245,166,35,.08)}
+.fchip.active{border-color:var(--fc,var(--gold));color:var(--fc,var(--gold));background:var(--fcbg,rgba(245,166,35,.08))}
+
+/* EN-TÊTE DE CATÉGORIE (façon Instant Gaming, adapté à BabiPlay) */
+.cat-hero{padding:28px 16px 0;text-align:center}
+.cat-hero h1{font-family:'Rajdhani',sans-serif;font-size:32px;font-weight:700;letter-spacing:.5px}
+.cat-hero p{font-size:13px;color:var(--muted2);margin-top:6px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6}
+.subcon-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:16px 16px 0}
+.subcon-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:6px 16px;border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;white-space:nowrap}
+.subcon-chip.active{border-color:var(--fc,var(--gold));color:var(--text);background:var(--bg4)}
+.type-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;padding:16px 16px 20px;border-bottom:1px solid var(--border);margin-top:8px}
+.type-tab{background:none;border:none;color:var(--muted2);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:4px 0;border-bottom:2px solid transparent;transition:all .2s}
+.type-tab.active{color:var(--text);border-color:var(--fc,var(--gold))}
 
 /* SLIDER */
 .slider-wrap{position:relative;overflow:hidden;background:var(--bg2);height:200px}
@@ -391,6 +402,8 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 let sb, products = [], cart = [], currentUser = null, userProfile = null;
 let promoApplied = null;
 let currentFilter = 'all';
+let currentSousConsole = 'all';
+let currentType = 'tous';
 let sliderProds = [], sliderIdx = 0, sliderTimer = null;
 let searchTimeout = null;
 
@@ -414,7 +427,13 @@ const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴'
 const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo' }[p] || p);
 const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo' }[p] || 'card-badge-pc');
 const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo' }[p] || 'fb-pc');
-const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#66c0f4', nintendo:'#ff6b6b' }[p] || '#f5a623');
+const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b' }[p] || '#f5a623');
+const pDesc = p => ({
+  psn: "Vos jeux et cartes PlayStation au meilleur prix, payables en FCFA.",
+  xbox: "Cartes, abonnements Game Pass et jeux Xbox, livrés instantanément par email.",
+  pc: "Steam, Epic Games, Battle.net... tous vos jeux PC préférés en un seul endroit.",
+  nintendo: "Cartes eShop et jeux Switch pour toute la famille, prix en FCFA."
+}[p] || '');
 
 async function loadProducts() {
   const { data } = await sb.from('products').select('*').eq('est_actif', true).order('est_populaire', { ascending: false });
@@ -427,6 +446,7 @@ async function loadProducts() {
 function renderSlider() {
   sliderProds = products.filter(p => p.est_slider).sort((a, b) => (a.slider_ordre || 99) - (b.slider_ordre || 99));
   if (!sliderProds.length) { document.getElementById('slider-wrap').style.display = 'none'; return; }
+  document.getElementById('slider-wrap').style.display = 'block';
   const track = document.getElementById('slider-track');
   const dots = document.getElementById('sdots');
   track.innerHTML = sliderProds.map(p => {
@@ -469,14 +489,37 @@ function renderCatalogue(filter = currentFilter) {
   let list = filter === 'all' ? products : products.filter(p => p.plateforme === filter);
 
   if (filter !== 'all') {
-    // Vue filtrée — une seule grille
+    // Sous-consoles disponibles pour cette plateforme (ex: PS4/PS5, Xbox One/Series, Steam/Epic/...)
+    const consoles = [...new Set(list.map(p => p.categorie).filter(Boolean))];
+    let filtered = currentSousConsole === 'all' ? list : list.filter(p => p.categorie === currentSousConsole);
+    if (currentType === 'tendances') filtered = filtered.filter(p => p.est_populaire);
+    else if (currentType === 'cartes') filtered = filtered.filter(p => p.sous_categorie === 'Cartes cadeaux');
+    else if (currentType === 'abonnements') filtered = filtered.filter(p => p.sous_categorie === 'Abonnements' || p.sous_categorie === 'Game Pass');
+
     cat.innerHTML = `
+      <div class="cat-hero">
+        <h1>${pLabel(filter)}</h1>
+        <p>${pDesc(filter)}</p>
+        <div style="width:40px;height:3px;background:var(--fc,var(--gold));margin:12px auto 0;border-radius:2px"></div>
+      </div>
+      ${consoles.length > 1 ? `
+      <div class="subcon-row">
+        <button class="subcon-chip ${currentSousConsole === 'all' ? 'active' : ''}" onclick="setSousConsole('all')">Tous</button>
+        ${consoles.map(c => `<button class="subcon-chip ${currentSousConsole === c ? 'active' : ''}" onclick="setSousConsole('${esc(c)}')">${c}</button>`).join('')}
+      </div>` : ''}
+      <div class="type-row">
+        <button class="type-tab ${currentType === 'tous' ? 'active' : ''}" onclick="setType('tous')">Tous les jeux</button>
+        <button class="type-tab ${currentType === 'tendances' ? 'active' : ''}" onclick="setType('tendances')">🔥 Tendances</button>
+        <button class="type-tab ${currentType === 'cartes' ? 'active' : ''}" onclick="setType('cartes')">🎁 Cartes cadeaux</button>
+        <button class="type-tab ${currentType === 'abonnements' ? 'active' : ''}" onclick="setType('abonnements')">⭐ Abonnements</button>
+      </div>
       <div class="section-block">
         <div class="section-head">
-          <h2>${pEmoji(filter)} ${pLabel(filter)}</h2>
-          <span style="font-size:12px;color:var(--muted2)">${list.length} article${list.length > 1 ? 's' : ''}</span>
+          <span style="font-size:12px;color:var(--muted2)">${filtered.length} article${filtered.length > 1 ? 's' : ''}</span>
         </div>
-        <div class="prod-grid">${list.map(cardHtml).join('')}</div>
+        ${filtered.length
+          ? `<div class="prod-grid">${filtered.map(cardHtml).join('')}</div>`
+          : '<div class="empty-state">Aucun produit dans cette catégorie pour le moment.</div>'}
       </div>`;
     return;
   }
@@ -524,10 +567,35 @@ function cardHtml(p) {
 
 function setFilter(filter, btn) {
   currentFilter = filter;
+  currentSousConsole = 'all';
+  currentType = 'tous';
   document.querySelectorAll('.fchip').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  const root = document.documentElement;
+  if (filter === 'all') {
+    root.style.removeProperty('--fc');
+    root.style.removeProperty('--fcbg');
+  } else {
+    const c = pColor(filter);
+    root.style.setProperty('--fc', c);
+    root.style.setProperty('--fcbg', c + '22');
+  }
   renderCatalogue(filter);
   window.scrollTo({ top: document.getElementById('slider-wrap').offsetHeight + 56 + 48, behavior: 'smooth' });
+}
+
+function setSousConsole(c) {
+  currentSousConsole = c;
+  renderCatalogue(currentFilter);
+}
+
+function setType(t) {
+  currentType = t;
+  renderCatalogue(currentFilter);
+}
+
+function esc(s) {
+  return (s || '').replace(/'/g, "\\'");
 }
 
 // RECHERCHE
