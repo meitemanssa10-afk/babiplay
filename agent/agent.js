@@ -12,6 +12,9 @@ const KINGUIN_BASE = 'https://gateway.kinguin.net/esa/api';
 
 console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
 
+// ═════════════════════════════════════════════════════════════
+// TRAITEMENT DES COMMANDES (achat + livraison auto)
+// ═════════════════════════════════════════════════════════════
 async function obtenirProduitKinguinParId(productId) {
   const res = await fetch(`${KINGUIN_BASE}/v1/products/${productId}`, {
     headers: { 'X-Api-Key': KINGUIN_KEY }
@@ -162,18 +165,50 @@ setInterval(async () => {
 }, 4 * 60 * 1000);
 
 // ═════════════════════════════════════════════════════════════
-// IMPORT EN MASSE DU CATALOGUE KINGUIN
+// IMPORT DU CATALOGUE — PLAFONNÉ PAR CATÉGORIE (100 max chacune)
 // ═════════════════════════════════════════════════════════════
 const IMPORT_SECRET = crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
-console.log(`👉 Import : https://babiplay-agent.onrender.com/import-kinguin-products?secret=${IMPORT_SECRET}`);
-console.log(`👉 Fix    : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
+console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}`);
+console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.25');
 const EUR_TO_XOF = 655.957;
 const PRIX_MIN_EUR = 0.5;
+const CAP_PAR_CATEGORIE = parseInt(process.env.CAP_PAR_CATEGORIE || '100', 10);
+
+// Les 10 catégories suivies. Facile à modifier : ajoute/retire une ligne pour changer la sélection.
+const CATEGORIES = [
+  { plateforme: 'psn',      sousCategorie: 'Cartes cadeaux', label: 'PSN — Cartes cadeaux' },
+  { plateforme: 'psn',      sousCategorie: 'Abonnements',    label: 'PSN — Abonnements (PS Plus)' },
+  { plateforme: 'psn',      sousCategorie: '',                label: 'PSN — Jeux' },
+  { plateforme: 'xbox',     sousCategorie: 'Cartes cadeaux', label: 'Xbox — Cartes cadeaux' },
+  { plateforme: 'xbox',     sousCategorie: 'Game Pass',      label: 'Xbox — Game Pass' },
+  { plateforme: 'xbox',     sousCategorie: '',                label: 'Xbox — Jeux' },
+  { plateforme: 'pc',       sousCategorie: 'Cartes cadeaux', label: 'PC — Cartes cadeaux (Steam Wallet...)' },
+  { plateforme: 'pc',       sousCategorie: '',                label: 'PC — Jeux (Steam/Epic/...)' },
+  { plateforme: 'nintendo', sousCategorie: 'Cartes cadeaux', label: 'Nintendo — Cartes eShop' },
+  { plateforme: 'nintendo', sousCategorie: '',                label: 'Nintendo — Jeux' },
+];
+
+// Titres/services connus → mis en avant dans chaque catégorie (proxy de "popularité",
+// Kinguin ne fournit pas de note/bestseller sur cette API vendeur).
+const MOTS_CLES_POPULAIRES = [
+  'gta', 'grand theft auto', 'fifa', 'fc 24', 'fc 25', 'ea sports fc',
+  'call of duty', 'modern warfare', 'fortnite', 'v-bucks', 'minecraft',
+  'cyberpunk', 'elden ring', 'spider-man', 'hogwarts legacy', 'mortal kombat',
+  'nba 2k', 'red dead', 'zelda', 'mario', 'god of war', 'battlefield',
+  "assassin's creed", 'resident evil', 'final fantasy', 'playstation plus',
+  'ps plus', 'game pass', 'apex legends', 'valorant', 'league of legends',
+  'counter-strike', 'pubg', 'diablo', 'overwatch'
+];
+
+function estPopulaire(nom) {
+  const n = (nom || '').toLowerCase();
+  return MOTS_CLES_POPULAIRES.some(k => n.includes(k));
+}
 
 let importEnCours = false;
 let fixEnCours = false;
@@ -238,6 +273,26 @@ function priceToFCFA(eurPrice) {
   return Math.round(eurPrice * (1 + MARGIN) * EUR_TO_XOF);
 }
 
+// Extrait le montant nominal d'une carte cadeau depuis son nom Kinguin (ex: "PSN Card 20 EUR" -> 20)
+function extraireMontantFacial(nom) {
+  const m = (nom || '').match(/(\d{1,4})\s*(?:€|eur|euros?)\b/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Nom propre et uniforme pour les cartes cadeaux (ex: "Carte PSN 20€"). Pour tout le reste, on garde le nom Kinguin.
+function nomAffiche(product, plateforme, categorie, sousCategorie) {
+  if (sousCategorie === 'Cartes cadeaux') {
+    const montant = extraireMontantFacial(product.name);
+    if (montant) {
+      const label = {
+        psn: 'Carte PSN', xbox: 'Carte Xbox', nintendo: 'Carte eShop Nintendo'
+      }[plateforme] || `Carte ${categorie || 'cadeau'}`;
+      return `${label} ${montant}€`;
+    }
+  }
+  return product.name || 'Produit Kinguin';
+}
+
 async function fetchKinguinPage(page) {
   const url = `${KINGUIN_PRODUCTS_BASE}/products?page=${page}&limit=${PAGE_LIMIT}`;
   const res = await fetch(url, { headers: { 'X-Api-Key': KINGUIN_KEY } });
@@ -251,66 +306,122 @@ async function getExistingKinguinIds() {
   return new Set((data || []).map(r => r.kinguin_product_id).filter(Boolean));
 }
 
-async function insertProducts(rows) {
-  if (!rows.length) return;
-  const { error } = await supabase.from('products').insert(rows);
-  if (error) throw new Error('Erreur insertion Supabase: ' + error.message);
-}
+function catKey(cat) { return cat.plateforme + '|' + cat.sousCategorie; }
 
-async function runImportKinguin() {
+// ─────────────────────────────────────────────
+// IMPORT PAR CATÉGORIES (100 max chacune, connus en priorité)
+// ─────────────────────────────────────────────
+async function runImportParCategories() {
   if (importEnCours) { console.log('⚠️ Import déjà en cours.'); return; }
   importEnCours = true;
-  console.log(`🚀 Import Kinguin | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA | prix min: ${PRIX_MIN_EUR}€`);
+  console.log(`🗂️ Import par catégories | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA | plafond: ${CAP_PAR_CATEGORIE}/catégorie`);
   try {
     const existingIds = await getExistingKinguinIds();
-    console.log(`   ${existingIds.size} produit(s) déjà en base.`);
-    let page = 1, totalCount = null, totalImported = 0, totalSkippedFR = 0, totalSkippedDoublon = 0, totalSkippedPrix = 0;
+    console.log(`   ${existingIds.size} produit(s) déjà en base (ignorés).`);
+
+    const buckets = {};
+    for (const cat of CATEGORIES) buckets[catKey(cat)] = { populaires: [], autres: [] };
+
+    let page = 1, totalCount = null;
     while (true) {
       let data;
       try { data = await fetchKinguinPage(page); }
       catch (e) { console.error(`⚠️ Erreur page ${page}: ${e.message} — retry dans 5s`); await sleep(5000); continue; }
-      if (totalCount === null) { totalCount = data.item_count; console.log(`📦 ${totalCount} produits au total chez Kinguin.`); }
+      if (totalCount === null) { totalCount = data.item_count; console.log(`📦 ${totalCount} produits au total chez Kinguin — analyse en cours...`); }
       const results = data.results || [];
       if (!results.length) break;
-      const rowsToInsert = [];
+
       for (const product of results) {
-        if (!isSellableInFrance(product)) { totalSkippedFR++; continue; }
-        if (!product.productId || existingIds.has(product.productId)) { totalSkippedDoublon++; continue; }
+        if (!isSellableInFrance(product)) continue;
+        if (!product.productId || existingIds.has(product.productId)) continue;
         const eurPrice = product.price || 0;
-        if (eurPrice < PRIX_MIN_EUR) { totalSkippedPrix++; continue; }
+        if (eurPrice < PRIX_MIN_EUR) continue;
+
+        const imageUrl = getImageUrl(product);
+        if (!imageUrl) continue; // pas de photo trouvée → produit ignoré (jamais de produit sans image sur le site)
+
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
-        const prix = priceToFCFA(eurPrice);
-        rowsToInsert.push({
-          nom: product.name || 'Produit Kinguin', plateforme, categorie, sous_categorie: sousCategorie,
-          description: genererDescriptionFR(plateforme, categorie, sousCategorie),
-          prix,
-          image_url: getImageUrl(product),
-          video_url: '',
-          est_slider: false, slider_ordre: 1, est_populaire: false, est_actif: true,
-          kinguin_product_id: product.productId, stock: 999
-        });
-        existingIds.add(product.productId);
+
+        // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
+        // "20€" ne doit pas ressortir à 700 FCFA). Pour les jeux, les prix très variables sont normaux.
+        if (sousCategorie === 'Cartes cadeaux') {
+          const montant = extraireMontantFacial(product.name);
+          if (montant) {
+            const prixCalcule = priceToFCFA(eurPrice);
+            const valeurFacialeFCFA = montant * EUR_TO_XOF;
+            const ratio = prixCalcule / valeurFacialeFCFA;
+            if (ratio < 0.5 || ratio > 1.2) continue; // prix aberrant vs la valeur faciale → on ignore
+          }
+        }
+
+        const key = plateforme + '|' + sousCategorie;
+        const bucket = buckets[key];
+        if (!bucket) continue; // catégorie non suivie, on ignore
+
+        const item = { product, plateforme, categorie, sousCategorie, imageUrl };
+        if (estPopulaire(product.name)) {
+          bucket.populaires.push(item);
+        } else if (bucket.autres.length < CAP_PAR_CATEGORIE * 3) {
+          // on garde une petite marge (x3) pour avoir de quoi compléter, sans exploser la mémoire
+          bucket.autres.push(item);
+        }
       }
-      if (rowsToInsert.length) {
-        try { await insertProducts(rowsToInsert); totalImported += rowsToInsert.length; }
-        catch (e) { console.error(`⚠️ Erreur insertion page ${page}: ${e.message}`); }
+
+      if (page % 20 === 0 || page * PAGE_LIMIT >= totalCount) {
+        console.log(`   Page ${page}/${Math.ceil(totalCount / PAGE_LIMIT)} analysée...`);
       }
-      console.log(`Page ${page} — importés: ${totalImported} | exclus FR: ${totalSkippedFR} | prix invalides: ${totalSkippedPrix} | doublons: ${totalSkippedDoublon}`);
       if (page * PAGE_LIMIT >= totalCount) break;
       page++;
       await sleep(300);
     }
-    console.log(`✅ Import terminé ! Importés: ${totalImported} | Exclus FR: ${totalSkippedFR} | Prix invalides: ${totalSkippedPrix} | Doublons: ${totalSkippedDoublon}`);
+
+    console.log('🧮 Analyse terminée — sélection et insertion...');
+    let totalImportes = 0;
+
+    for (const cat of CATEGORIES) {
+      const key = catKey(cat);
+      const bucket = buckets[key];
+      const trouves = bucket.populaires.length + bucket.autres.length;
+      const selection = [...bucket.populaires, ...bucket.autres].slice(0, CAP_PAR_CATEGORIE);
+
+      const rows = selection.map(({ product, plateforme, categorie, sousCategorie, imageUrl }) => ({
+        nom: nomAffiche(product, plateforme, categorie, sousCategorie),
+        plateforme,
+        categorie,
+        sous_categorie: sousCategorie,
+        description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+        prix: priceToFCFA(product.price),
+        image_url: imageUrl,
+        video_url: '',
+        est_slider: false,
+        slider_ordre: 1,
+        est_populaire: estPopulaire(product.name),
+        est_actif: true,
+        kinguin_product_id: product.productId,
+        stock: 999
+      }));
+
+      if (rows.length) {
+        for (let i = 0; i < rows.length; i += 200) {
+          const { error } = await supabase.from('products').insert(rows.slice(i, i + 200));
+          if (error) console.error(`   ⚠️ Erreur insertion "${cat.label}":`, error.message);
+        }
+      }
+      totalImportes += rows.length;
+      console.log(`   ✅ ${cat.label} : ${rows.length} importés (sur ${trouves} trouvés, dont ${bucket.populaires.length} reconnus comme populaires)`);
+    }
+
+    console.log(`\n🎉 Import terminé ! ${totalImportes} produits importés au total (max ${CAP_PAR_CATEGORIE} × ${CATEGORIES.length} catégories).`);
   } catch (e) {
-    console.error('❌ Erreur fatale import Kinguin:', e);
+    console.error('❌ Erreur fatale import par catégories:', e);
   } finally {
     importEnCours = false;
   }
 }
 
 // ─────────────────────────────────────────────
-// CORRECTION : description FR + vraies photos + prix corrigés
+// CORRECTION : description FR + vraies photos + prix corrigés (produits déjà importés)
 // ─────────────────────────────────────────────
 async function runFixKinguinProducts() {
   if (fixEnCours) { console.log('⚠️ Correction déjà en cours.'); return; }
@@ -366,12 +477,12 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const secret = url.searchParams.get('secret');
 
-  if (url.pathname === '/import-kinguin-products') {
+  if (url.pathname === '/import-categories') {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
     if (importEnCours) { res.writeHead(200); res.end('Import déjà en cours — voir logs Render.'); return; }
-    runImportKinguin();
+    runImportParCategories();
     res.writeHead(200);
-    res.end('✅ Import démarré ! Va dans Render → Logs pour suivre la progression.');
+    res.end(`✅ Import par catégories démarré (max ${CAP_PAR_CATEGORIE}/catégorie, ${CATEGORIES.length} catégories) ! Va dans Render → Logs pour suivre la progression.`);
     return;
   }
 
