@@ -174,7 +174,7 @@ console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/f
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
-const MARGIN = parseFloat(process.env.MARGIN || '0.25');
+const MARGIN = parseFloat(process.env.MARGIN || '0.12');
 const EUR_TO_XOF = 655.957;
 const PRIX_MIN_EUR = 0.5;
 const CAP_PAR_CATEGORIE = parseInt(process.env.CAP_PAR_CATEGORIE || '100', 10);
