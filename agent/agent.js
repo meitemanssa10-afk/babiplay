@@ -229,6 +229,15 @@ function estCompatibleEurope(product) {
   return liste.includes('FR');
 }
 
+// Exclut les cartes explicitement libellées dans une autre devise que l'euro (ex: "15 USD Gift Card US"),
+// même si les autres filtres de région les auraient laissées passer.
+function contientDeviseNonEuro(nom) {
+  const n = (nom || '').toLowerCase();
+  const aAutreDevise = /\busd\b|\$\s*\d|\d\s*\$|\bgbp\b|£|\btry\b|\bpln\b/.test(n);
+  const aEuro = n.includes('eur') || n.includes('€');
+  return aAutreDevise && !aEuro;
+}
+
 // Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
 function getImageUrl(product) {
   if (product.coverImageOriginal) return product.coverImageOriginal;
@@ -276,13 +285,23 @@ function estCompteExclu(product) {
 
 function guessSousCategorie(product) {
   const tags = product.tags || [];
-  const name = (product.name || '').toLowerCase();
+  const name = (product.name || '').toLowerCase().trim();
   // Abonnements / Game Pass vérifiés EN PREMIER : Kinguin étiquette souvent ces produits avec le
   // même tag "prepaid" que les vraies cartes cadeaux, ce qui les faisait atterrir au mauvais endroit.
   if (name.includes('game pass')) return 'Game Pass';
   const motsAbonnement = ['subscription', 'membership', 'switch online', 'ea play', 'ubisoft+', 'xbox live gold'];
   if (motsAbonnement.some(k => name.includes(k)) || (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn')))) return 'Abonnements';
-  if (tags.includes('prepaid') || name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
+
+  // "gift card" / "wallet" / "points" dans le nom = carte générique fiable, quel que soit le début du nom.
+  if (name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
+
+  // Le tag "prepaid" seul est TROP large chez Kinguin : il s'applique aussi aux jeux précis vendus via
+  // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" — c'est un JEU, pas une
+  // carte cadeau générique). On ne le prend en compte que si le nom commence vraiment par la marque
+  // (signe d'une carte générique), pas par un titre de jeu.
+  const commenceParMarque = ['playstation', 'psn', 'xbox', 'nintendo', 'steam', 'epic', 'ea ', 'ubisoft'].some(m => name.startsWith(m));
+  if (tags.includes('prepaid') && commenceParMarque) return 'Cartes cadeaux';
+
   return '';
 }
 
@@ -367,6 +386,7 @@ async function runImportParCategories() {
 
       for (const product of results) {
         if (estCompteExclu(product)) continue; // "ACCOUNT" = compte partagé, jamais livrable automatiquement
+        if (contientDeviseNonEuro(product.name)) continue; // carte en dollars/livres/etc. sans mention euro
         if (!estCompatibleEurope(product)) continue;
         if (!product.productId || existingIds.has(product.productId)) continue;
         const eurPrice = product.price || 0;
@@ -386,7 +406,7 @@ async function runImportParCategories() {
             const prixCalcule = priceToFCFA(eurPrice);
             const valeurFacialeFCFA = montant * EUR_TO_XOF;
             const ratio = prixCalcule / valeurFacialeFCFA;
-            if (ratio < 0.5 || ratio > 1.2) continue; // prix aberrant vs la valeur faciale → on ignore
+            if (ratio < 0.75 || ratio > 1.05) continue; // prix aberrant vs la valeur faciale → on ignore
           }
         }
 
@@ -527,7 +547,7 @@ async function runFixKinguinProducts() {
       for (const product of results) {
         const row = existingMap.get(product.productId);
         if (!row) continue;
-        if (estCompteExclu(product)) {
+        if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
           await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
           totalCorriges++;
           continue;
