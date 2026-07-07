@@ -62,11 +62,27 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .tab{background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:5px 12px;border-radius:16px;font-size:12px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
 .tab.active{border-color:var(--gold);color:var(--gold);background:rgba(245,166,35,.08)}
 
+/* TABLEAU D'INFOS (façon Instant Gaming) */
+.specs-table{width:100%;border-collapse:collapse}
+.specs-table tr{border-bottom:1px solid var(--border)}
+.specs-table tr:last-child{border-bottom:none}
+.specs-table td{padding:9px 0;font-size:13px;vertical-align:top}
+.specs-table td:first-child{color:var(--muted2);width:42%;padding-right:12px}
+.specs-table td:last-child{color:var(--text);font-weight:500}
+
+/* SÉLECTEUR D'ÉDITION (dropdown) */
+.edition-select{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:border-color .2s}
+.edition-select:focus{border-color:var(--gold)}
+
+/* GALERIE / VIDÉO */
+.gallery-yt-wrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:#000}
+.gallery-yt-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
 /* AUTRES ÉDITIONS */
 .editions-grid{display:flex;gap:8px;flex-wrap:wrap}
-.edition-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
+.edition-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .2s;text-decoration:none;display:block;color:var(--text)}
 .edition-card:hover,.edition-card.active{border-color:var(--gold);background:rgba(245,166,35,.06)}
-.edition-card .ec-name{font-size:12px;font-weight:600;margin-bottom:2px}
+.edition-card .ec-name{font-size:12px;font-weight:600;margin-bottom:2px;color:var(--text)}
 .edition-card .ec-price{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--gold)}
 
 /* COLONNE DROITE — ACHAT */
@@ -137,6 +153,15 @@ const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Ninten
 const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#66c0f4', nintendo:'#ff6b6b' }[p] || '#f5a623');
 const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo' }[p] || 'fb-pc');
 
+// Détecte un lien YouTube et le convertit en lien intégrable, en boucle et muet
+function getYouTubeEmbed(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  if (!m) return null;
+  const id = m[1];
+  return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=1&modestbranding=1&playsinline=1&rel=0`;
+}
+
 const STEPS = {
   psn: [
     { t: 'Connectez-vous au PlayStation Store', d: "Depuis votre PS4, PS5 ou via store.playstation.com" },
@@ -190,9 +215,29 @@ function renderPage() {
   const editions = allProducts.filter(x => x.plateforme === p.plateforme && x.sous_categorie === p.sous_categorie && x.id !== p.id).slice(0, 6);
   const similaires = allProducts.filter(x => x.plateforme === p.plateforme && x.id !== p.id && x.sous_categorie !== p.sous_categorie).slice(0, 8);
 
-  const imgHtml = p.image_url
-    ? `<img src="${p.image_url}" alt="${p.nom}" class="gallery-main">`
-    : `<div class="gallery-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
+  const ytEmbed = getYouTubeEmbed(p.video_url);
+  const imgHtml = ytEmbed
+    ? `<div class="gallery-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${p.nom}"></iframe></div>`
+    : p.image_url
+      ? `<img src="${p.image_url}" alt="${p.nom}" class="gallery-main">`
+      : `<div class="gallery-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
+
+  const specsRows = [
+    ['Compatibilité région', 'Europe (France incluse)'],
+    ['Genres', p.genres],
+    ['Développeur', p.developpeur],
+    ['Éditeur', p.editeur],
+    ['Date de sortie', p.date_sortie],
+    ['Note Metacritic', p.note_metacritic ? `${p.note_metacritic}/100` : ''],
+  ].filter(([, val]) => val);
+
+  const specsHtml = specsRows.length > 0 ? `
+    <div class="info-box">
+      <h3>ℹ️ Informations</h3>
+      <table class="specs-table">
+        ${specsRows.map(([label, val]) => `<tr><td>${label}</td><td>${val}</td></tr>`).join('')}
+      </table>
+    </div>` : '';
 
   const buyImgHtml = p.image_url
     ? `<img src="${p.image_url}" alt="${p.nom}" class="buy-img">`
@@ -201,13 +246,10 @@ function renderPage() {
   const editionsHtml = editions.length > 0 ? `
     <div class="info-box">
       <h3>📦 Autres montants / éditions</h3>
-      <div class="editions-grid">
-        ${editions.map(e => `
-          <a class="edition-card" href="produit.html?id=${e.id}">
-            <div class="ec-name">${e.nom}</div>
-            <div class="ec-price">${fmt(e.prix)} FCFA</div>
-          </a>`).join('')}
-      </div>
+      <select class="edition-select" onchange="if(this.value) window.location.href='produit.html?id='+this.value">
+        <option value="">${p.nom} — ${fmt(p.prix)} FCFA (actuel)</option>
+        ${editions.map(e => `<option value="${e.id}">${e.nom} — ${fmt(e.prix)} FCFA</option>`).join('')}
+      </select>
     </div>` : '';
 
   const similairesHtml = similaires.length > 0 ? `
@@ -254,6 +296,8 @@ function renderPage() {
           <h3>📋 À propos de ce produit</h3>
           <p class="info-desc">${p.description || 'Code numérique livré par email après paiement.'}</p>
         </div>
+
+        ${specsHtml}
 
         <!-- Activation -->
         <div class="info-box">
