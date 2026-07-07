@@ -281,6 +281,12 @@ function priceToFCFA(eurPrice) {
   return Math.round(eurPrice * (1 + MARGIN) * EUR_TO_XOF);
 }
 
+// Joint un tableau (développeurs, éditeurs, genres) en texte lisible, ou renvoie tel quel si déjà une chaîne
+function joinField(val) {
+  if (Array.isArray(val)) return val.filter(Boolean).join(', ');
+  return val || '';
+}
+
 // Extrait le montant nominal d'une carte cadeau depuis son nom Kinguin (ex: "PSN Card 20 EUR" -> 20)
 function extraireMontantFacial(nom) {
   const m = (nom || '').match(/(\d{1,4})\s*(?:€|eur|euros?)\b/i);
@@ -402,6 +408,11 @@ async function runImportParCategories() {
         prix: priceToFCFA(product.price),
         image_url: imageUrl,
         video_url: '',
+        developpeur: joinField(product.developers),
+        editeur: joinField(product.publishers),
+        genres: joinField(product.genres),
+        date_sortie: product.releaseDate || '',
+        note_metacritic: product.metacriticScore || null,
         est_slider: false,
         slider_ordre: 1,
         est_populaire: estPopulaire(product.name),
@@ -477,7 +488,14 @@ async function runFixKinguinProducts() {
         if (!row) continue;
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
-        const fields = { description: genererDescriptionFR(plateforme, categorie, sousCategorie) };
+        const fields = {
+          description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+          developpeur: joinField(product.developers),
+          editeur: joinField(product.publishers),
+          genres: joinField(product.genres),
+          date_sortie: product.releaseDate || '',
+          note_metacritic: product.metacriticScore || null,
+        };
         const nouvelleImage = getImageUrl(product);
         if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
         const eurPrice = product.price || 0;
