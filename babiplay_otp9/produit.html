@@ -70,20 +70,11 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .specs-table td:first-child{color:var(--muted2);width:42%;padding-right:12px}
 .specs-table td:last-child{color:var(--text);font-weight:500}
 
-/* SÉLECTEUR D'ÉDITION (dropdown) */
-.edition-select{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:border-color .2s}
-.edition-select:focus{border-color:var(--gold)}
-
 /* GALERIE / VIDÉO */
 .gallery-yt-wrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:#000}
 .gallery-yt-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
-/* AUTRES ÉDITIONS */
-.editions-grid{display:flex;gap:8px;flex-wrap:wrap}
-.edition-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .2s;text-decoration:none;display:block;color:var(--text)}
-.edition-card:hover,.edition-card.active{border-color:var(--gold);background:rgba(245,166,35,.06)}
-.edition-card .ec-name{font-size:12px;font-weight:600;margin-bottom:2px;color:var(--text)}
-.edition-card .ec-price{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--gold)}
+/* AUTRES ÉDITIONS : réutilise .sim-card / .sim-grid, définis plus bas */
 
 /* COLONNE DROITE — ACHAT */
 .buy-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;position:sticky;top:72px}
@@ -246,10 +237,18 @@ function renderPage() {
   const editionsHtml = editions.length > 0 ? `
     <div class="info-box">
       <h3>📦 Autres montants / éditions</h3>
-      <select class="edition-select" onchange="if(this.value) window.location.href='produit.html?id='+this.value">
-        <option value="">${p.nom} — ${fmt(p.prix)} FCFA (actuel)</option>
-        ${editions.map(e => `<option value="${e.id}">${e.nom} — ${fmt(e.prix)} FCFA</option>`).join('')}
-      </select>
+      <div class="sim-grid">
+        ${editions.map(e => `
+          <a class="sim-card" href="produit.html?id=${e.id}">
+            ${e.image_url
+              ? `<img src="${e.image_url}" alt="${e.nom}" loading="lazy">`
+              : `<div class="sim-card-fb ${pFbClass(e.plateforme)}">${pEmoji(e.plateforme)}</div>`}
+            <div class="sim-info">
+              <div class="sim-name">${e.nom}</div>
+              <div class="sim-price">${fmt(e.prix)} FCFA</div>
+            </div>
+          </a>`).join('')}
+      </div>
     </div>` : '';
 
   const similairesHtml = similaires.length > 0 ? `
