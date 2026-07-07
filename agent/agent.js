@@ -283,7 +283,7 @@ function estCompteExclu(product) {
   return n.includes('account') || n.includes('compte partagé') || n.includes('login details');
 }
 
-function guessSousCategorie(product) {
+function guessSousCategorie(product, plateforme) {
   const tags = product.tags || [];
   const name = (product.name || '').toLowerCase().trim();
   // Abonnements / Game Pass vérifiés EN PREMIER : Kinguin étiquette souvent ces produits avec le
@@ -296,10 +296,18 @@ function guessSousCategorie(product) {
   if (name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
 
   // Le tag "prepaid" seul est TROP large chez Kinguin : il s'applique aussi aux jeux précis vendus via
-  // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" — c'est un JEU, pas une
-  // carte cadeau générique). On ne le prend en compte que si le nom commence vraiment par la marque
-  // (signe d'une carte générique), pas par un titre de jeu.
-  const commenceParMarque = ['playstation', 'psn', 'xbox', 'nintendo', 'steam', 'epic', 'ea ', 'ubisoft'].some(m => name.startsWith(m));
+  // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" ou "EA Sports FC 24
+  // PlayStation Network Card" — ce sont des JEUX, pas des cartes cadeaux génériques). On vérifie que le
+  // nom commence par la marque DE LA PLATEFORME DÉTECTÉE précisément (pas n'importe quelle marque —
+  // "EA Sports FC 24" commence par "EA " mais n'est pas une carte EA App générique).
+  const marquesParPlateforme = {
+    psn: ['playstation', 'psn'],
+    xbox: ['xbox'],
+    nintendo: ['nintendo'],
+    pc: ['steam', 'epic games', 'battle.net', 'ubisoft connect', 'ea app', 'origin', 'gog', 'rockstar games', 'microsoft store'],
+  };
+  const marques = marquesParPlateforme[plateforme] || [];
+  const commenceParMarque = marques.some(m => name.startsWith(m));
   if (tags.includes('prepaid') && commenceParMarque) return 'Cartes cadeaux';
 
   return '';
@@ -396,7 +404,7 @@ async function runImportParCategories() {
         if (!imageUrl) continue; // pas de photo trouvée → produit ignoré (jamais de produit sans image sur le site)
 
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
-        const sousCategorie = guessSousCategorie(product);
+        const sousCategorie = guessSousCategorie(product, plateforme);
 
         // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
         // "20€" ne doit pas ressortir à 700 FCFA). Pour les jeux, les prix très variables sont normaux.
@@ -532,6 +540,13 @@ async function runFixKinguinProducts() {
   fixEnCours = true;
   console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
+    // Nettoyage direct en base : désactive tout produit "compte partagé" résiduel, même si sa fiche
+    // n'existe plus dans le catalogue Kinguin actuel (donc jamais touché par la boucle ci-dessous).
+    const { data: comptesResiduels, error: errResiduels } = await supabase.from('products')
+      .update({ est_actif: false }).ilike('nom', '%account%').eq('est_actif', true).select('id');
+    if (errResiduels) console.error('⚠️ Erreur nettoyage comptes résiduels:', errResiduels.message);
+    else if (comptesResiduels?.length) console.log(`🧹 ${comptesResiduels.length} produit(s) "compte partagé" résiduel(s) désactivé(s).`);
+
     const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
     if (error) throw new Error('Lecture produits: ' + error.message);
     const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
@@ -553,7 +568,25 @@ async function runFixKinguinProducts() {
           continue;
         }
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
-        const sousCategorie = guessSousCategorie(product);
+        const sousCategorie = guessSousCategorie(product, plateforme);
+
+        // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
+        // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
+        if (sousCategorie === 'Cartes cadeaux') {
+          const montant = extraireMontantFacial(product.name);
+          if (montant) {
+            const eurPriceCheck = product.price || 0;
+            const prixCalcule = priceToFCFA(eurPriceCheck);
+            const valeurFacialeFCFA = montant * EUR_TO_XOF;
+            const ratio = prixCalcule / valeurFacialeFCFA;
+            if (ratio < 0.75 || ratio > 1.05) {
+              await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+              totalCorriges++;
+              continue;
+            }
+          }
+        }
+
         const fields = {
           nom: nomAffiche(product, plateforme, categorie, sousCategorie),
           sous_categorie: sousCategorie,
