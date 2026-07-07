@@ -191,12 +191,14 @@ const CATEGORIES = [
   { plateforme: 'pc',       sousCategorie: '',                label: 'PC — Jeux (Steam/Epic/...)' },
   { plateforme: 'nintendo', sousCategorie: 'Cartes cadeaux', label: 'Nintendo — Cartes eShop' },
   { plateforme: 'nintendo', sousCategorie: '',                label: 'Nintendo — Jeux' },
+  { plateforme: 'streaming', sousCategorie: 'Cartes cadeaux', label: 'Streaming — Cartes cadeaux (Netflix, Disney+...)' },
+  { plateforme: 'streaming', sousCategorie: 'Abonnements',    label: 'Streaming — Abonnements (Spotify, Crunchyroll...)' },
 ];
 
 // Titres/services connus → mis en avant dans chaque catégorie (proxy de "popularité",
 // Kinguin ne fournit pas de note/bestseller sur cette API vendeur).
 const MOTS_CLES_POPULAIRES = [
-  'gta', 'grand theft auto', 'fifa', 'fc 24', 'fc 25', 'ea sports fc',
+  'gta', 'grand theft auto', 'fifa', 'fc 24', 'fc 25', 'fc 26', 'fc 27', 'ea sports fc',
   'call of duty', 'modern warfare', 'fortnite', 'v-bucks', 'minecraft',
   'cyberpunk', 'elden ring', 'spider-man', 'hogwarts legacy', 'mortal kombat',
   'nba 2k', 'red dead', 'zelda', 'mario', 'god of war', 'battlefield',
@@ -240,6 +242,13 @@ function getImageUrl(product) {
 function mapPlatform(kinguinPlatform, productName) {
   const p = (kinguinPlatform || '').toLowerCase();
   const n = (productName || '').toLowerCase();
+
+  // Streaming & apps — détecté par le NOM (le champ "platform" de Kinguin dit juste "Other" pour ces produits)
+  if (n.includes('netflix')) return { plateforme: 'streaming', categorie: 'Netflix' };
+  if (n.includes('spotify')) return { plateforme: 'streaming', categorie: 'Spotify' };
+  if (n.includes('disney')) return { plateforme: 'streaming', categorie: 'Disney+' };
+  if (n.includes('crunchyroll')) return { plateforme: 'streaming', categorie: 'Crunchyroll' };
+
   if (p.includes('playstation') || p.includes('psn'))
     return { plateforme: 'psn', categorie: n.includes('ps5') ? 'PS5' : 'PS4' };
   if (p.includes('xbox'))
@@ -257,17 +266,28 @@ function mapPlatform(kinguinPlatform, productName) {
   return { plateforme: 'pc', categorie };
 }
 
+// Produits livrés comme "compte partagé" (ex: "... ACCOUNT", identifiants tout faits envoyés par le
+// vendeur) plutôt qu'un vrai code à activer soi-même. Jamais compatibles avec notre livraison auto —
+// on les exclut systématiquement, quelle que soit la catégorie.
+function estCompteExclu(product) {
+  const n = (product.name || '').toLowerCase();
+  return n.includes('account') || n.includes('compte partagé') || n.includes('login details');
+}
+
 function guessSousCategorie(product) {
   const tags = product.tags || [];
   const name = (product.name || '').toLowerCase();
-  if (tags.includes('prepaid') || name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
+  // Abonnements / Game Pass vérifiés EN PREMIER : Kinguin étiquette souvent ces produits avec le
+  // même tag "prepaid" que les vraies cartes cadeaux, ce qui les faisait atterrir au mauvais endroit.
   if (name.includes('game pass')) return 'Game Pass';
-  if (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn'))) return 'Abonnements';
+  const motsAbonnement = ['subscription', 'membership', 'switch online', 'ea play', 'ubisoft+', 'xbox live gold'];
+  if (motsAbonnement.some(k => name.includes(k)) || (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn')))) return 'Abonnements';
+  if (tags.includes('prepaid') || name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
   return '';
 }
 
 function genererDescriptionFR(plateforme, categorie, sousCategorie) {
-  const storeLabel = { psn: 'PlayStation Store', xbox: 'Xbox', pc: categorie || 'PC', nintendo: 'Nintendo eShop' }[plateforme] || 'la plateforme';
+  const storeLabel = { psn: 'PlayStation Store', xbox: 'Xbox', pc: categorie || 'PC', nintendo: 'Nintendo eShop', streaming: categorie || 'streaming' }[plateforme] || 'la plateforme';
   if (sousCategorie === 'Cartes cadeaux')
     return `Carte cadeau numérique ${storeLabel} — le code est envoyé par email immédiatement après le paiement. À utiliser sur un compte enregistré dans la région correspondante.`;
   if (sousCategorie === 'Game Pass')
@@ -346,6 +366,7 @@ async function runImportParCategories() {
       if (!results.length) break;
 
       for (const product of results) {
+        if (estCompteExclu(product)) continue; // "ACCOUNT" = compte partagé, jamais livrable automatiquement
         if (!estCompatibleEurope(product)) continue;
         if (!product.productId || existingIds.has(product.productId)) continue;
         const eurPrice = product.price || 0;
@@ -416,6 +437,7 @@ async function runImportParCategories() {
         est_slider: false,
         slider_ordre: 1,
         est_populaire: estPopulaire(product.name),
+        est_precommande: !!product.isPreorder,
         est_actif: true,
         kinguin_product_id: product.productId,
         stock: 999
@@ -450,20 +472,39 @@ async function marquerSliderPourHomepage() {
   const PLATEFORMES = ['psn', 'xbox', 'pc', 'nintendo'];
   let ordre = 1;
   for (const plateforme of PLATEFORMES) {
-    const { data, error } = await supabase.from('products')
+    // Priorité 1 : précommandes / jeux très attendus (GTA VI, prochains FC/FIFA...)
+    const { data: precommandes, error: err1 } = await supabase.from('products')
       .select('id')
       .eq('plateforme', plateforme)
-      .eq('est_populaire', true)
+      .eq('est_precommande', true)
       .eq('est_actif', true)
       .order('id', { ascending: true })
       .limit(2);
-    if (error) { console.error(`   ⚠️ Erreur sélection slider (${plateforme}):`, error.message); continue; }
-    for (const row of data || []) {
+    if (err1) console.error(`   ⚠️ Erreur sélection précommandes (${plateforme}):`, err1.message);
+    let choisis = precommandes || [];
+
+    // Priorité 2 : complète avec des produits populaires si pas assez de précommandes
+    if (choisis.length < 2) {
+      const idsExclus = choisis.map(c => c.id);
+      let requete = supabase.from('products')
+        .select('id')
+        .eq('plateforme', plateforme)
+        .eq('est_populaire', true)
+        .eq('est_actif', true)
+        .order('id', { ascending: true })
+        .limit(2 - choisis.length);
+      if (idsExclus.length) requete = requete.not('id', 'in', `(${idsExclus.join(',')})`);
+      const { data: populaires, error: err2 } = await requete;
+      if (err2) console.error(`   ⚠️ Erreur sélection populaires (${plateforme}):`, err2.message);
+      choisis = choisis.concat(populaires || []);
+    }
+
+    for (const row of choisis) {
       await supabase.from('products').update({ est_slider: true, slider_ordre: ordre }).eq('id', row.id);
       ordre++;
     }
   }
-  console.log(`🎞️ ${ordre - 1} produit(s) mis en avant dans le slider de la page d'accueil.`);
+  console.log(`🎞️ ${ordre - 1} produit(s) mis en avant dans le slider (précommandes en priorité).`);
 }
 
 async function runFixKinguinProducts() {
@@ -486,15 +527,23 @@ async function runFixKinguinProducts() {
       for (const product of results) {
         const row = existingMap.get(product.productId);
         if (!row) continue;
+        if (estCompteExclu(product)) {
+          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+          totalCorriges++;
+          continue;
+        }
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product);
         const fields = {
+          nom: nomAffiche(product, plateforme, categorie, sousCategorie),
+          sous_categorie: sousCategorie,
           description: genererDescriptionFR(plateforme, categorie, sousCategorie),
           developpeur: joinField(product.developers),
           editeur: joinField(product.publishers),
           genres: joinField(product.genres),
           date_sortie: product.releaseDate || '',
           note_metacritic: product.metacriticScore || null,
+          est_precommande: !!product.isPreorder,
         };
         const nouvelleImage = getImageUrl(product);
         if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
