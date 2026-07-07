@@ -429,6 +429,7 @@ let searchTimeout = null;
   if (session) { currentUser = session.user; await loadProfile(); }
   updateNavAuth();
   await loadProducts();
+  reprendreAjoutPanier();
   sb.auth.onAuthStateChange(async (e, s) => {
     currentUser = s ? s.user : null;
     if (currentUser) await loadProfile(); else userProfile = null;
@@ -675,6 +676,21 @@ document.addEventListener('click', e => {
 });
 
 // PANIER
+// Reprend le produit qu'on a cliqué "Ajouter au panier" sur produit.html (qui redirige ici)
+function reprendreAjoutPanier() {
+  const params = new URLSearchParams(location.search);
+  const idAtraiter = sessionStorage.getItem('add_to_cart');
+  sessionStorage.removeItem('add_to_cart');
+  if (params.get('cart') === '1' && idAtraiter) {
+    addToCart(idAtraiter);
+    toggleDrawer();
+  }
+  if (params.get('cart') === '1') {
+    // Nettoie l'URL pour éviter de re-déclencher au rafraîchissement
+    window.history.replaceState({}, '', 'index.html');
+  }
+}
+
 function addToCart(id, e) {
   if (e) e.preventDefault();
   const p = products.find(x => x.id === id);
