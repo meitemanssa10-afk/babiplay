@@ -44,6 +44,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .fb-xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
 .fb-pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
 .fb-nintendo{background:linear-gradient(140deg,#8b0009,#e60012)}
+.fb-streaming{background:linear-gradient(140deg,#2a1050,#a970ff)}
 
 /* INFOS PRODUIT */
 .info-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px}
@@ -139,10 +140,10 @@ const params = new URLSearchParams(location.search);
 const prodId = params.get('id');
 
 const fmt = n => (n || 0).toLocaleString('fr-FR');
-const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴' }[p] || '🎮');
-const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo' }[p] || p);
-const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#66c0f4', nintendo:'#ff6b6b' }[p] || '#f5a623');
-const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo' }[p] || 'fb-pc');
+const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺' }[p] || '🎮');
+const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps' }[p] || p);
+const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#66c0f4', nintendo:'#ff6b6b', streaming:'#a970ff' }[p] || '#f5a623');
+const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo', streaming:'fb-streaming' }[p] || 'fb-pc');
 
 // Détecte un lien YouTube et le convertit en lien intégrable, en boucle et muet
 function getYouTubeEmbed(url) {
@@ -177,6 +178,12 @@ const STEPS = {
     { t: 'Accédez à \"Activer un produit\"', d: "Steam : Jeux → Activer un produit | Epic : Compte → Codes" },
     { t: 'Entrez votre code', d: "Copiez-collez le code reçu par email" },
     { t: 'Téléchargez et jouez !', d: "Le jeu ou le crédit est ajouté à votre bibliothèque" },
+  ],
+  streaming: [
+    { t: 'Connectez-vous à votre compte', d: "Utilisez votre compte Netflix, Spotify, Disney+ ou Crunchyroll existant (ou créez-en un gratuitement)" },
+    { t: 'Allez sur la page de validation de code', d: "Depuis le site officiel du service, section \"Carte cadeau\" ou \"Redeem\"" },
+    { t: 'Entrez votre code', d: "Saisissez le code reçu par email juste après votre paiement" },
+    { t: 'Profitez !', d: "L'abonnement est actif immédiatement sur tous vos appareils (téléphone, TV, ordinateur...)" },
   ],
 };
 
