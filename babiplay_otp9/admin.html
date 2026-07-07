@@ -259,9 +259,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <option value="all">Toutes les plateformes</option>
           <option value="psn">PSN</option>
           <option value="xbox">Xbox</option>
-          <option value="steam">Steam</option>
+          <option value="pc">PC</option>
           <option value="nintendo">Nintendo</option>
         </select>
+        <input class="table-search" placeholder="🔍 Rechercher un produit (ex: Mario Kart)..." oninput="searchProducts(this.value)" style="flex:1;max-width:320px">
       </div>
       <div class="table-wrap">
         <table><thead><tr><th>Image</th><th>Nom</th><th>Plateforme</th><th>Prix</th><th>Stock codes</th><th>Slider</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -561,8 +562,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
       </div>
       <div class="form-group">
         <label>URL de la vidéo (optionnel)</label>
-        <input type="url" id="prod-video" placeholder="https://... (lien MP4 de la vidéo)">
-        <small style="color:var(--muted);font-size:12px;margin-top:4px;display:block">Tu peux aussi uploader une vidéo dans le champ image ci-dessus</small>
+        <input type="url" id="prod-video" placeholder="https://... (lien MP4 ou lien YouTube de la bande-annonce)">
+        <small style="color:var(--muted);font-size:12px;margin-top:4px;display:block">Colle un lien YouTube (bande-annonce officielle) ou un lien MP4 direct. Tu peux aussi uploader une vidéo dans le champ image ci-dessus.</small>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -811,15 +812,25 @@ async function loadDashboard(){
 // ============================================================
 // PRODUITS
 // ============================================================
+let prodFilterPlatform='all';
+let prodSearchQuery='';
+
 async function loadProducts(){
   const{data}=await sb.from('products').select('*').order('created_at',{ascending:false});
-  allProducts=data||[];renderProducts('all');
+  allProducts=data||[];applyProductFilters();
 }
 
-function renderProducts(filter){
-  const list=filter==='all'?allProducts:allProducts.filter(p=>p.plateforme===filter);
+function applyProductFilters(){
+  let list=prodFilterPlatform==='all'?allProducts:allProducts.filter(p=>p.plateforme===prodFilterPlatform);
+  if(prodSearchQuery){
+    list=list.filter(p=>(p.nom||'').toLowerCase().includes(prodSearchQuery));
+  }
+  renderProducts(list);
+}
+
+function renderProducts(list){
   const tb=document.getElementById('products-tbody');
-  if(!list.length){tb.innerHTML='<tr><td colspan="8"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun produit</p></div></td></tr>';return;}
+  if(!list.length){tb.innerHTML='<tr><td colspan="8"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun produit trouvé</p></div></td></tr>';return;}
   tb.innerHTML=list.map(p=>`
     <tr>
       <td>${p.image_url?`<img src="${p.image_url}" style="width:48px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:platEmoji(p.plateforme)}</td>
@@ -836,7 +847,8 @@ function renderProducts(filter){
     </tr>`).join('');
 }
 
-function filterProducts(val){renderProducts(val);}
+function filterProducts(val){prodFilterPlatform=val;applyProductFilters();}
+function searchProducts(val){prodSearchQuery=val.trim().toLowerCase();applyProductFilters();}
 
 function openProductModal(p=null){
   document.getElementById('modal-product-title').textContent=p?'Modifier le produit':'Ajouter un produit';
@@ -1455,7 +1467,7 @@ async function relancerInactifs(){
                   <p style="color:#000;margin:6px 0 0;font-size:13px">On vous manque !</p>
                 </div>
                 <div style="padding:28px">
-                  <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${dest.prenom||''}}</strong> 👋</p>
+                  <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${dest.prenom||''}</strong> 👋</p>
                   <p style="color:#9a9ab8;font-size:14px;line-height:1.7">
                     Cela fait un moment qu'on ne vous a pas vu sur BabiPlay CI !<br><br>
                     Nous sommes toujours là avec vos cartes gaming préférées :
