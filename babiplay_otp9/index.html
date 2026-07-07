@@ -84,10 +84,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .slider-track{display:flex;height:100%;transition:transform .5s ease}
 .slide{min-width:100%;height:100%;position:relative;display:flex;align-items:flex-end;padding:20px 16px;flex-shrink:0;overflow:hidden;cursor:pointer;text-decoration:none;color:var(--text)}
 @media(min-width:600px){.slide{padding:32px 40px}}
-.slide-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.4)}
+.slide-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.4) blur(8px);transform:scale(1.1)}
+.slide-fg{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat}
 .slide-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,.2) 60%,transparent 100%)}
 @media(min-width:600px){.slide-overlay{background:linear-gradient(90deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,.1) 70%,transparent 100%)}}
 .slide-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.4)}
+.slide-yt-wrap{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.slide-yt-wrap::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.4)}
+.slide-yt-wrap iframe{position:absolute;top:50%;left:50%;width:100vw;height:56.25vw;min-height:100%;min-width:177.78vh;transform:translate(-50%,-50%);border:0}
 .slide-content{position:relative;z-index:2;max-width:420px}
 .slide-plat{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
 .slide-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;line-height:1.2;margin-bottom:8px;color:var(--gold)}
@@ -123,11 +127,13 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .fb-xbox{background:linear-gradient(140deg,#0a3d0a,#107c10)}
 .fb-pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
 .fb-nintendo{background:linear-gradient(140deg,#8b0009,#e60012)}
+.fb-streaming{background:linear-gradient(140deg,#2a1050,#a970ff)}
 .card-badge{position:absolute;top:6px;left:6px;font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 7px;border-radius:4px;text-transform:uppercase}
 .card-badge-psn{background:rgba(0,112,209,.4);color:#90c8ff;border:1px solid rgba(0,112,209,.5)}
 .card-badge-xbox{background:rgba(82,176,67,.4);color:#90e080;border:1px solid rgba(82,176,67,.5)}
 .card-badge-pc{background:rgba(102,192,244,.4);color:#c0eaff;border:1px solid rgba(102,192,244,.5)}
 .card-badge-nintendo{background:rgba(228,0,15,.4);color:#ffaaaa;border:1px solid rgba(228,0,15,.5)}
+.card-badge-streaming{background:rgba(169,112,255,.4);color:#d6c0ff;border:1px solid rgba(169,112,255,.5)}
 .card-pop{position:absolute;top:6px;right:6px;background:var(--gold);color:#000;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
 .card-wrap-img{position:relative}
 .card-body{padding:8px 10px 10px}
@@ -273,6 +279,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
       <button class="fchip" onclick="setFilter('nintendo',this)" data-filter="nintendo">
         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
       </button>
+      <button class="fchip" onclick="setFilter('streaming',this)" data-filter="streaming">📺 Streaming</button>
     </div>
   </div>
 
@@ -430,17 +437,27 @@ let searchTimeout = null;
 })();
 
 const fmt = n => (n || 0).toLocaleString('fr-FR');
-const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴' }[p] || '🎮');
-const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo' }[p] || p);
-const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo' }[p] || 'card-badge-pc');
-const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo' }[p] || 'fb-pc');
-const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b' }[p] || '#f5a623');
+const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺' }[p] || '🎮');
+const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps' }[p] || p);
+const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming' }[p] || 'card-badge-pc');
+const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo', streaming:'fb-streaming' }[p] || 'fb-pc');
+const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b', streaming:'#a970ff' }[p] || '#f5a623');
 const pDesc = p => ({
   psn: "Vos jeux et cartes PlayStation au meilleur prix, payables en FCFA.",
   xbox: "Cartes, abonnements Game Pass et jeux Xbox, livrés instantanément par email.",
   pc: "Steam, Epic Games, Battle.net... tous vos jeux PC préférés en un seul endroit.",
-  nintendo: "Cartes eShop et jeux Switch pour toute la famille, prix en FCFA."
+  nintendo: "Cartes eShop et jeux Switch pour toute la famille, prix en FCFA.",
+  streaming: "Netflix, Spotify, Disney+, Crunchyroll... vos abonnements préférés en FCFA, activables sur votre propre compte."
 }[p] || '');
+
+// Détecte un lien YouTube (watch, youtu.be, shorts) et le convertit en lien intégrable, en boucle et muet
+function getYouTubeEmbed(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  if (!m) return null;
+  const id = m[1];
+  return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3`;
+}
 
 async function loadProducts() {
   const { data } = await sb.from('products').select('*').eq('est_actif', true).order('est_populaire', { ascending: false });
@@ -468,11 +485,17 @@ function renderSlider() {
   }
   track.innerHTML = sliderProds.map(p => {
     const color = pColor(p.plateforme);
-    let media = p.video_url
-      ? `<video class="slide-video" autoplay muted loop playsinline src="${p.video_url}"></video>`
-      : p.image_url
-        ? `<div class="slide-bg" style="background-image:url('${p.image_url}')"></div>`
-        : `<div class="slide-bg ${pFbClass(p.plateforme)}"></div>`;
+    const ytEmbed = getYouTubeEmbed(p.video_url);
+    let media;
+    if (ytEmbed) {
+      media = `<div class="slide-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${p.nom}"></iframe></div>`;
+    } else if (p.video_url) {
+      media = `<video class="slide-video" autoplay muted loop playsinline src="${p.video_url}"></video>`;
+    } else if (p.image_url) {
+      media = `<div class="slide-bg" style="background-image:url('${p.image_url}')"></div><div class="slide-fg" style="background-image:url('${p.image_url}')"></div>`;
+    } else {
+      media = `<div class="slide-bg ${pFbClass(p.plateforme)}"></div>`;
+    }
     return `<a class="slide" href="produit.html?id=${p.id}">
       ${media}
       <div class="slide-overlay"></div>
@@ -512,6 +535,7 @@ function renderCatalogue(filter = currentFilter) {
     if (currentType === 'tendances') filtered = filtered.filter(p => p.est_populaire);
     else if (currentType === 'cartes') filtered = filtered.filter(p => p.sous_categorie === 'Cartes cadeaux');
     else if (currentType === 'abonnements') filtered = filtered.filter(p => p.sous_categorie === 'Abonnements' || p.sous_categorie === 'Game Pass');
+    else if (currentType === 'precommandes') filtered = filtered.filter(p => p.est_precommande);
 
     cat.innerHTML = `
       <div class="cat-hero">
@@ -527,6 +551,7 @@ function renderCatalogue(filter = currentFilter) {
       <div class="type-row">
         <button class="type-tab ${currentType === 'tous' ? 'active' : ''}" onclick="setType('tous')">Tous les jeux</button>
         <button class="type-tab ${currentType === 'tendances' ? 'active' : ''}" onclick="setType('tendances')">🔥 Tendances</button>
+        <button class="type-tab ${currentType === 'precommandes' ? 'active' : ''}" onclick="setType('precommandes')">🚀 Précommandes</button>
         <button class="type-tab ${currentType === 'cartes' ? 'active' : ''}" onclick="setType('cartes')">🎁 Cartes cadeaux</button>
         <button class="type-tab ${currentType === 'abonnements' ? 'active' : ''}" onclick="setType('abonnements')">⭐ Abonnements</button>
       </div>
@@ -548,6 +573,7 @@ function renderCatalogue(filter = currentFilter) {
     { id: 'xbox', title: '🕹️ Xbox & Game Pass', items: products.filter(p => p.plateforme === 'xbox').slice(0, 6) },
     { id: 'pc', title: '🖥️ PC & Steam', items: products.filter(p => p.plateforme === 'pc').slice(0, 6) },
     { id: 'nintendo', title: '🔴 Nintendo', items: products.filter(p => p.plateforme === 'nintendo').slice(0, 6) },
+    { id: 'streaming', title: '📺 Streaming & Apps', items: products.filter(p => p.plateforme === 'streaming').slice(0, 6) },
   ].filter(s => s.items.length > 0);
 
   cat.innerHTML = sections.map(s => `
