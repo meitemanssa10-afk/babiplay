@@ -292,8 +292,12 @@ function guessSousCategorie(product, plateforme) {
   const motsAbonnement = ['subscription', 'membership', 'switch online', 'ea play', 'ubisoft+', 'xbox live gold'];
   if (motsAbonnement.some(k => name.includes(k)) || (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn')))) return 'Abonnements';
 
-  // "gift card" / "wallet" / "points" dans le nom = carte générique fiable, quel que soit le début du nom.
-  if (name.includes('gift card') || name.includes('wallet') || name.includes('points')) return 'Cartes cadeaux';
+  // "gift card" / "wallet" dans le nom = carte générique fiable, quel que soit le début du nom.
+  // ATTENTION : "points" a été retiré volontairement — ce mot désigne presque toujours une monnaie
+  // interne à un jeu précis (FIFA Points, COD Points, Warzone Points, V-Bucks...), pas une carte
+  // cadeau de plateforme. En le gardant, ces produits (très nombreux et souvent "populaires") noyaient
+  // les vraies cartes PSN / Xbox / eShop et prenaient toute la place dans les 100 slots par catégorie.
+  if (name.includes('gift card') || name.includes('wallet')) return 'Cartes cadeaux';
 
   // Le tag "prepaid" seul est TROP large chez Kinguin : il s'applique aussi aux jeux précis vendus via
   // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" ou "EA Sports FC 24
