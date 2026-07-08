@@ -254,7 +254,7 @@ const CODES_PAYS_NON_FRANCE = [
   'SA','QA','KW','BH','OM','EG','MA','TN','DZ','RU','UA','IL','TH','SG','MY','PH','ID','VN','PK','AR',
   'CL','CO','PE','QAT'
 ];
-const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','ron','sek','nok','dkk','zar','inr','jpy','cny','hkd','cad','aud','nzd','brl','mxn','sar','qar','kwd','bhd','omr','egp','dirham'];
+const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','ron','sek','nok','dkk','zar','inr','jpy','cny','hkd','cad','aud','nzd','brl','mxn','sar','qar','kwd','bhd','omr','egp','dirham','chf'];
 
 function estCarteFrance(nomOriginal) {
   const n = (nomOriginal || '').trim();
