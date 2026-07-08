@@ -461,8 +461,23 @@ function getYouTubeEmbed(url) {
 }
 
 async function loadProducts() {
-  const { data } = await sb.from('products').select('*').eq('est_actif', true).order('est_populaire', { ascending: false });
-  products = data || [];
+  // Supabase plafonne chaque requête à 1000 lignes par défaut. On a maintenant plus de 4000
+  // produits actifs, donc on doit paginer avec .range() pour tous les récupérer — sinon les
+  // catégories sans produit "populaire" (PSN Cartes cadeaux, Nintendo eShop, Streaming...)
+  // se retrouvaient triées en dernier et disparaissaient complètement au-delà de la 1000e ligne.
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    const { data, error } = await sb.from('products').select('*').eq('est_actif', true)
+      .order('est_populaire', { ascending: false }).range(from, from + pageSize - 1);
+    if (error) { console.error('Erreur chargement produits:', error.message); break; }
+    if (!data || !data.length) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  products = all;
   renderSlider();
   renderCatalogue();
 }
