@@ -202,7 +202,9 @@ const STEPS = {
     let from = 0;
     let all = [];
     while (true) {
-      const { data, error } = await sb.from('products').select('*').eq('est_actif', true).range(from, from + pageSize - 1);
+      const { data, error } = await sb.from('products')
+        .select('id, nom, prix, image_url, plateforme, sous_categorie')
+        .eq('est_actif', true).range(from, from + pageSize - 1);
       if (error) { console.error('Erreur chargement produits:', error.message); break; }
       if (!data || !data.length) break;
       all = all.concat(data);
