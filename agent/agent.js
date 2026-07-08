@@ -244,25 +244,25 @@ function contientDeviseNonEuro(nom) {
 
 // Filtre STRICT réservé aux cartes cadeaux / abonnements / points : Kinguin vend ces produits en
 // dizaines de pays et devises différents (ZAR, JPY, INR, CAD, CZK, SEK, HKD, BRL, TRY, USD, GBP, AED,
-// MAD...). Pour les cartes cadeaux le code pays est en général à la toute fin ("... Gift Card FR"),
-// mais pour les "Points" il apparaît souvent au milieu ("FC Points 12000 UK XBOX One..."). On cherche
-// donc le code n'importe où dans le nom. On ne garde QUE la France ("FR"). S'il n'y a aucun code pays
-// ni devise suspecte détecté, on considère le produit compatible (générique / région libre).
+// MAD, CHF...). Pour les cartes cadeaux le code pays est en général à la toute fin ("... Gift Card
+// FR"), mais pour les "Points" il apparaît souvent au milieu ("FC Points 12000 UK XBOX One..."). On
+// cherche donc le code n'importe où dans le nom. On ne garde QUE la France ("FR"). S'il n'y a aucun
+// code pays ni devise suspecte détecté, on considère le produit compatible (générique / région libre).
 const CODES_PAYS_NON_FRANCE = [
   'US','UK','GB','CA','AU','NZ','JP','KR','CN','HK','TW','IN','BR','MX','ZA','TR','PL','CZ','HU','RO',
   'SK','SI','HR','BG','GR','PT','ES','IT','DE','NL','BE','AT','CH','SE','NO','DK','FI','IE','IS','AE',
   'SA','QA','KW','BH','OM','EG','MA','TN','DZ','RU','UA','IL','TH','SG','MY','PH','ID','VN','PK','AR',
-  'CL','CO','PE','QAT'
+  'CL','CO','PE','QAT','LU','CY','EE','LV','LT','MT'
 ];
 const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','ron','sek','nok','dkk','zar','inr','jpy','cny','hkd','cad','aud','nzd','brl','mxn','sar','qar','kwd','bhd','omr','egp','dirham','chf'];
 
 function estCarteFrance(nomOriginal) {
   const n = (nomOriginal || '').trim();
   const nLower = n.toLowerCase();
+  if (/\bFR\b/.test(n)) return true; // code FR trouvé quelque part → inclus, priorité absolue
   for (const code of CODES_PAYS_NON_FRANCE) {
     if (new RegExp('\\b' + code + '\\b').test(n)) return false; // pays étranger explicite → exclu
   }
-  if (/\bFR\b/.test(n)) return true; // code FR trouvé quelque part → inclus
   const aDeviseNonEuro = CODES_DEVISE_NON_EURO.some(c => nLower.includes(c)) || /\$|£|₺|₹|¥|₩|₪|kr\b/.test(n);
   const aEuro = nLower.includes('eur') || n.includes('€');
   if (aDeviseNonEuro && !aEuro) return false;
@@ -453,8 +453,8 @@ async function runImportParCategories() {
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
 
-        // Cartes cadeaux / abonnements : uniquement les versions France (voir estCarteFrance). Les
-        // jeux restent soumis au filtre devise plus permissif déjà appliqué plus haut.
+        // Cartes cadeaux / abonnements / points : uniquement les versions France (voir estCarteFrance).
+        // Les jeux restent soumis au filtre devise plus permissif déjà appliqué plus haut.
         if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) continue;
 
         // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
@@ -542,9 +542,6 @@ async function runImportParCategories() {
 }
 
 // ─────────────────────────────────────────────
-// CORRECTION : description FR + vraies photos + prix corrigés (produits déjà importés)
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
 // SLIDER DE LA PAGE D'ACCUEIL : met en avant 2 produits populaires par plateforme
 // ─────────────────────────────────────────────
 async function marquerSliderPourHomepage() {
@@ -598,9 +595,9 @@ async function runFixKinguinProducts() {
     if (errResiduels) console.error('⚠️ Erreur nettoyage comptes résiduels:', errResiduels.message);
     else if (comptesResiduels?.length) console.log(`🧹 ${comptesResiduels.length} produit(s) "compte partagé" résiduel(s) désactivé(s).`);
 
-    // Même chose pour les cartes cadeaux / abonnements non-françaises importées AVANT le filtre
-    // estCarteFrance : on les repasse directement en base plutôt que de compter sur le fait qu'elles
-    // réapparaissent dans le catalogue Kinguin du jour (qui change constamment).
+    // Même chose pour les cartes cadeaux / abonnements / points non-françaises importées AVANT le
+    // filtre estCarteFrance : on les repasse directement en base plutôt que de compter sur le fait
+    // qu'elles réapparaissent dans le catalogue Kinguin du jour (qui change constamment).
     const { data: cartesNonFrance, error: errCartesNonFrance } = await supabase.from('products')
       .select('id, nom').eq('est_actif', true).in('sous_categorie', ['Cartes cadeaux', 'Abonnements', 'Points']);
     if (errCartesNonFrance) console.error('⚠️ Erreur lecture cartes cadeaux/abonnements:', errCartesNonFrance.message);
@@ -610,7 +607,7 @@ async function runFixKinguinProducts() {
         for (let i = 0; i < idsNonFrance.length; i += 200) {
           await supabase.from('products').update({ est_actif: false }).in('id', idsNonFrance.slice(i, i + 200));
         }
-        console.log(`🧹 ${idsNonFrance.length} carte(s) cadeau/abonnement non-française(s) désactivée(s).`);
+        console.log(`🧹 ${idsNonFrance.length} carte(s) cadeau/abonnement/points non-française(s) désactivée(s).`);
       }
     }
 
@@ -667,8 +664,8 @@ async function runFixKinguinProducts() {
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
 
-        // Cartes cadeaux / abonnements non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD, GBP...)
-        // déjà importées avant le correctif : on les désactive.
+        // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
+        // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
         if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
           await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
           totalCorriges++;
