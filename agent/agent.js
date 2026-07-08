@@ -575,6 +575,22 @@ async function runFixKinguinProducts() {
     if (errResiduels) console.error('⚠️ Erreur nettoyage comptes résiduels:', errResiduels.message);
     else if (comptesResiduels?.length) console.log(`🧹 ${comptesResiduels.length} produit(s) "compte partagé" résiduel(s) désactivé(s).`);
 
+    // Même chose pour les cartes cadeaux / abonnements non-françaises importées AVANT le filtre
+    // estCarteFrance : on les repasse directement en base plutôt que de compter sur le fait qu'elles
+    // réapparaissent dans le catalogue Kinguin du jour (qui change constamment).
+    const { data: cartesNonFrance, error: errCartesNonFrance } = await supabase.from('products')
+      .select('id, nom').eq('est_actif', true).in('sous_categorie', ['Cartes cadeaux', 'Abonnements']);
+    if (errCartesNonFrance) console.error('⚠️ Erreur lecture cartes cadeaux/abonnements:', errCartesNonFrance.message);
+    else {
+      const idsNonFrance = (cartesNonFrance || []).filter(r => !estCarteFrance(r.nom)).map(r => r.id);
+      if (idsNonFrance.length) {
+        for (let i = 0; i < idsNonFrance.length; i += 200) {
+          await supabase.from('products').update({ est_actif: false }).in('id', idsNonFrance.slice(i, i + 200));
+        }
+        console.log(`🧹 ${idsNonFrance.length} carte(s) cadeau/abonnement non-française(s) désactivée(s).`);
+      }
+    }
+
     const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
     if (error) throw new Error('Lecture produits: ' + error.message);
     const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
