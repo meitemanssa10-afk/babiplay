@@ -547,10 +547,12 @@ function renderCatalogue(filter = currentFilter) {
 
   if (filter !== 'all') {
     // Sous-consoles disponibles pour cette plateforme (ex: PS4/PS5, Xbox One/Series, Steam/Epic/...)
-    const consoles = [...new Set(list.map(p => p.categorie).filter(Boolean))];
+    // PSN : plus de distinction PS4/PS5, tout s'affiche ensemble (les jeux ciblent rarement une seule
+    // des deux consoles de façon exclusive, et ça évite au client de devoir chercher dans le mauvais onglet).
+    const consoles = filter === 'psn' ? [] : [...new Set(list.map(p => p.categorie).filter(Boolean))];
     // Les cartes cadeaux / abonnements sans console précisée (categorie vide, ex: cartes PSN
     // génériques valables sur PS4 ET PS5) restent visibles quel que soit le sous-filtre choisi.
-    let filtered = currentSousConsole === 'all' ? list : list.filter(p => p.categorie === currentSousConsole || !p.categorie);
+    let filtered = (filter === 'psn' || currentSousConsole === 'all') ? list : list.filter(p => p.categorie === currentSousConsole || !p.categorie);
     if (currentType === 'tendances') filtered = filtered.filter(p => p.est_populaire);
     else if (currentType === 'cartes') filtered = filtered.filter(p => p.sous_categorie === 'Cartes cadeaux');
     else if (currentType === 'abonnements') filtered = filtered.filter(p => p.sous_categorie === 'Abonnements' || p.sous_categorie === 'Game Pass');
