@@ -230,12 +230,24 @@ function estCompatibleEurope(product) {
 }
 
 // Exclut les cartes explicitement libellées dans une autre devise que l'euro (ex: "15 USD Gift Card US"),
-// même si les autres filtres de région les auraient laissées passer.
+// même si les autres filtres de région les auraient laissées passer. Gardé pour les JEUX (moins strict).
 function contientDeviseNonEuro(nom) {
   const n = (nom || '').toLowerCase();
   const aAutreDevise = /\busd\b|\$\s*\d|\d\s*\$|\bgbp\b|£|\btry\b|\bpln\b/.test(n);
   const aEuro = n.includes('eur') || n.includes('€');
   return aAutreDevise && !aEuro;
+}
+
+// Filtre STRICT réservé aux cartes cadeaux / abonnements : Kinguin vend les cartes PSN/Xbox/eShop en
+// dizaines de devises et pays différents (ZAR, JPY, INR, CAD, CZK, SEK, HKD, BRL, TRY, USD, GBP...),
+// identifiables par un code pays de 2 lettres en majuscules à la toute fin du nom (ex: "... Gift Card
+// FR", "... Card ZA", "... Card JP"). On ne garde QUE les cartes France ("FR"). S'il n'y a aucun code
+// pays à la fin (ancienne convention Kinguin, carte générique), on retombe sur la présence d'EUR/€.
+function estCarteFrance(nomOriginal) {
+  const n = (nomOriginal || '').trim();
+  const m = n.match(/\b([A-Z]{2})$/);
+  if (m) return m[1] === 'FR';
+  return !contientDeviseNonEuro(n);
 }
 
 // Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
@@ -258,8 +270,16 @@ function mapPlatform(kinguinPlatform, productName) {
   if (n.includes('disney')) return { plateforme: 'streaming', categorie: 'Disney+' };
   if (n.includes('crunchyroll')) return { plateforme: 'streaming', categorie: 'Crunchyroll' };
 
-  if (p.includes('playstation') || p.includes('psn'))
-    return { plateforme: 'psn', categorie: n.includes('ps5') ? 'PS5' : 'PS4' };
+  if (p.includes('playstation') || p.includes('psn')) {
+    // Les cartes cadeaux/abonnements PSN sont valables sur PS4 ET PS5 — on ne les rattache à une
+    // sous-console que si le nom le précise explicitement (cas des jeux). Sinon on laisse vide : le
+    // site les affichera dans "Tous" plutôt que de les perdre dans un onglet PS4/PS5 qui ne leur
+    // correspond pas vraiment.
+    let categorie = '';
+    if (n.includes('ps5')) categorie = 'PS5';
+    else if (n.includes('ps4')) categorie = 'PS4';
+    return { plateforme: 'psn', categorie };
+  }
   if (p.includes('xbox'))
     return { plateforme: 'xbox', categorie: p.includes('series') || n.includes('series') ? 'Xbox Series X|S' : 'Xbox One' };
   if (p.includes('nintendo') || p.includes('switch') || p === '2ds' || p === '3ds')
@@ -409,6 +429,10 @@ async function runImportParCategories() {
 
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
+
+        // Cartes cadeaux / abonnements : uniquement les versions France (voir estCarteFrance). Les
+        // jeux restent soumis au filtre devise plus permissif déjà appliqué plus haut.
+        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements') && !estCarteFrance(product.name)) continue;
 
         // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
         // "20€" ne doit pas ressortir à 700 FCFA). Pour les jeux, les prix très variables sont normaux.
@@ -573,6 +597,14 @@ async function runFixKinguinProducts() {
         }
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
+
+        // Cartes cadeaux / abonnements non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD, GBP...)
+        // déjà importées avant le correctif : on les désactive.
+        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements') && !estCarteFrance(product.name)) {
+          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+          totalCorriges++;
+          continue;
+        }
 
         // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
         // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
