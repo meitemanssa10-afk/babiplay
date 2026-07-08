@@ -183,13 +183,17 @@ const CAP_PAR_CATEGORIE = parseInt(process.env.CAP_PAR_CATEGORIE || '100', 10);
 const CATEGORIES = [
   { plateforme: 'psn',      sousCategorie: 'Cartes cadeaux', label: 'PSN — Cartes cadeaux' },
   { plateforme: 'psn',      sousCategorie: 'Abonnements',    label: 'PSN — Abonnements (PS Plus)' },
+  { plateforme: 'psn',      sousCategorie: 'Points',         label: 'PSN — Points (monnaies de jeu)' },
   { plateforme: 'psn',      sousCategorie: '',                label: 'PSN — Jeux' },
   { plateforme: 'xbox',     sousCategorie: 'Cartes cadeaux', label: 'Xbox — Cartes cadeaux' },
   { plateforme: 'xbox',     sousCategorie: 'Game Pass',      label: 'Xbox — Game Pass' },
+  { plateforme: 'xbox',     sousCategorie: 'Points',         label: 'Xbox — Points (monnaies de jeu)' },
   { plateforme: 'xbox',     sousCategorie: '',                label: 'Xbox — Jeux' },
   { plateforme: 'pc',       sousCategorie: 'Cartes cadeaux', label: 'PC — Cartes cadeaux (Steam Wallet...)' },
+  { plateforme: 'pc',       sousCategorie: 'Points',         label: 'PC — Points (monnaies de jeu)' },
   { plateforme: 'pc',       sousCategorie: '',                label: 'PC — Jeux (Steam/Epic/...)' },
   { plateforme: 'nintendo', sousCategorie: 'Cartes cadeaux', label: 'Nintendo — Cartes eShop' },
+  { plateforme: 'nintendo', sousCategorie: 'Points',         label: 'Nintendo — Points (monnaies de jeu)' },
   { plateforme: 'nintendo', sousCategorie: '',                label: 'Nintendo — Jeux' },
   { plateforme: 'streaming', sousCategorie: 'Cartes cadeaux', label: 'Streaming — Cartes cadeaux (Netflix, Disney+...)' },
   { plateforme: 'streaming', sousCategorie: 'Abonnements',    label: 'Streaming — Abonnements (Spotify, Crunchyroll...)' },
@@ -238,16 +242,31 @@ function contientDeviseNonEuro(nom) {
   return aAutreDevise && !aEuro;
 }
 
-// Filtre STRICT réservé aux cartes cadeaux / abonnements : Kinguin vend les cartes PSN/Xbox/eShop en
-// dizaines de devises et pays différents (ZAR, JPY, INR, CAD, CZK, SEK, HKD, BRL, TRY, USD, GBP...),
-// identifiables par un code pays de 2 lettres en majuscules à la toute fin du nom (ex: "... Gift Card
-// FR", "... Card ZA", "... Card JP"). On ne garde QUE les cartes France ("FR"). S'il n'y a aucun code
-// pays à la fin (ancienne convention Kinguin, carte générique), on retombe sur la présence d'EUR/€.
+// Filtre STRICT réservé aux cartes cadeaux / abonnements / points : Kinguin vend ces produits en
+// dizaines de pays et devises différents (ZAR, JPY, INR, CAD, CZK, SEK, HKD, BRL, TRY, USD, GBP, AED,
+// MAD...). Pour les cartes cadeaux le code pays est en général à la toute fin ("... Gift Card FR"),
+// mais pour les "Points" il apparaît souvent au milieu ("FC Points 12000 UK XBOX One..."). On cherche
+// donc le code n'importe où dans le nom. On ne garde QUE la France ("FR"). S'il n'y a aucun code pays
+// ni devise suspecte détecté, on considère le produit compatible (générique / région libre).
+const CODES_PAYS_NON_FRANCE = [
+  'US','UK','GB','CA','AU','NZ','JP','KR','CN','HK','TW','IN','BR','MX','ZA','TR','PL','CZ','HU','RO',
+  'SK','SI','HR','BG','GR','PT','ES','IT','DE','NL','BE','AT','CH','SE','NO','DK','FI','IE','IS','AE',
+  'SA','QA','KW','BH','OM','EG','MA','TN','DZ','RU','UA','IL','TH','SG','MY','PH','ID','VN','PK','AR',
+  'CL','CO','PE','QAT'
+];
+const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','ron','sek','nok','dkk','zar','inr','jpy','cny','hkd','cad','aud','nzd','brl','mxn','sar','qar','kwd','bhd','omr','egp','dirham'];
+
 function estCarteFrance(nomOriginal) {
   const n = (nomOriginal || '').trim();
-  const m = n.match(/\b([A-Z]{2})$/);
-  if (m) return m[1] === 'FR';
-  return !contientDeviseNonEuro(n);
+  const nLower = n.toLowerCase();
+  for (const code of CODES_PAYS_NON_FRANCE) {
+    if (new RegExp('\\b' + code + '\\b').test(n)) return false; // pays étranger explicite → exclu
+  }
+  if (/\bFR\b/.test(n)) return true; // code FR trouvé quelque part → inclus
+  const aDeviseNonEuro = CODES_DEVISE_NON_EURO.some(c => nLower.includes(c)) || /\$|£|₺|₹|¥|₩|₪|kr\b/.test(n);
+  const aEuro = nLower.includes('eur') || n.includes('€');
+  if (aDeviseNonEuro && !aEuro) return false;
+  return true; // rien de suspect → considéré compatible France/Europe
 }
 
 // Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
@@ -312,12 +331,14 @@ function guessSousCategorie(product, plateforme) {
   const motsAbonnement = ['subscription', 'membership', 'switch online', 'ea play', 'ubisoft+', 'xbox live gold'];
   if (motsAbonnement.some(k => name.includes(k)) || (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn')))) return 'Abonnements';
 
-  // "gift card" / "wallet" dans le nom = carte générique fiable, quel que soit le début du nom.
-  // ATTENTION : "points" a été retiré volontairement — ce mot désigne presque toujours une monnaie
-  // interne à un jeu précis (FIFA Points, COD Points, Warzone Points, V-Bucks...), pas une carte
-  // cadeau de plateforme. En le gardant, ces produits (très nombreux et souvent "populaires") noyaient
-  // les vraies cartes PSN / Xbox / eShop et prenaient toute la place dans les 100 slots par catégorie.
+  // "gift card" / "wallet" dans le nom = carte cadeau générique fiable, quel que soit le début du nom.
   if (name.includes('gift card') || name.includes('wallet')) return 'Cartes cadeaux';
+
+  // Monnaie interne à un jeu précis (FIFA/FC Points, COD Points, Warzone Points, V-Bucks, EVO
+  // Points...) : ce n'est PAS une carte cadeau de plateforme (le client ne peut pas l'utiliser où il
+  // veut, seulement dans CE jeu), mais on la vend quand même, dans son propre rayon "Points" par
+  // plateforme, pour ne pas la mélanger avec les vraies cartes cadeaux.
+  if (name.includes('points') || name.includes('v-bucks') || name.includes('vbucks')) return 'Points';
 
   // Le tag "prepaid" seul est TROP large chez Kinguin : il s'applique aussi aux jeux précis vendus via
   // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" ou "EA Sports FC 24
@@ -345,6 +366,8 @@ function genererDescriptionFR(plateforme, categorie, sousCategorie) {
     return `Abonnement Xbox Game Pass — accès à la bibliothèque de jeux Xbox et PC. Code d'activation envoyé par email après achat.`;
   if (sousCategorie === 'Abonnements')
     return `Abonnement premium ${storeLabel} — profitez du jeu en ligne et d'avantages exclusifs. Code envoyé par email après achat.`;
+  if (sousCategorie === 'Points')
+    return `Monnaie virtuelle à usage interne au jeu (utilisable uniquement dans ce jeu, pas sur l'ensemble de la boutique ${storeLabel}). Code envoyé par email après achat.`;
   return `Clé d'activation officielle pour ${storeLabel}. Téléchargement et activation immédiats après réception du code par email.`;
 }
 
@@ -432,7 +455,7 @@ async function runImportParCategories() {
 
         // Cartes cadeaux / abonnements : uniquement les versions France (voir estCarteFrance). Les
         // jeux restent soumis au filtre devise plus permissif déjà appliqué plus haut.
-        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements') && !estCarteFrance(product.name)) continue;
+        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) continue;
 
         // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
         // "20€" ne doit pas ressortir à 700 FCFA). Pour les jeux, les prix très variables sont normaux.
@@ -579,7 +602,7 @@ async function runFixKinguinProducts() {
     // estCarteFrance : on les repasse directement en base plutôt que de compter sur le fait qu'elles
     // réapparaissent dans le catalogue Kinguin du jour (qui change constamment).
     const { data: cartesNonFrance, error: errCartesNonFrance } = await supabase.from('products')
-      .select('id, nom').eq('est_actif', true).in('sous_categorie', ['Cartes cadeaux', 'Abonnements']);
+      .select('id, nom').eq('est_actif', true).in('sous_categorie', ['Cartes cadeaux', 'Abonnements', 'Points']);
     if (errCartesNonFrance) console.error('⚠️ Erreur lecture cartes cadeaux/abonnements:', errCartesNonFrance.message);
     else {
       const idsNonFrance = (cartesNonFrance || []).filter(r => !estCarteFrance(r.nom)).map(r => r.id);
@@ -589,6 +612,36 @@ async function runFixKinguinProducts() {
         }
         console.log(`🧹 ${idsNonFrance.length} carte(s) cadeau/abonnement non-française(s) désactivée(s).`);
       }
+    }
+
+    // Reclasse les produits marqués "Cartes cadeaux" à tort (avant l'ajout du rayon "Points") : vers
+    // "Points" si c'est une monnaie de jeu (FIFA Points, COD Points, V-Bucks...), sinon vers "Jeux".
+    // On ne dépend pas de Kinguin ici, donc ça marche même si la fiche a disparu de son catalogue depuis.
+    const { data: fauxesCartes, error: errFaussesCartes } = await supabase.from('products')
+      .select('id, nom, plateforme').eq('est_actif', true).eq('sous_categorie', 'Cartes cadeaux');
+    if (errFaussesCartes) console.error('⚠️ Erreur lecture cartes cadeaux:', errFaussesCartes.message);
+    else {
+      const marquesParPlateformeCheck = {
+        psn: /^(playstation|psn)/i, xbox: /^xbox/i, nintendo: /^nintendo/i,
+        pc: /^(steam|epic games|battle\.net|ubisoft connect|ea app|origin|gog|rockstar games|microsoft store)/i,
+      };
+      const idsVersPoints = [], idsVersJeux = [];
+      for (const r of (fauxesCartes || [])) {
+        const n = (r.nom || '').toLowerCase();
+        if (n.includes('gift card') || n.includes('wallet')) continue; // vraie carte, on garde
+        const regexMarque = marquesParPlateformeCheck[r.plateforme];
+        if (regexMarque && regexMarque.test(r.nom || '')) continue; // commence par la bonne marque, on garde
+        if (n.includes('points') || n.includes('v-bucks') || n.includes('vbucks')) idsVersPoints.push(r.id);
+        else idsVersJeux.push(r.id);
+      }
+      for (let i = 0; i < idsVersPoints.length; i += 200) {
+        await supabase.from('products').update({ sous_categorie: 'Points' }).in('id', idsVersPoints.slice(i, i + 200));
+      }
+      for (let i = 0; i < idsVersJeux.length; i += 200) {
+        await supabase.from('products').update({ sous_categorie: '' }).in('id', idsVersJeux.slice(i, i + 200));
+      }
+      if (idsVersPoints.length) console.log(`🔀 ${idsVersPoints.length} produit(s) reclassé(s) de "Cartes cadeaux" vers "Points".`);
+      if (idsVersJeux.length) console.log(`🔀 ${idsVersJeux.length} produit(s) reclassé(s) de "Cartes cadeaux" vers "Jeux".`);
     }
 
     const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
@@ -616,7 +669,7 @@ async function runFixKinguinProducts() {
 
         // Cartes cadeaux / abonnements non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD, GBP...)
         // déjà importées avant le correctif : on les désactive.
-        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements') && !estCarteFrance(product.name)) {
+        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
           await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
           totalCorriges++;
           continue;
