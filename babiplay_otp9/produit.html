@@ -194,9 +194,27 @@ const STEPS = {
 
   if (!prodId) { render404(); return; }
 
-  const [{ data: p }, { data: all }] = await Promise.all([
+  // Supabase plafonne chaque requête à 1000 lignes par défaut ; on a plus de 4000 produits
+  // actifs, donc on pagine avec .range() pour tout récupérer (sinon les sections "Autres
+  // éditions" / "Produits similaires" pouvaient être vides pour les produits au-delà de la 1000e ligne).
+  async function loadAllActiveProducts() {
+    const pageSize = 1000;
+    let from = 0;
+    let all = [];
+    while (true) {
+      const { data, error } = await sb.from('products').select('*').eq('est_actif', true).range(from, from + pageSize - 1);
+      if (error) { console.error('Erreur chargement produits:', error.message); break; }
+      if (!data || !data.length) break;
+      all = all.concat(data);
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  }
+
+  const [{ data: p }, all] = await Promise.all([
     sb.from('products').select('*').eq('id', prodId).single(),
-    sb.from('products').select('*').eq('est_actif', true)
+    loadAllActiveProducts()
   ]);
 
   if (!p) { render404(); return; }
