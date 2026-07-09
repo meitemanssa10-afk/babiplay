@@ -549,7 +549,10 @@ function renderCatalogue(filter = currentFilter) {
     // Sous-consoles disponibles pour cette plateforme (ex: PS4/PS5, Xbox One/Series, Steam/Epic/...)
     // PSN : plus de distinction PS4/PS5, tout s'affiche ensemble (les jeux ciblent rarement une seule
     // des deux consoles de façon exclusive, et ça évite au client de devoir chercher dans le mauvais onglet).
-    const consoles = filter === 'psn' ? [] : [...new Set(list.map(p => p.categorie).filter(Boolean))];
+    // Streaming : liste fixe des services (Netflix/Spotify/Disney+/Crunchyroll), affichée même si le
+    // rayon est encore vide, plutôt que déduite des produits déjà en stock.
+    const SERVICES_STREAMING = ['Netflix', 'Spotify', 'Disney+', 'Crunchyroll'];
+    const consoles = filter === 'psn' ? [] : filter === 'streaming' ? SERVICES_STREAMING : [...new Set(list.map(p => p.categorie).filter(Boolean))];
     // Les cartes cadeaux / abonnements sans console précisée (categorie vide, ex: cartes PSN
     // génériques valables sur PS4 ET PS5) restent visibles quel que soit le sous-filtre choisi.
     let filtered = (filter === 'psn' || currentSousConsole === 'all') ? list : list.filter(p => p.categorie === currentSousConsole || !p.categorie);
@@ -565,7 +568,7 @@ function renderCatalogue(filter = currentFilter) {
         <p>${pDesc(filter)}</p>
         <div style="width:40px;height:3px;background:var(--fc,var(--gold));margin:12px auto 0;border-radius:2px"></div>
       </div>
-      ${(consoles.length > 1 || (filter === 'streaming' && consoles.length >= 1)) ? `
+      ${consoles.length > 1 ? `
       <div class="subcon-row">
         <button class="subcon-chip ${currentSousConsole === 'all' ? 'active' : ''}" onclick="setSousConsole('all')">Tous</button>
         ${consoles.map(c => `<button class="subcon-chip ${currentSousConsole === c ? 'active' : ''}" onclick="setSousConsole('${esc(c)}')">${c}</button>`).join('')}
