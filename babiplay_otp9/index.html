@@ -565,11 +565,12 @@ function renderCatalogue(filter = currentFilter) {
         <p>${pDesc(filter)}</p>
         <div style="width:40px;height:3px;background:var(--fc,var(--gold));margin:12px auto 0;border-radius:2px"></div>
       </div>
-      ${consoles.length > 1 ? `
+      ${(consoles.length > 1 || (filter === 'streaming' && consoles.length >= 1)) ? `
       <div class="subcon-row">
         <button class="subcon-chip ${currentSousConsole === 'all' ? 'active' : ''}" onclick="setSousConsole('all')">Tous</button>
         ${consoles.map(c => `<button class="subcon-chip ${currentSousConsole === c ? 'active' : ''}" onclick="setSousConsole('${esc(c)}')">${c}</button>`).join('')}
       </div>` : ''}
+      ${filter !== 'streaming' ? `
       <div class="type-row">
         <button class="type-tab ${currentType === 'tous' ? 'active' : ''}" onclick="setType('tous')">Tous les jeux</button>
         <button class="type-tab ${currentType === 'tendances' ? 'active' : ''}" onclick="setType('tendances')">🔥 Tendances</button>
@@ -577,7 +578,7 @@ function renderCatalogue(filter = currentFilter) {
         <button class="type-tab ${currentType === 'cartes' ? 'active' : ''}" onclick="setType('cartes')">🎁 Cartes cadeaux</button>
         <button class="type-tab ${currentType === 'abonnements' ? 'active' : ''}" onclick="setType('abonnements')">⭐ Abonnements</button>
         <button class="type-tab ${currentType === 'points' ? 'active' : ''}" onclick="setType('points')">🪙 Points</button>
-      </div>
+      </div>` : ''}
       <div class="section-block">
         <div class="section-head">
           <span style="font-size:12px;color:var(--muted2)">${filtered.length} article${filtered.length > 1 ? 's' : ''}</span>
