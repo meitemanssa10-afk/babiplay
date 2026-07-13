@@ -282,7 +282,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
       </button>
       <button class="fchip" onclick="setFilter('streaming',this)" data-filter="streaming">📺 Streaming</button>
-      <button class="fchip" onclick="setFilter('materiel',this)" data-filter="materiel">🕹️ Matériel</button>
+      <button class="fchip" onclick="setFilter('materiel',this)" data-filter="materiel">🕹️ Accessoires Gaming</button>
     </div>
   </div>
 
@@ -457,7 +457,7 @@ let searchTimeout = null;
 
 const fmt = n => (n || 0).toLocaleString('fr-FR');
 const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺', materiel:'🕹️' }[p] || '🎮');
-const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps', materiel:'Matériel gaming' }[p] || p);
+const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps', materiel:'Accessoires Gaming' }[p] || p);
 const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming', materiel:'card-badge-materiel' }[p] || 'card-badge-pc');
 const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo', streaming:'fb-streaming', materiel:'fb-materiel' }[p] || 'fb-pc');
 const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b', streaming:'#a970ff', materiel:'#ffb020' }[p] || '#f5a623');
@@ -467,7 +467,7 @@ const pDesc = p => ({
   pc: "Steam, Epic Games, Battle.net... tous vos jeux PC préférés en un seul endroit.",
   nintendo: "Cartes eShop et jeux Switch pour toute la famille, prix en FCFA.",
   streaming: "Netflix, Spotify, Disney+, Crunchyroll... vos abonnements préférés en FCFA, activables sur votre propre compte.",
-  materiel: "Le matériel gaming qu'il te faut. Manettes, consoles et PC gamer sélectionnés avec soin, livrés en main propre à Abidjan sous environ 7 jours."
+  materiel: "Les accessoires gaming qu'il te faut. Manettes, consoles et PC gamer sélectionnés avec soin, livrés en main propre à Abidjan sous environ 7 jours."
 }[p] || '');
 
 // Détecte un lien YouTube (watch, youtu.be, shorts) et le convertit en lien intégrable, en boucle et muet
@@ -622,7 +622,7 @@ function renderCatalogue(filter = currentFilter) {
     { id: 'pc', title: '🖥️ PC & Steam', items: products.filter(p => p.plateforme === 'pc').slice(0, 6) },
     { id: 'nintendo', title: '🔴 Nintendo', items: products.filter(p => p.plateforme === 'nintendo').slice(0, 6) },
     { id: 'streaming', title: '📺 Streaming & Apps', items: products.filter(p => p.plateforme === 'streaming').slice(0, 6) },
-    { id: 'materiel', title: '🕹️ Matériel gaming', items: products.filter(p => p.plateforme === 'materiel').slice(0, 6) },
+    { id: 'materiel', title: '🕹️ Accessoires Gaming', items: products.filter(p => p.plateforme === 'materiel').slice(0, 6) },
   ].filter(s => s.items.length > 0);
 
   cat.innerHTML = sections.map(s => `
