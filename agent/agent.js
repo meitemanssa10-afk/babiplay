@@ -111,6 +111,7 @@ async function traiterCommande(commande) {
   console.log(`🔄 Traitement commande ${commande.id}...`);
   try {
     await supabase.from('commandes').update({ statut: 'en_cours' }).eq('id', commande.id);
+    if (commande.order_id) await supabase.from('orders').update({ statut: 'en_cours' }).eq('id', commande.order_id);
     let kinguinProductId = null;
     const produitId = commande.product_id || commande.produit_id;
     if (produitId) {
@@ -126,10 +127,16 @@ async function traiterCommande(commande) {
       statut: 'livree', livraison_auto: true,
       livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code
     }).eq('id', commande.id);
+    // Répercute la livraison sur "orders" (table lue par l'espace client dans compte.html) — sans ça,
+    // le client voyait "Payé" indéfiniment, sans jamais recevoir le code affiché sur son compte.
+    if (commande.order_id) {
+      await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code }).eq('id', commande.order_id);
+    }
     console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
     await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
+    if (commande.order_id) await supabase.from('orders').update({ statut: 'erreur' }).eq('id', commande.order_id);
   }
 }
 
