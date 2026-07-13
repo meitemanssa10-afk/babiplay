@@ -510,6 +510,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
             <option value="psn">PlayStation</option>
             <option value="xbox">Xbox</option>
             <option value="nintendo">Nintendo</option>
+            <option value="materiel">Accessoires Gaming (physique)</option>
           </select>
         </div>
         <div class="form-group"><label>Catégorie *</label>
@@ -518,19 +519,28 @@ tr:hover td{background:rgba(255,255,255,.02)}
           </select>
         </div>
       </div>
-      <div class="form-group"><label>Sous-catégorie</label>
+      <div class="form-group" id="prod-sous-categorie-group"><label>Sous-catégorie</label>
         <select id="prod-sous-categorie">
+          <option value="">— Aucune —</option>
           <option value="Cartes cadeaux">Cartes cadeaux</option>
           <option value="Abonnements">Abonnements</option>
           <option value="Game Pass">Game Pass</option>
+          <option value="Points">Points</option>
         </select>
+      </div>
+      <div class="form-group" id="prod-physique-group" style="display:none;background:rgba(255,176,32,.06);border:1px solid rgba(255,176,32,.2);border-radius:10px;padding:14px">
+        <label class="form-check"><input type="checkbox" id="prod-physique" checked> 🚚 Produit physique (livraison manuelle, pas de code par email)</label>
+        <div style="margin-top:10px">
+          <label>Délai de livraison annoncé (jours)</label>
+          <input type="number" id="prod-delai" placeholder="7" value="7">
+        </div>
       </div>
       <div class="form-group"><label>Description</label><textarea id="prod-desc" placeholder="20€ de crédit PlayStation Store..."></textarea></div>
       <div class="form-row">
         <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="prod-prix" placeholder="14500"></div>
         <div class="form-group"><label>Stock (illimité, géré par fournisseur)</label><input type="number" id="prod-stock" placeholder="999" value="999" readonly style="opacity:.6"></div>
       </div>
-      <div class="form-group" style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:14px">
+      <div class="form-group" id="prod-kinguin-group" style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:14px">
         <label style="color:var(--gold)">🔗 ID Produit Kinguin (fournisseur)</label>
         <input type="text" id="prod-kinguin-id" placeholder="Ex: 5c9b68662539a4e8f17ae2fe">
         <small style="color:var(--muted2);font-size:12px;display:block;margin-top:6px">
@@ -855,6 +865,9 @@ function openProductModal(p=null){
   document.getElementById('prod-id').value=p?p.id:'';
   document.getElementById('prod-nom').value=p?p.nom:'';
   document.getElementById('prod-plateforme').value=p?p.plateforme:'psn';
+  updateCatOptions();
+  document.getElementById('prod-categorie').value=p?p.categorie||'':'';
+  document.getElementById('prod-sous-categorie').value=p?p.sous_categorie||'':'';
   document.getElementById('prod-desc').value=p?p.description||'':'';
   document.getElementById('prod-prix').value=p?p.prix:'';
   document.getElementById('prod-image').value=p?p.image_url||'':'';
@@ -864,6 +877,8 @@ function openProductModal(p=null){
   document.getElementById('prod-populaire').checked=p?p.est_populaire:false;
   document.getElementById('prod-actif').checked=p?p.est_actif:true;
   document.getElementById('prod-kinguin-id').value=p?p.kinguin_product_id||'':'';
+  document.getElementById('prod-physique').checked=p?!!p.est_physique:true;
+  document.getElementById('prod-delai').value=p?p.delai_livraison_jours||7:7;
   previewImage();
   document.getElementById('modal-product').classList.add('open');
 }
@@ -879,11 +894,13 @@ function previewImage(){
 
 async function saveProduct(){
   const id=document.getElementById('prod-id').value;
+  const plateforme=document.getElementById('prod-plateforme').value;
+  const estPhysique=plateforme==='materiel'&&document.getElementById('prod-physique').checked;
   const data={
     nom:document.getElementById('prod-nom').value.trim(),
-    plateforme:document.getElementById('prod-plateforme').value,
+    plateforme,
     categorie:document.getElementById('prod-categorie').value,
-    sous_categorie:document.getElementById('prod-sous-categorie').value,
+    sous_categorie:estPhysique?'':document.getElementById('prod-sous-categorie').value,
     description:document.getElementById('prod-desc').value.trim(),
     prix:parseInt(document.getElementById('prod-prix').value)||0,
     image_url:document.getElementById('prod-image').value.trim(),
@@ -893,6 +910,8 @@ async function saveProduct(){
     est_populaire:document.getElementById('prod-populaire').checked,
     est_actif:document.getElementById('prod-actif').checked,
     kinguin_product_id:document.getElementById('prod-kinguin-id').value.trim(),
+    est_physique:estPhysique,
+    delai_livraison_jours:estPhysique?(parseInt(document.getElementById('prod-delai').value)||7):null,
   };
   if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
   let error;
@@ -1751,10 +1770,16 @@ function updateCatOptions(){
     pc:['Steam','EA App','Epic Games','Battle.net','Ubisoft Connect','Microsoft Store'],
     psn:['PS4','PS5'],
     xbox:['Xbox One','Xbox Series X|S'],
-    nintendo:['Switch','Switch 2']
+    nintendo:['Switch','Switch 2'],
+    materiel:['Manettes','Consoles','PC Gamer']
   };
   const sel=document.getElementById('prod-categorie');
   sel.innerHTML=(cats[plat]||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+  // Les accessoires physiques n'ont pas de sous-catégorie (pas de "Cartes cadeaux"/"Abonnements" qui
+  // s'applique) et affichent à la place les champs livraison.
+  document.getElementById('prod-sous-categorie-group').style.display = plat==='materiel' ? 'none' : '';
+  document.getElementById('prod-physique-group').style.display = plat==='materiel' ? '' : 'none';
+  document.getElementById('prod-kinguin-group').style.display = plat==='materiel' ? 'none' : '';
 }
 
 // ============================================================
