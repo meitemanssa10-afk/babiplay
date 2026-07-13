@@ -128,12 +128,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .fb-pc{background:linear-gradient(140deg,#0d1520,#2a475e)}
 .fb-nintendo{background:linear-gradient(140deg,#8b0009,#e60012)}
 .fb-streaming{background:linear-gradient(140deg,#2a1050,#a970ff)}
+.fb-materiel{background:linear-gradient(140deg,#2b1c00,#ffb020)}
 .card-badge{position:absolute;top:6px;left:6px;font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 7px;border-radius:4px;text-transform:uppercase}
 .card-badge-psn{background:rgba(0,112,209,.4);color:#90c8ff;border:1px solid rgba(0,112,209,.5)}
 .card-badge-xbox{background:rgba(82,176,67,.4);color:#90e080;border:1px solid rgba(82,176,67,.5)}
 .card-badge-pc{background:rgba(102,192,244,.4);color:#c0eaff;border:1px solid rgba(102,192,244,.5)}
 .card-badge-nintendo{background:rgba(228,0,15,.4);color:#ffaaaa;border:1px solid rgba(228,0,15,.5)}
 .card-badge-streaming{background:rgba(169,112,255,.4);color:#d6c0ff;border:1px solid rgba(169,112,255,.5)}
+.card-badge-materiel{background:rgba(255,176,32,.4);color:#ffdca0;border:1px solid rgba(255,176,32,.5)}
 .card-pop{position:absolute;top:6px;right:6px;background:var(--gold);color:#000;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
 .card-wrap-img{position:relative}
 .card-body{padding:8px 10px 10px}
@@ -280,6 +282,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/120px-Nintendo.svg.png" alt="Nintendo"> Nintendo
       </button>
       <button class="fchip" onclick="setFilter('streaming',this)" data-filter="streaming">📺 Streaming</button>
+      <button class="fchip" onclick="setFilter('materiel',this)" data-filter="materiel">🕹️ Matériel</button>
     </div>
   </div>
 
@@ -331,6 +334,21 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
       <span class="total-amt" id="cart-total">0 FCFA</span>
     </div>
     <button class="pay-btn" id="pay-btn" disabled onclick="checkout()">💳 PAYER MAINTENANT</button>
+  </div>
+</div>
+
+<!-- LIVRAISON (matériel physique uniquement) -->
+<div class="auth-overlay" id="delivery-overlay" onclick="closeDeliveryOverlay(event)">
+  <div class="auth-modal">
+    <div class="auth-handle"></div>
+    <button class="auth-x" onclick="document.getElementById('delivery-overlay').classList.remove('open')">✕</button>
+    <h2>🚚 Infos de livraison</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Ce produit est physique — on en a besoin pour organiser la livraison à Abidjan (délai ~7 jours).</p>
+    <div class="fg"><label>Nom du destinataire</label><input type="text" id="delivery-nom" placeholder="Kouamé Koffi"></div>
+    <div class="fg"><label>Téléphone</label><input type="tel" id="delivery-tel" placeholder="+225 07 00 00 00 00"></div>
+    <div class="fg"><label>Quartier / commune + repère</label><input type="text" id="delivery-adresse" placeholder="Ex: Cocody Angré, près de la pharmacie Sainte-Marie"></div>
+    <p id="delivery-err" style="color:#ff6b6b;font-size:13px;margin-bottom:10px"></p>
+    <button class="btn-auth" onclick="confirmDeliveryAndPay()">Confirmer et payer →</button>
   </div>
 </div>
 
@@ -438,17 +456,18 @@ let searchTimeout = null;
 })();
 
 const fmt = n => (n || 0).toLocaleString('fr-FR');
-const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺' }[p] || '🎮');
-const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps' }[p] || p);
-const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming' }[p] || 'card-badge-pc');
-const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo', streaming:'fb-streaming' }[p] || 'fb-pc');
-const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b', streaming:'#a970ff' }[p] || '#f5a623');
+const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺', materiel:'🕹️' }[p] || '🎮');
+const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps', materiel:'Matériel gaming' }[p] || p);
+const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming', materiel:'card-badge-materiel' }[p] || 'card-badge-pc');
+const pFbClass = p => ({ psn:'fb-psn', xbox:'fb-xbox', pc:'fb-pc', nintendo:'fb-nintendo', streaming:'fb-streaming', materiel:'fb-materiel' }[p] || 'fb-pc');
+const pColor = p => ({ psn:'#5baeff', xbox:'#7dd670', pc:'#f5a623', nintendo:'#ff6b6b', streaming:'#a970ff', materiel:'#ffb020' }[p] || '#f5a623');
 const pDesc = p => ({
   psn: "Vos jeux et cartes PlayStation au meilleur prix, payables en FCFA.",
   xbox: "Cartes, abonnements Game Pass et jeux Xbox, livrés instantanément par email.",
   pc: "Steam, Epic Games, Battle.net... tous vos jeux PC préférés en un seul endroit.",
   nintendo: "Cartes eShop et jeux Switch pour toute la famille, prix en FCFA.",
-  streaming: "Netflix, Spotify, Disney+, Crunchyroll... vos abonnements préférés en FCFA, activables sur votre propre compte."
+  streaming: "Netflix, Spotify, Disney+, Crunchyroll... vos abonnements préférés en FCFA, activables sur votre propre compte.",
+  materiel: "Le matériel gaming qu'il te faut. Manettes, consoles et PC gamer sélectionnés avec soin, livrés en main propre à Abidjan sous environ 7 jours."
 }[p] || '');
 
 // Détecte un lien YouTube (watch, youtu.be, shorts) et le convertit en lien intégrable, en boucle et muet
@@ -470,7 +489,7 @@ async function loadProducts() {
   let all = [];
   while (true) {
     const { data, error } = await sb.from('products')
-      .select('id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, est_slider, slider_ordre')
+      .select('id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, est_slider, slider_ordre, est_physique, delai_livraison_jours')
       .eq('est_actif', true).order('est_populaire', { ascending: false }).range(from, from + pageSize - 1);
     if (error) { console.error('Erreur chargement produits:', error.message); break; }
     if (!data || !data.length) break;
@@ -550,9 +569,11 @@ function renderCatalogue(filter = currentFilter) {
     // PSN : plus de distinction PS4/PS5, tout s'affiche ensemble (les jeux ciblent rarement une seule
     // des deux consoles de façon exclusive, et ça évite au client de devoir chercher dans le mauvais onglet).
     // Streaming : liste fixe des services (Netflix/Spotify/Disney+/Crunchyroll), affichée même si le
-    // rayon est encore vide, plutôt que déduite des produits déjà en stock.
+    // rayon est encore vide, plutôt que déduite des produits déjà en stock. Matériel : même logique,
+    // avec les trois familles de produits physiques (Manettes/Consoles/PC Gamer).
     const SERVICES_STREAMING = ['Netflix', 'Spotify', 'Disney+', 'Crunchyroll'];
-    const consoles = filter === 'psn' ? [] : filter === 'streaming' ? SERVICES_STREAMING : [...new Set(list.map(p => p.categorie).filter(Boolean))];
+    const FAMILLES_MATERIEL = ['Manettes', 'Consoles', 'PC Gamer'];
+    const consoles = filter === 'psn' ? [] : filter === 'streaming' ? SERVICES_STREAMING : filter === 'materiel' ? FAMILLES_MATERIEL : [...new Set(list.map(p => p.categorie).filter(Boolean))];
     // Les cartes cadeaux / abonnements sans console précisée (categorie vide, ex: cartes PSN
     // génériques valables sur PS4 ET PS5) restent visibles quel que soit le sous-filtre choisi.
     let filtered = (filter === 'psn' || currentSousConsole === 'all') ? list : list.filter(p => p.categorie === currentSousConsole || !p.categorie);
@@ -573,7 +594,7 @@ function renderCatalogue(filter = currentFilter) {
         <button class="subcon-chip ${currentSousConsole === 'all' ? 'active' : ''}" onclick="setSousConsole('all')">Tous</button>
         ${consoles.map(c => `<button class="subcon-chip ${currentSousConsole === c ? 'active' : ''}" onclick="setSousConsole('${esc(c)}')">${c}</button>`).join('')}
       </div>` : ''}
-      ${filter !== 'streaming' ? `
+      ${(filter !== 'streaming' && filter !== 'materiel') ? `
       <div class="type-row">
         <button class="type-tab ${currentType === 'tous' ? 'active' : ''}" onclick="setType('tous')">Tous les jeux</button>
         <button class="type-tab ${currentType === 'tendances' ? 'active' : ''}" onclick="setType('tendances')">🔥 Tendances</button>
@@ -601,6 +622,7 @@ function renderCatalogue(filter = currentFilter) {
     { id: 'pc', title: '🖥️ PC & Steam', items: products.filter(p => p.plateforme === 'pc').slice(0, 6) },
     { id: 'nintendo', title: '🔴 Nintendo', items: products.filter(p => p.plateforme === 'nintendo').slice(0, 6) },
     { id: 'streaming', title: '📺 Streaming & Apps', items: products.filter(p => p.plateforme === 'streaming').slice(0, 6) },
+    { id: 'materiel', title: '🕹️ Matériel gaming', items: products.filter(p => p.plateforme === 'materiel').slice(0, 6) },
   ].filter(s => s.items.length > 0);
 
   cat.innerHTML = sections.map(s => `
@@ -628,6 +650,7 @@ function cardHtml(p) {
     </div>
     <div class="card-body">
       <div class="card-name">${p.nom}</div>
+      ${p.est_physique ? `<div style="font-size:11px;color:var(--gold,#ffb020);margin-top:2px">🚚 Livraison ~${p.delai_livraison_jours || 7} jours (Abidjan)</div>` : ''}
       <div class="card-foot">
         <div class="card-price">${fmt(p.prix)}<small>FCFA</small></div>
       </div>
@@ -730,6 +753,7 @@ function addToCart(id, e) {
 function removeFromCart(id) {
   cart = cart.filter(c => c.id !== id);
   promoApplied = null;
+  deliveryInfo = null;
   document.getElementById('promo-msg').textContent = '';
   document.getElementById('promo-in').value = '';
   updateCartUI();
@@ -782,9 +806,35 @@ function toggleDrawer() {
   document.getElementById('drawer').classList.toggle('open');
 }
 
+let deliveryInfo = null;
+
 async function checkout() {
   if (!currentUser) { openAuth('login'); showToast('⚠️ Connectez-vous pour payer'); return; }
   if (!cart.length) return;
+  const produit = cart[0];
+  if (produit.est_physique && !deliveryInfo) { openDeliveryModal(); return; }
+  await proceedToPayment();
+}
+
+function openDeliveryModal() {
+  document.getElementById('delivery-err').textContent = '';
+  document.getElementById('delivery-overlay').classList.add('open');
+}
+function closeDeliveryOverlay(e) {
+  if (!e || e.target === document.getElementById('delivery-overlay')) document.getElementById('delivery-overlay').classList.remove('open');
+}
+function confirmDeliveryAndPay() {
+  const nom = document.getElementById('delivery-nom').value.trim();
+  const tel = document.getElementById('delivery-tel').value.trim();
+  const adresse = document.getElementById('delivery-adresse').value.trim();
+  const err = document.getElementById('delivery-err');
+  if (!nom || !tel || !adresse) { err.textContent = 'Merci de remplir les 3 champs.'; return; }
+  deliveryInfo = { nom, telephone: tel, adresse };
+  document.getElementById('delivery-overlay').classList.remove('open');
+  proceedToPayment();
+}
+
+async function proceedToPayment() {
   const btn = document.getElementById('pay-btn');
   btn.disabled = true; btn.textContent = '⏳ Redirection...';
   let total = cart.reduce((s, c) => s + c.prix, 0);
@@ -794,6 +844,7 @@ async function checkout() {
       : Math.max(0, total - promoApplied.reduction_fcfa);
   }
   const produit = cart[0];
+  const clientNom = userProfile ? `${userProfile.prenom || ''} ${userProfile.nom || ''}`.trim() : currentUser.email;
   try {
     const { data: order, error } = await sb.from('orders').insert({
       user_id: currentUser.id, product_id: produit.id, nom_produit: produit.nom,
@@ -801,14 +852,29 @@ async function checkout() {
       statut: 'en_attente', promo_code: promoApplied ? promoApplied.code : null
     }).select().single();
     if (error) { showToast('Erreur: ' + error.message, 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; return; }
+    // custom_data transmis à PayDunya puis renvoyé tel quel au webhook lors de la confirmation de
+    // paiement — c'est ce qui permet au webhook de savoir QUEL produit exact a été acheté (au lieu de
+    // deviner par recherche de nom chez Kinguin) et de recevoir les infos de livraison si physique.
+    const customData = {
+      order_id: order.id,
+      product_id: produit.id,
+      produit_nom: produit.nom,
+      plateforme: produit.plateforme,
+      client_email: currentUser.email,
+      client_nom: clientNom
+    };
+    if (produit.est_physique && deliveryInfo) {
+      customData.adresse_livraison = `${deliveryInfo.nom} — ${deliveryInfo.adresse}`;
+      customData.telephone_livraison = deliveryInfo.telephone;
+    }
     const res = await fetch('/.netlify/functions/paydunya', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         invoice: { total_amount: total, description: produit.nom },
         store: { name: 'BabiPlay CI', tagline: 'Cartes gaming en FCFA', postal_address: 'Abidjan CI', phone_number: '0700000000', logo_url: 'https://babiplay.store', website_url: 'https://babiplay.store' },
-        actions: { cancel_url: 'https://babiplay.store', return_url: 'https://babiplay.store/compte.html', callback_url: 'https://babiplay.store' },
-        customer: { name: userProfile ? `${userProfile.prenom || ''} ${userProfile.nom || ''}`.trim() : currentUser.email, email: currentUser.email },
-        custom_data: { order_id: order.id }
+        actions: { cancel_url: 'https://babiplay.store', return_url: 'https://babiplay.store/compte.html', callback_url: 'https://babiplay.store/.netlify/functions/webhook' },
+        customer: { name: clientNom, email: currentUser.email },
+        custom_data: customData
       })
     });
     const data = await res.json();
