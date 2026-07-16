@@ -1312,11 +1312,11 @@ async function _envoyerPromoEtReset(userId, email, prenom, pct){
     est_actif:true
   });
 
-  // Envoyer email via Brevo
+  // Envoyer email via Brevo (relayé par une fonction Netlify — la clé ne quitte jamais le serveur)
   try{
-    await fetch('https://api.brevo.com/v3/smtp/email',{
+    await fetch('/.netlify/functions/send-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
         to:[{email,name:prenom}],
@@ -1528,9 +1528,9 @@ async function relancerInactifs(){
   let envoyes=0,erreurs=0;
   for(const dest of inactifs){
     try{
-      const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+      const res=await fetch('/.netlify/functions/send-email',{
         method:'POST',
-        headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
           to:[{email:dest.email,name:dest.prenom||'Client'}],
@@ -1731,13 +1731,13 @@ async function envoyerEmailMarketing(){
 
   showToast(`📨 Envoi en cours à ${destinataires.length} client(s)...`);
 
-  // Envoyer via Brevo API
+  // Envoyer via Brevo API (relayé par une fonction Netlify)
   let envoyes=0,erreurs=0;
   for(const dest of destinataires){
     try{
-      const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+      const res=await fetch('/.netlify/functions/send-email',{
         method:'POST',
-        headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
           to:[{email:dest.email,name:dest.prenom||'Client'}],
@@ -1793,14 +1793,13 @@ async function envoyerEmailMarketing(){
 }
 
 // ============================================================
-const BREVO_KEY=''; // Clé supprimée
 const BREVO_TEMPLATE_CODE=1;
 
 async function envoyerEmailCode(email,prenom,produit,code,prix,points,commandeId){
   try{
-    const res=await fetch('https://api.brevo.com/v3/smtp/email',{
+    const res=await fetch('/.netlify/functions/send-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json','api-key':BREVO_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         templateId:BREVO_TEMPLATE_CODE,
         to:[{email,name:prenom||'Client'}],
