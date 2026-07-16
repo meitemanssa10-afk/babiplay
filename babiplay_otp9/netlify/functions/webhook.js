@@ -53,6 +53,18 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ message: 'Aucun article à traiter' }) };
     }
 
+    // PayDunya peut renvoyer la même confirmation de paiement plusieurs fois (retry réseau côté
+    // PayDunya) — sans cette vérification, on créerait plusieurs commandes pour un seul paiement
+    // réel du client (double achat chez Kinguin, double livraison physique). On vérifie si ce
+    // jeton de transaction a déjà été traité avant de continuer.
+    if (token) {
+      const { data: dejaTraite } = await supabase.from('commandes').select('id').eq('paydunya_token', token).limit(1);
+      if (dejaTraite && dejaTraite.length) {
+        console.log(`↪️ Paiement déjà traité (token ${token}), doublon ignoré`);
+        return { statusCode: 200, headers, body: JSON.stringify({ message: 'Paiement déjà traité, doublon ignoré' }) };
+      }
+    }
+
     const commandesCreees = [];
 
     for (const article of articles) {
