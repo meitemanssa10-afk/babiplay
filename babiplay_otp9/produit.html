@@ -229,7 +229,13 @@ const STEPS = {
 function renderPage() {
   const p = produit;
   const color = pColor(p.plateforme);
-  const steps = STEPS[p.plateforme] || STEPS.pc;
+  const delai = p.delai_livraison_jours || 7;
+  const steps = p.est_physique ? [
+    { t: 'Commande confirmée', d: "Votre paiement est validé et votre commande est enregistrée" },
+    { t: 'Préparation', d: "Nous récupérons et préparons votre article avec soin" },
+    { t: 'Expédition', d: `Livraison vers la Côte d'Ivoire — délai annoncé : ${delai} jours` },
+    { t: 'Réception', d: "Vous êtes contacté(e) pour organiser la remise du colis" },
+  ] : (STEPS[p.plateforme] || STEPS.pc);
   const editions = allProducts.filter(x => x.plateforme === p.plateforme && x.sous_categorie === p.sous_categorie && x.id !== p.id).slice(0, 6);
   const similaires = allProducts.filter(x => x.plateforme === p.plateforme && x.id !== p.id && x.sous_categorie !== p.sous_categorie).slice(0, 8);
 
@@ -327,7 +333,7 @@ function renderPage() {
 
         <!-- Activation -->
         <div class="info-box">
-          <h3>🚀 Comment activer votre code ?</h3>
+          <h3>${p.est_physique ? '🚚 Comment se passe la livraison ?' : '🚀 Comment activer votre code ?'}</h3>
           <div class="steps">
             ${steps.map((s, i) => `
               <div class="step">
@@ -350,10 +356,10 @@ function renderPage() {
         <div>
           <div class="buy-price">${fmt(p.prix)} <small>FCFA</small></div>
         </div>
-        <div class="buy-stock"><div class="buy-stock-dot"></div> En stock — livraison immédiate</div>
+        <div class="buy-stock"><div class="buy-stock-dot"></div> ${p.est_physique ? `En stock — livraison sous ${delai} jours` : 'En stock — livraison immédiate'}</div>
         <button class="btn-add" onclick="addToCart()">🛒 Ajouter au panier</button>
         <div class="buy-perks">
-          <div class="perk"><span class="perk-icon">📧</span><span>Code envoyé par email instantanément</span></div>
+          <div class="perk"><span class="perk-icon">${p.est_physique ? '🚚' : '📧'}</span><span>${p.est_physique ? `Livraison en ${delai} jours` : 'Code envoyé par email instantanément'}</span></div>
           <div class="perk"><span class="perk-icon">📱</span><span>Orange Money · MTN · Moov · Wave</span></div>
           <div class="perk"><span class="perk-icon">💬</span><span>Support WhatsApp disponible</span></div>
           <div class="perk"><span class="perk-icon">🔒</span><span>Paiement 100% sécurisé PayDunya</span></div>
