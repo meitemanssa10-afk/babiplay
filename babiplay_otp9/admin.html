@@ -502,6 +502,16 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <div class="modal-body">
       <input type="hidden" id="prod-id">
+      <div class="form-group" style="background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.25);border-radius:10px;padding:14px">
+        <label style="color:#4285f4">⚡ Importer depuis un lien (BigBuy, Cdiscount, Fnac...)</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input type="url" id="import-url" placeholder="Colle le lien de la fiche produit ici..." style="flex:1">
+          <button type="button" class="btn btn-primary" onclick="importFromLink()" id="import-btn" style="white-space:nowrap">Récupérer</button>
+        </div>
+        <small style="color:var(--muted2);font-size:12px;display:block;margin-top:6px">
+          Pré-remplit nom, description, image et prix de référence si le site les publie. Vérifie et ajuste toujours ton prix de vente avant d'enregistrer.
+        </small>
+      </div>
       <div class="form-group"><label>Nom du produit *</label><input type="text" id="prod-nom" placeholder="Carte PSN 20€"></div>
       <div class="form-row">
         <div class="form-group"><label>Plateforme *</label>
@@ -884,6 +894,31 @@ function openProductModal(p=null){
 }
 
 function editProduct(p){openProductModal(p);}
+
+async function importFromLink(){
+  const url=document.getElementById('import-url').value.trim();
+  if(!url){showToast('Colle un lien produit d\'abord','error');return;}
+  const btn=document.getElementById('import-btn');
+  const btnTexteOrigine=btn.textContent;
+  btn.textContent='Récupération...';btn.disabled=true;
+  try{
+    const res=await fetch('/.netlify/functions/import-product?url='+encodeURIComponent(url));
+    const data=await res.json();
+    if(data.error && !data.nom && !data.image){
+      showToast('Impossible de lire ce site : '+data.error,'error');
+    }else{
+      if(data.nom)document.getElementById('prod-nom').value=data.nom;
+      if(data.description)document.getElementById('prod-desc').value=data.description;
+      if(data.image){document.getElementById('prod-image').value=data.image;previewImage();}
+      if(data.prix)showToast('Prix de référence trouvé : '+data.prix+' — fixe ton propre prix de vente en FCFA','success');
+      else showToast('Champs pré-remplis, vérifie et complète le prix','success');
+    }
+  }catch(err){
+    showToast('Erreur : '+err.message,'error');
+  }finally{
+    btn.textContent=btnTexteOrigine;btn.disabled=false;
+  }
+}
 
 function previewImage(){
   const url=document.getElementById('prod-image').value;
