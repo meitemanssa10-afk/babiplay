@@ -814,8 +814,8 @@ let deliveryInfo = null;
 async function checkout() {
   if (!currentUser) { openAuth('login'); showToast('⚠️ Connectez-vous pour payer'); return; }
   if (!cart.length) return;
-  const produit = cart[0];
-  if (produit.est_physique && !deliveryInfo) { openDeliveryModal(); return; }
+  const contientPhysique = cart.some(c => c.est_physique);
+  if (contientPhysique && !deliveryInfo) { openDeliveryModal(); return; }
   await proceedToPayment();
 }
 
@@ -846,34 +846,41 @@ async function proceedToPayment() {
       ? Math.round(total * (1 - promoApplied.reduction_pct / 100))
       : Math.max(0, total - promoApplied.reduction_fcfa);
   }
-  const produit = cart[0];
   const clientNom = userProfile ? `${userProfile.prenom || ''} ${userProfile.nom || ''}`.trim() : currentUser.email;
   try {
-    const { data: order, error } = await sb.from('orders').insert({
-      user_id: currentUser.id, product_id: produit.id, nom_produit: produit.nom,
-      plateforme: produit.plateforme, prix_paye: total, points_gagnes: 10,
+    // Une commande "orders" séparée par article du panier (avant : une seule commande créée pour
+    // tout le panier, celle de cart[0] uniquement — le reste était payé mais jamais enregistré).
+    const lignesACreer = cart.map(p => ({
+      user_id: currentUser.id, product_id: p.id, nom_produit: p.nom,
+      plateforme: p.plateforme, prix_paye: p.prix, points_gagnes: 10,
       statut: 'en_attente', promo_code: promoApplied ? promoApplied.code : null
-    }).select().single();
+    }));
+    const { data: ordersCrees, error } = await sb.from('orders').insert(lignesACreer).select();
     if (error) { showToast('Erreur: ' + error.message, 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; return; }
+
     // custom_data transmis à PayDunya puis renvoyé tel quel au webhook lors de la confirmation de
-    // paiement — c'est ce qui permet au webhook de savoir QUEL produit exact a été acheté (au lieu de
-    // deviner par recherche de nom chez Kinguin) et de recevoir les infos de livraison si physique.
+    // paiement — la liste "articles" permet au webhook de créer une commande de traitement par
+    // article payé, au lieu d'une seule pour tout le panier.
+    const articles = cart.map((p, i) => ({
+      order_id: ordersCrees[i].id,
+      product_id: p.id,
+      produit_nom: p.nom,
+      plateforme: p.plateforme,
+      prix: p.prix
+    }));
     const customData = {
-      order_id: order.id,
-      product_id: produit.id,
-      produit_nom: produit.nom,
-      plateforme: produit.plateforme,
+      articles,
       client_email: currentUser.email,
       client_nom: clientNom
     };
-    if (produit.est_physique && deliveryInfo) {
+    if (deliveryInfo) {
       customData.adresse_livraison = `${deliveryInfo.nom} — ${deliveryInfo.adresse}`;
       customData.telephone_livraison = deliveryInfo.telephone;
     }
     const res = await fetch('/.netlify/functions/paydunya', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        invoice: { total_amount: total, description: produit.nom },
+        invoice: { total_amount: total, description: cart.map(c => c.nom).join(', ').slice(0, 200) },
         store: { name: 'BabiPlay CI', tagline: 'Cartes gaming en FCFA', postal_address: 'Abidjan CI', phone_number: '0700000000', logo_url: 'https://babiplay.store', website_url: 'https://babiplay.store' },
         actions: { cancel_url: 'https://babiplay.store', return_url: 'https://babiplay.store/compte.html', callback_url: 'https://babiplay.store/.netlify/functions/webhook' },
         customer: { name: clientNom, email: currentUser.email },
@@ -883,7 +890,10 @@ async function proceedToPayment() {
     const data = await res.json();
     if (data.response_code === '00') {
       const url = data.invoice_url || data.response_text;
-      if (url && url.startsWith('http')) { await sb.from('orders').update({ transaction_id: data.token || '' }).eq('id', order.id); window.location.href = url; }
+      if (url && url.startsWith('http')) {
+        await sb.from('orders').update({ transaction_id: data.token || '' }).in('id', ordersCrees.map(o => o.id));
+        window.location.href = url;
+      }
       else { showToast('Erreur: ' + (data.response_text || ''), 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; }
     } else { showToast('Erreur: ' + (data.response_text || ''), 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; }
   } catch (e) { showToast('Erreur connexion', 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; }
