@@ -74,6 +74,10 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 /* GALERIE / VIDÉO */
 .gallery-yt-wrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:#000}
 .gallery-yt-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.gallery-thumbs{display:flex;gap:8px;margin-top:8px;overflow-x:auto}
+.gallery-thumb{width:64px;height:64px;flex-shrink:0;object-fit:cover;border-radius:8px;border:2px solid var(--border);cursor:pointer;opacity:.6;transition:all .2s}
+.gallery-thumb:hover{opacity:.85}
+.gallery-thumb.active{border-color:var(--gold);opacity:1}
 
 /* AUTRES ÉDITIONS : réutilise .sim-card / .sim-grid, définis plus bas */
 
@@ -240,10 +244,12 @@ function renderPage() {
   const similaires = allProducts.filter(x => x.plateforme === p.plateforme && x.id !== p.id && x.sous_categorie !== p.sous_categorie).slice(0, 8);
 
   const ytEmbed = getYouTubeEmbed(p.video_url);
+  const galerie = Array.isArray(p.images) && p.images.length ? p.images : (p.image_url ? [p.image_url] : []);
   const imgHtml = ytEmbed
     ? `<div class="gallery-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${p.nom}"></iframe></div>`
-    : p.image_url
-      ? `<img src="${p.image_url}" alt="${p.nom}" class="gallery-main">`
+    : galerie.length
+      ? `<img src="${galerie[0]}" alt="${p.nom}" class="gallery-main" id="gallery-main-img">
+         ${galerie.length > 1 ? `<div class="gallery-thumbs">${galerie.map((src, i) => `<img src="${src}" class="gallery-thumb${i === 0 ? ' active' : ''}" onclick="document.getElementById('gallery-main-img').src=this.src;document.querySelectorAll('.gallery-thumb').forEach(t=>t.classList.remove('active'));this.classList.add('active')">`).join('')}</div>` : ''}`
       : `<div class="gallery-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
 
   const specsRows = [
