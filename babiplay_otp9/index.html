@@ -431,7 +431,8 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 <div class="toast" id="toast"></div>
 
 <script>
-let sb, products = [], cart = [], currentUser = null, userProfile = null;
+let sb, products = [], cart = JSON.parse(localStorage.getItem('babiplay_cart') || '[]'), currentUser = null, userProfile = null;
+function sauvegarderPanier(){ localStorage.setItem('babiplay_cart', JSON.stringify(cart)); }
 let promoApplied = null;
 let currentFilter = 'all';
 let currentSousConsole = 'all';
@@ -746,12 +747,14 @@ function addToCart(id, e) {
   if (!p) return;
   if (cart.find(c => c.id === id)) { showToast('⚠️ Déjà dans le panier'); return; }
   cart.push({ ...p });
+  sauvegarderPanier();
   updateCartUI();
   showToast('✅ ' + p.nom + ' ajouté !', 'ok');
 }
 
 function removeFromCart(id) {
   cart = cart.filter(c => c.id !== id);
+  sauvegarderPanier();
   promoApplied = null;
   deliveryInfo = null;
   document.getElementById('promo-msg').textContent = '';
