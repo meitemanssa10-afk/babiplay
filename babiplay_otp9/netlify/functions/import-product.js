@@ -30,6 +30,23 @@ function decodeHtmlEntities(str) {
     .replace(/&gt;/g, '>');
 }
 
+// Certains sites (BigBuy notamment, technologie Next.js) n'affichent la vraie image
+// qu'après chargement côté navigateur : la balise og:image ne contient alors qu'un
+// logo générique. Ces sites cachent quand même toutes les données réelles de la page
+// dans un bloc <script id="__NEXT_DATA__"> présent dès le départ. On y cherche une
+// vraie image produit en secours quand og:image semble être un logo générique.
+function extractFromNextData(html) {
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!m) return '';
+  const urls = m[1].match(/https?:\/\/[^"'\\]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+  const reelle = urls.find(u => !/logo|bigbuy-home|placeholder|sprite/i.test(u));
+  return reelle || '';
+}
+
+function estImageGenerique(url) {
+  return !url || /logo|bigbuy-home|placeholder|sprite/i.test(url);
+}
+
 exports.handler = async (event) => {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
@@ -58,6 +75,7 @@ exports.handler = async (event) => {
     const description = extractMeta(html, ['og:description', 'twitter:description', 'description']);
 
     const image = extractMeta(html, ['og:image', 'twitter:image']);
+    const imageFinale = estImageGenerique(image) ? (extractFromNextData(html) || image) : image;
 
     const prixBrut = extractMeta(html, ['og:price:amount', 'product:price:amount', 'twitter:data1']);
     const prix = (prixBrut.match(/[\d]+([.,]\d+)?/) || [])[0] || '';
@@ -65,7 +83,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ nom: nom.trim(), description: description.trim(), image: image.trim(), prix })
+      body: JSON.stringify({ nom: nom.trim(), description: description.trim(), image: imageFinale.trim(), prix })
     };
   } catch (err) {
     return { statusCode: 200, headers, body: JSON.stringify({ error: err.message, nom: '', description: '', image: '', prix: '' }) };
