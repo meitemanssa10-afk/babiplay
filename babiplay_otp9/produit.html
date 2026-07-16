@@ -27,22 +27,22 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 @media(min-width:700px){.hero-title{font-size:38px}}
 .hero-meta{font-size:12px;color:var(--muted2);display:flex;align-items:center;gap:10px}
 
-/* LAYOUT — grille à zones nommées : sur mobile l'ordre visuel est galerie → achat → infos
-   (le client voit l'image, peut acheter tout de suite, puis descend s'il veut en savoir plus).
-   Sur grand écran, la colonne achat reste fixe à droite pendant que galerie+infos défilent à gauche. */
+/* LAYOUT — grille à zones nommées : sur mobile l'ordre visuel est achat → infos (le client
+   voit l'image + le prix + le bouton d'achat tout de suite, puis descend s'il veut en savoir
+   plus). Sur grand écran, la colonne achat reste fixe à droite pendant que les infos défilent
+   à gauche. */
 .product-layout{
   max-width:1100px;margin:0 auto;padding:16px;
   display:grid;gap:14px;
   grid-template-columns:1fr;
-  grid-template-areas:"galerie" "achat" "infos";
+  grid-template-areas:"achat" "infos";
 }
-.layout-galerie{grid-area:galerie}
 .layout-achat{grid-area:achat}
 .layout-infos{grid-area:infos;display:flex;flex-direction:column;gap:14px}
 @media(min-width:900px){
   .product-layout{
     grid-template-columns:1fr 300px;
-    grid-template-areas:"galerie achat" "infos achat";
+    grid-template-areas:"infos achat";
     align-items:start;
   }
 }
@@ -279,10 +279,6 @@ function renderPage() {
       </table>
     </div>` : '';
 
-  const buyImgHtml = p.image_url
-    ? `<img src="${p.image_url}" alt="${p.nom}" class="buy-img">`
-    : `<div class="buy-img-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
-
   const editionsHtml = editions.length > 0 ? `
     <div class="info-box">
       <h3>📦 Autres montants / éditions</h3>
@@ -333,15 +329,10 @@ function renderPage() {
 
     <!-- LAYOUT -->
     <div class="product-layout">
-      <!-- GALERIE -->
-      <div class="layout-galerie">
-        ${imgHtml}
-      </div>
-
       <!-- ACHAT -->
       <div class="layout-achat">
         <div class="buy-box">
-          ${buyImgHtml}
+          ${imgHtml}
           <div class="buy-name">${p.nom}</div>
           <div>
             <div class="buy-price">${fmt(p.prix)} <small>FCFA</small></div>
@@ -366,6 +357,8 @@ function renderPage() {
         </div>
 
         ${specsHtml}
+
+        ${p.image_url ? `<img src="${p.image_url}" alt="${p.nom}" style="width:100%;border-radius:14px;border:1px solid var(--border)">` : ''}
 
         <!-- Activation -->
         <div class="info-box">
