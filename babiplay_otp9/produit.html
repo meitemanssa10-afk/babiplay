@@ -19,12 +19,9 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .back-btn:hover{color:var(--text);border-color:var(--border2)}
 
 /* HERO */
-.hero{position:relative;min-height:220px;display:flex;align-items:flex-end;overflow:hidden}
-@media(min-width:700px){.hero{min-height:320px}}
-.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.3)}
-.hero-overlay{position:absolute;inset:0;background:linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,.5) 50%,transparent 100%)}
-.hero-content{position:relative;z-index:2;padding:20px 16px;width:100%}
-@media(min-width:700px){.hero-content{padding:32px 40px;max-width:700px}}
+.hero{position:relative;padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+@media(min-width:700px){.hero{padding:22px 40px 18px}}
+.hero-content{max-width:1100px;margin:0 auto}
 .hero-plat{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;border-radius:4px;margin-bottom:10px;text-transform:uppercase}
 .hero-title{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;line-height:1.2;margin-bottom:6px}
 @media(min-width:700px){.hero-title{font-size:38px}}
@@ -323,10 +320,8 @@ function renderPage() {
   document.getElementById('page-content').innerHTML = `
     <!-- HERO -->
     <div class="hero">
-      ${p.image_url ? `<div class="hero-bg" style="background-image:url('${p.image_url}')"></div>` : `<div class="hero-bg ${pFbClass(p.plateforme)}" style="opacity:.5"></div>`}
-      <div class="hero-overlay"></div>
       <div class="hero-content">
-        <span class="hero-plat" style="background:rgba(0,0,0,.5);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
+        <span class="hero-plat" style="background:rgba(0,0,0,.3);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
         <div class="hero-title">${p.nom}</div>
         <div class="hero-meta">
           <span>${p.categorie || ''}</span>
