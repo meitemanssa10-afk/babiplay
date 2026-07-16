@@ -1151,9 +1151,9 @@ function renderClients(list){
   const tb=document.getElementById('clients-tbody');
   tb.innerHTML=list.length?list.map(c=>`
     <tr>
-      <td><strong>${c.prenom||''} ${c.nom||''}</strong></td>
-      <td style="color:var(--muted2)">${c.email}</td>
-      <td style="color:var(--muted2)">${c.telephone||'—'}</td>
+      <td><strong>${esc(c.prenom)} ${esc(c.nom)}</strong></td>
+      <td style="color:var(--muted2)">${esc(c.email)}</td>
+      <td style="color:var(--muted2)">${esc(c.telephone)||'—'}</td>
       <td><span class="badge badge-gold">⭐ ${c.points||0} pts</span></td>
       <td>${c.total_commandes||0}</td>
       <td style="color:var(--muted);font-size:12px">${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
@@ -1258,8 +1258,8 @@ async function loadClientsFideles(){
       <tbody>
         ${list.map(c=>`
           <tr>
-            <td><strong>${c.prenom||''} ${c.nom||''}</strong></td>
-            <td style="color:var(--muted2);font-size:12px">${c.email}</td>
+            <td><strong>${esc(c.prenom)} ${esc(c.nom)}</strong></td>
+            <td style="color:var(--muted2);font-size:12px">${esc(c.email)}</td>
             <td><span class="badge badge-gold">⭐ ${c.points} pts</span></td>
             <td style="color:var(--muted2)">${Math.floor(c.points/10)} achats</td>
             <td>
@@ -1272,7 +1272,7 @@ async function loadClientsFideles(){
               </select>
             </td>
             <td>
-              <button class="btn btn-primary btn-sm" onclick="envoyerPromoClient('${c.id}','${c.email}','${c.prenom||'Client'}')">
+              <button class="btn btn-primary btn-sm" onclick="envoyerPromoClient('${c.id}','${escAttr(c.email)}','${escAttr(c.prenom||'Client')}')">
                 📨 Envoyer code
               </button>
             </td>
@@ -1386,19 +1386,19 @@ function renderRewards(filter){
   }
   tb.innerHTML=list.map(r=>`
     <tr>
-      <td><strong>${r.prenom||''} ${r.nom||''}</strong></td>
-      <td style="color:var(--muted2);font-size:12px">${r.email||'—'}</td>
+      <td><strong>${esc(r.prenom)} ${esc(r.nom)}</strong></td>
+      <td style="color:var(--muted2);font-size:12px">${esc(r.email)||'—'}</td>
       <td>
         ${r.points_palier===100
           ?'<span class="badge badge-gold">🥉 100 pts — Palier 1</span>'
           :'<span class="badge" style="background:rgba(245,166,35,.2);color:var(--gold);border:1px solid var(--gold)">🥇 500 pts — Palier 2</span>'}
       </td>
-      <td style="font-size:13px">${r.produit_offert_nom||'<span style="color:var(--muted)">Non choisi</span>'}</td>
+      <td style="font-size:13px">${r.produit_offert_nom?esc(r.produit_offert_nom):'<span style="color:var(--muted)">Non choisi</span>'}</td>
       <td>${rewardBadge(r.statut)}</td>
       <td style="color:var(--muted);font-size:12px">${new Date(r.created_at).toLocaleDateString('fr-FR')}</td>
       <td>
         ${r.statut==='en_attente'
-          ?`<button class="btn btn-primary btn-sm" onclick='openCadeauModal(${JSON.stringify(r)})'>🎁 Choisir cadeau</button>`
+          ?`<button class="btn btn-primary btn-sm" onclick='openCadeauModal(${JSON.stringify(r).replace(/'/g,"&#39;")})'>🎁 Choisir cadeau</button>`
           :r.statut==='cadeau_choisi'
             ?`<button class="btn btn-green btn-sm" onclick='envoyerCodeCadeau("${r.id}")'>📧 Envoyer code</button>`
             :'<span style="color:var(--muted);font-size:12px">✅ Terminé</span>'}
@@ -1421,8 +1421,8 @@ function openCadeauModal(r){
   document.getElementById('cadeau-user-email').value=r.email||'';
   document.getElementById('cadeau-user-prenom').value=r.prenom||'';
   document.getElementById('cadeau-client-info').innerHTML=`
-    <strong style="color:var(--text)">Client :</strong> ${r.prenom||''} ${r.nom||''}<br>
-    <strong style="color:var(--text)">Email :</strong> ${r.email||'—'}<br>
+    <strong style="color:var(--text)">Client :</strong> ${esc(r.prenom)} ${esc(r.nom)}<br>
+    <strong style="color:var(--text)">Email :</strong> ${esc(r.email)||'—'}<br>
     <strong style="color:var(--text)">Palier :</strong> ${r.points_palier} points`;
   document.getElementById('cadeau-code-manual').value='';
   // Remplir select produits
@@ -1519,7 +1519,7 @@ async function relancerInactifs(){
     <div style="display:flex;flex-direction:column;gap:6px">
       ${inactifs.map(c=>`
         <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px">
-          <span>${c.prenom||''} ${c.nom||''} <span style="color:var(--muted2)">(${c.email})</span></span>
+          <span>${esc(c.prenom)} ${esc(c.nom)} <span style="color:var(--muted2)">(${esc(c.email)})</span></span>
           <span class="badge badge-gold">😴 Inactif</span>
         </div>`).join('')}
     </div>`;
@@ -1876,6 +1876,19 @@ function platLabel(p){return{psn:'PSN',xbox:'Xbox',steam:'Steam',nintendo:'Ninte
 function platEmoji(p){return{psn:'🎮',xbox:'🕹️',steam:'🖥️',nintendo:'🔴'}[p]||'🎮';}
 function platDot(p){return{psn:'psn',xbox:'xbox',steam:'steam',nintendo:'nin'}[p]||'psn';}
 function fmt(n){return(n||0).toLocaleString('fr-FR');}
+// Neutralise tout code HTML/script qu'un client aurait pu taper dans son prénom, nom, email ou
+// téléphone (formulaire d'inscription) avant de l'afficher — sans ça, un client malveillant
+// pourrait exécuter du code dans le navigateur de l'admin en consultant sa fiche.
+function esc(str){
+  if(str==null)return'';
+  return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Pour les cas où une donnée client est collée dans un attribut onclick="...('...')" — il faut
+// en plus neutraliser les guillemets simples et antislashs pour ne pas pouvoir sortir de la chaîne JS.
+function escAttr(str){
+  if(str==null)return'';
+  return String(str).replace(/[\\'"<>&]/g,c=>({'\\':'\\\\',"'":"\\'",'"':'&quot;','<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+}
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
