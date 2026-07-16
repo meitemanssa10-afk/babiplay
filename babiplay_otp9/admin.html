@@ -561,29 +561,28 @@ tr:hover td{background:rgba(255,255,255,.02)}
         </small>
       </div>
       <div class="form-group">
-        <label>Image du produit</label>
+        <label>Images du produit (minimum 3 conseillé)</label>
         <div style="display:flex;gap:10px;margin-bottom:8px">
-          <input type="url" id="prod-image" placeholder="ou colle un lien image..." oninput="previewImage()" style="flex:1">
+          <input type="url" id="prod-image" placeholder="colle un lien image et clique Ajouter..." style="flex:1">
+          <button type="button" class="btn btn-secondary" onclick="ajouterImageGalerie()" style="white-space:nowrap">+ Ajouter</button>
         </div>
         <div class="upload-zone" id="upload-zone" onclick="document.getElementById('prod-image-file').click()"
           ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
           ondragleave="this.style.borderColor='var(--border2)'"
           ondrop="handleImageDrop(event)">
-          <input type="file" id="prod-image-file" accept="image/*,video/mp4,video/webm" style="display:none" onchange="handleImageUpload(event)">
+          <input type="file" id="prod-image-file" accept="image/*,video/mp4,video/webm" multiple style="display:none" onchange="handleImageUpload(event)">
           <div id="upload-zone-content">
             <div style="font-size:32px;margin-bottom:8px">📁</div>
-            <div style="font-size:13px;color:var(--muted2)">Clique pour choisir une image ou vidéo</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">ou glisse-dépose ici · JPG, PNG, MP4 · Max 50Mo</div>
+            <div style="font-size:13px;color:var(--muted2)">Clique pour choisir une ou plusieurs images/vidéos</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">ou glisse-dépose ici · JPG, PNG, MP4 · Max 50Mo chacune</div>
           </div>
         </div>
-        <div class="img-preview" id="img-preview" style="margin-top:8px">
-          <div class="img-preview-text">Aperçu de l'image ici</div>
-        </div>
+        <div id="galerie-images" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
       </div>
       <div class="form-group">
         <label>URL de la vidéo (optionnel)</label>
         <input type="url" id="prod-video" placeholder="https://... (lien MP4 ou lien YouTube de la bande-annonce)">
-        <small style="color:var(--muted);font-size:12px;margin-top:4px;display:block">Colle un lien YouTube (bande-annonce officielle) ou un lien MP4 direct. Tu peux aussi uploader une vidéo dans le champ image ci-dessus.</small>
+        <small style="color:var(--muted);font-size:12px;margin-top:4px;display:block">Colle un lien YouTube (bande-annonce officielle) ou un lien MP4 direct. Tu peux aussi uploader une vidéo dans la zone ci-dessus.</small>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -889,7 +888,9 @@ function openProductModal(p=null){
   document.getElementById('prod-kinguin-id').value=p?p.kinguin_product_id||'':'';
   document.getElementById('prod-physique').checked=p?!!p.est_physique:true;
   document.getElementById('prod-delai').value=p?p.delai_livraison_jours||7:7;
-  previewImage();
+  galerieImages = p ? (Array.isArray(p.images) && p.images.length ? [...p.images] : (p.image_url ? [p.image_url] : [])) : [];
+  document.getElementById('prod-image').value='';
+  renderGalerieImages();
   document.getElementById('modal-product').classList.add('open');
 }
 
@@ -909,7 +910,7 @@ async function importFromLink(){
     }else{
       if(data.nom)document.getElementById('prod-nom').value=data.nom;
       if(data.description)document.getElementById('prod-desc').value=data.description;
-      if(data.image){document.getElementById('prod-image').value=data.image;previewImage();}
+      if(data.image){ajouterImageGalerie(data.image);}
       if(data.prix)showToast('Prix de référence trouvé : '+data.prix+' — fixe ton propre prix de vente en FCFA','success');
       else showToast('Champs pré-remplis, vérifie et complète le prix','success');
     }
@@ -920,11 +921,31 @@ async function importFromLink(){
   }
 }
 
-function previewImage(){
-  const url=document.getElementById('prod-image').value;
-  const prev=document.getElementById('img-preview');
-  if(url){prev.innerHTML=`<img src="${url}" onerror="this.parentElement.innerHTML='<div class=img-preview-text>❌ Image introuvable</div>'">`;}
-  else{prev.innerHTML='<div class="img-preview-text">👆 Collez un lien image ci-dessus</div>';}
+let galerieImages=[];
+
+function ajouterImageGalerie(url){
+  const input=document.getElementById('prod-image');
+  const val=(url||input.value).trim();
+  if(!val){showToast('Colle un lien image d\'abord','err');return;}
+  galerieImages.push(val);
+  input.value='';
+  renderGalerieImages();
+}
+
+function retirerImageGalerie(index){
+  galerieImages.splice(index,1);
+  renderGalerieImages();
+}
+
+function renderGalerieImages(){
+  const zone=document.getElementById('galerie-images');
+  if(!galerieImages.length){zone.innerHTML='<div style="font-size:12px;color:var(--muted)">Aucune image ajoutée pour l\'instant — ajoute-en au moins 3.</div>';return;}
+  zone.innerHTML=galerieImages.map((url,i)=>`
+    <div style="position:relative;width:80px;height:80px">
+      <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=80 height=80><rect width=80 height=80 fill=%23252530/></svg>'">
+      ${i===0?'<span style="position:absolute;top:2px;left:2px;background:var(--gold);color:#000;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px">Principale</span>':''}
+      <button type="button" onclick="retirerImageGalerie(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);border:none;color:#fff;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1">✕</button>
+    </div>`).join('');
 }
 
 async function saveProduct(){
@@ -938,7 +959,8 @@ async function saveProduct(){
     sous_categorie:estPhysique?'':document.getElementById('prod-sous-categorie').value,
     description:document.getElementById('prod-desc').value.trim(),
     prix:parseInt(document.getElementById('prod-prix').value)||0,
-    image_url:document.getElementById('prod-image').value.trim(),
+    image_url:galerieImages[0]||'',
+    images:galerieImages,
     video_url:document.getElementById('prod-video').value.trim(),
     est_slider:document.getElementById('prod-slider').checked,
     slider_ordre:parseInt(document.getElementById('prod-slider-ordre').value)||1,
@@ -1819,16 +1841,14 @@ function updateCatOptions(){
 
 // ============================================================
 async function handleImageUpload(event){
-  const file=event.target.files[0];
-  if(!file)return;
-  await uploadFile(file);
+  const files=Array.from(event.target.files||[]);
+  for(const file of files){await uploadFile(file);}
 }
 async function handleImageDrop(event){
   event.preventDefault();
   document.getElementById('upload-zone').style.borderColor='var(--border2)';
-  const file=event.dataTransfer.files[0];
-  if(!file)return;
-  await uploadFile(file);
+  const files=Array.from(event.dataTransfer.files||[]);
+  for(const file of files){await uploadFile(file);}
 }
 async function uploadFile(file){
   const isVideo=file.type.startsWith('video/');
@@ -1836,26 +1856,17 @@ async function uploadFile(file){
   const fileName=`${Date.now()}_${Math.random().toString(36).substring(2,8)}.${ext}`;
   const folder=isVideo?'videos':'images';
   const zone=document.getElementById('upload-zone');
+  const contenuOrigine=zone.innerHTML;
   zone.innerHTML=`<div style="font-size:13px;color:var(--muted2)">⬆️ Upload en cours...<br><small>${file.name}</small></div>`;
   try{
     const{data,error}=await sb.storage.from('babiplay-images').upload(`${folder}/${fileName}`,file,{cacheControl:'3600',upsert:false,contentType:file.type});
-    if(error){showToast('Erreur upload: '+error.message,'err');resetUploadZone();return;}
+    if(error){showToast('Erreur upload: '+error.message,'err');zone.innerHTML=contenuOrigine;return;}
     const{data:urlData}=sb.storage.from('babiplay-images').getPublicUrl(`${folder}/${fileName}`);
     const url=urlData.publicUrl;
     if(isVideo){document.getElementById('prod-video').value=url;showToast('✅ Vidéo uploadée !','ok');}
-    else{document.getElementById('prod-image').value=url;previewImage();showToast('✅ Image uploadée !','ok');}
-    resetUploadZone();
-  }catch(e){showToast('Erreur: '+e.message,'err');resetUploadZone();}
-}
-function resetUploadZone(){
-  const zone=document.getElementById('upload-zone');
-  if(!zone)return;
-  zone.innerHTML=`
-    <input type="file" id="prod-image-file" accept="image/*,video/mp4,video/webm" style="display:none" onchange="handleImageUpload(event)">
-    <div style="font-size:32px;margin-bottom:8px">📁</div>
-    <div style="font-size:13px;color:var(--muted2)">Clique pour choisir une image ou vidéo</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG, MP4 · Max 50Mo</div>`;
-  zone.onclick=()=>document.getElementById('prod-image-file').click();
+    else{ajouterImageGalerie(url);showToast('✅ Image ajoutée à la galerie !','ok');}
+    zone.innerHTML=contenuOrigine;
+  }catch(e){showToast('Erreur: '+e.message,'err');zone.innerHTML=contenuOrigine;}
 }
 
 // ============================================================
