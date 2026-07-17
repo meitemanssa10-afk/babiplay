@@ -213,6 +213,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sidebar-nav">
       <button class="nav-item active" onclick="showSection('dashboard')"><span class="icon">📊</span> Tableau de bord</button>
       <button class="nav-item" onclick="showSection('produits')"><span class="icon">🎮</span> Produits</button>
+      <button class="nav-item" onclick="showSection('bannieres')"><span class="icon">🎬</span> Bannières</button>
       <button class="nav-item" onclick="showSection('codes')"><span class="icon">🔑</span> Codes de jeu</button>
       <button class="nav-item" onclick="showSection('commandes')"><span class="icon">📦</span> Commandes <span class="nav-badge" id="badge-commandes">0</span></button>
       <button class="nav-item" onclick="showSection('clients')"><span class="icon">👥</span> Clients</button>
@@ -267,6 +268,18 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="table-wrap">
         <table><thead><tr><th>Image</th><th>Nom</th><th>Plateforme</th><th>Prix</th><th>Stock codes</th><th>Slider</th><th>Statut</th><th>Actions</th></tr></thead>
         <tbody id="products-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- BANNIERES -->
+    <div class="section" id="section-bannieres">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1>🎬 Bannières promo</h1><p>Pubs, bandes-annonces, collaborations — affichées dans le slider d'accueil</p></div>
+        <button class="btn btn-primary" onclick="openBannerModal()">+ Ajouter une bannière</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Aperçu</th><th>Titre</th><th>Lien</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="banners-tbody"></tbody></table>
       </div>
     </div>
 
@@ -647,6 +660,55 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </div>
 
+<!-- MODAL BANNIERE -->
+<div class="modal-overlay" id="modal-banniere">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-banniere-title">Ajouter une bannière</h3>
+      <button class="modal-x" onclick="closeModal('modal-banniere')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ban-id">
+      <div class="form-group"><label>Titre affiché</label><input type="text" id="ban-titre" placeholder="Ex: PS5 — Précommandez maintenant"></div>
+      <div class="form-group"><label>Sous-titre (optionnel)</label><input type="text" id="ban-sous-titre" placeholder="Ex: Disponible dès le 15 août"></div>
+      <div class="form-group">
+        <label>Image (utilisée si pas de vidéo)</label>
+        <input type="url" id="ban-image" placeholder="Colle un lien image...">
+      </div>
+      <div class="form-group">
+        <label>Vidéo (optionnel — lien YouTube ou MP4, prioritaire sur l'image)</label>
+        <input type="url" id="ban-video" placeholder="https://youtube.com/watch?v=... ou lien MP4 direct">
+      </div>
+      <div class="form-group">
+        <label>Au clic, cette bannière doit...</label>
+        <select id="ban-lien-type" onchange="updateBannerLienFields()">
+          <option value="aucun">Ne rien faire (juste informative)</option>
+          <option value="produit">Ouvrir une fiche produit du catalogue</option>
+          <option value="externe">Ouvrir un lien externe (site, WhatsApp, réseau social...)</option>
+        </select>
+      </div>
+      <div class="form-group" id="ban-produit-group" style="display:none">
+        <label>Produit lié</label>
+        <select id="ban-produit-id"></select>
+      </div>
+      <div class="form-group" id="ban-externe-group" style="display:none">
+        <label>URL externe</label>
+        <input type="url" id="ban-lien-externe" placeholder="https://...">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Ordre d'affichage</label><input type="number" id="ban-ordre" value="1"></div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <label class="form-check"><input type="checkbox" id="ban-actif" checked> Bannière active</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-banniere')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveBanner()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PROMO -->
 <div class="modal-overlay" id="modal-promo">
   <div class="modal-box">
@@ -781,6 +843,7 @@ async function showAdmin(){
   document.getElementById('admin-wrap').style.display='flex';
   await loadDashboard();
   await loadProducts();
+  await loadBanners();
   await loadOrders();
   await loadClients();
   await loadPromos();
@@ -985,6 +1048,92 @@ async function saveProduct(){
 async function toggleProduct(id,current){
   await sb.from('products').update({est_actif:!current}).eq('id',id);
   await loadProducts();showToast(current?'Produit désactivé':'Produit activé','ok');
+}
+
+// ============================================================
+// BANNIERES PROMO
+// ============================================================
+let allBanners=[];
+
+async function loadBanners(){
+  const{data}=await sb.from('banners').select('*').order('ordre',{ascending:true});
+  allBanners=data||[];renderBanners();
+}
+
+function renderBanners(){
+  const tb=document.getElementById('banners-tbody');
+  if(!allBanners.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">🎬</div><p>Aucune bannière pour l\'instant</p></div></td></tr>';return;}
+  tb.innerHTML=allBanners.map(b=>{
+    const apercu=b.video_url?'🎬 Vidéo':(b.image_url?`<img src="${b.image_url}" style="width:56px;height:32px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:'—');
+    const lien=b.lien_type==='produit'?'🎮 Produit':b.lien_type==='externe'?'🔗 Externe':'— Aucun';
+    return`
+    <tr>
+      <td>${apercu}</td>
+      <td><strong>${b.titre||'(sans titre)'}</strong></td>
+      <td>${lien}</td>
+      <td>${b.ordre||1}</td>
+      <td>${b.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick='editBanner(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleBanner('${b.id}',${b.est_actif})">${b.est_actif?'🚫':'✅'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateBannerLienFields(){
+  const type=document.getElementById('ban-lien-type').value;
+  document.getElementById('ban-produit-group').style.display=type==='produit'?'':'none';
+  document.getElementById('ban-externe-group').style.display=type==='externe'?'':'none';
+}
+
+function openBannerModal(b=null){
+  document.getElementById('modal-banniere-title').textContent=b?'Modifier la bannière':'Ajouter une bannière';
+  document.getElementById('ban-id').value=b?b.id:'';
+  document.getElementById('ban-titre').value=b?b.titre||'':'';
+  document.getElementById('ban-sous-titre').value=b?b.sous_titre||'':'';
+  document.getElementById('ban-image').value=b?b.image_url||'':'';
+  document.getElementById('ban-video').value=b?b.video_url||'':'';
+  document.getElementById('ban-lien-type').value=b?b.lien_type||'aucun':'aucun';
+  document.getElementById('ban-lien-externe').value=b?b.lien_externe||'':'';
+  document.getElementById('ban-ordre').value=b?b.ordre||1:(allBanners.length+1);
+  document.getElementById('ban-actif').checked=b?b.est_actif:true;
+  const sel=document.getElementById('ban-produit-id');
+  sel.innerHTML=allProducts.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  if(b&&b.produit_id)sel.value=b.produit_id;
+  updateBannerLienFields();
+  document.getElementById('modal-banniere').classList.add('open');
+}
+
+function editBanner(b){openBannerModal(b);}
+
+async function saveBanner(){
+  const id=document.getElementById('ban-id').value;
+  const lienType=document.getElementById('ban-lien-type').value;
+  const data={
+    titre:document.getElementById('ban-titre').value.trim(),
+    sous_titre:document.getElementById('ban-sous-titre').value.trim(),
+    image_url:document.getElementById('ban-image').value.trim(),
+    video_url:document.getElementById('ban-video').value.trim(),
+    lien_type:lienType,
+    produit_id:lienType==='produit'?document.getElementById('ban-produit-id').value:null,
+    lien_externe:lienType==='externe'?document.getElementById('ban-lien-externe').value.trim():null,
+    ordre:parseInt(document.getElementById('ban-ordre').value)||1,
+    est_actif:document.getElementById('ban-actif').checked
+  };
+  if(!data.titre){showToast('Le titre est obligatoire','err');return;}
+  if(!data.image_url&&!data.video_url){showToast('Ajoute une image ou une vidéo','err');return;}
+  let error;
+  if(id){({error}=await sb.from('banners').update(data).eq('id',id));}
+  else{({error}=await sb.from('banners').insert(data));}
+  if(error){showToast('Erreur : '+error.message,'err');return;}
+  closeModal('modal-banniere');showToast('✅ Bannière enregistrée !','ok');
+  await loadBanners();
+}
+
+async function toggleBanner(id,current){
+  await sb.from('banners').update({est_actif:!current}).eq('id',id);
+  await loadBanners();showToast(current?'Bannière désactivée':'Bannière activée','ok');
 }
 
 // ============================================================
