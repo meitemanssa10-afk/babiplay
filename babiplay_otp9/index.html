@@ -437,7 +437,7 @@ let promoApplied = null;
 let currentFilter = 'all';
 let currentSousConsole = 'all';
 let currentType = 'tous';
-let sliderProds = [], sliderIdx = 0, sliderTimer = null;
+let sliderProds = [], sliderIdx = 0, sliderTimer = null, activeBanners = [], slidesCount = 0;
 let searchTimeout = null;
 
 (async () => {
@@ -499,16 +499,22 @@ async function loadProducts() {
     from += pageSize;
   }
   products = all;
+  const{data:banData}=await sb.from('banners').select('*').eq('est_actif',true).order('ordre',{ascending:true});
+  activeBanners = banData||[];
   renderSlider();
   renderCatalogue();
 }
 
-// SLIDER
+// SLIDER — mélange les produits marqués "slider" ET les bannières promo libres (pubs,
+// bandes-annonces, collaborations), triés ensemble par leur ordre respectif.
 function renderSlider() {
   sliderProds = products.filter(p => p.est_slider).sort((a, b) => (a.slider_ordre || 99) - (b.slider_ordre || 99));
+  const slidesFromProducts = sliderProds.map(p => ({ type: 'produit', ordre: p.slider_ordre || 99, data: p }));
+  const slidesFromBanners = activeBanners.map(b => ({ type: 'banniere', ordre: b.ordre || 99, data: b }));
+  const slides = [...slidesFromProducts, ...slidesFromBanners].sort((a, b) => a.ordre - b.ordre);
   const track = document.getElementById('slider-track');
   const dots = document.getElementById('sdots');
-  if (!sliderProds.length) {
+  if (!slides.length) {
     track.innerHTML = `<div class="slide" style="cursor:default">
       <div class="slide-bg" style="background:linear-gradient(135deg,#1a1035,#2a1547,#3d1f1f)"></div>
       <div class="slide-overlay"></div>
@@ -520,33 +526,64 @@ function renderSlider() {
     dots.innerHTML = '';
     return;
   }
-  track.innerHTML = sliderProds.map(p => {
-    const color = pColor(p.plateforme);
-    const ytEmbed = getYouTubeEmbed(p.video_url);
-    let media;
-    if (ytEmbed) {
-      media = `<div class="slide-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${p.nom}"></iframe></div>`;
-    } else if (p.video_url) {
-      media = `<video class="slide-video" autoplay muted loop playsinline src="${p.video_url}"></video>`;
-    } else if (p.image_url) {
-      media = `<div class="slide-bg" style="background-image:url('${p.image_url}')"></div><div class="slide-fg" style="background-image:url('${p.image_url}')"></div>`;
-    } else {
-      media = `<div class="slide-bg ${pFbClass(p.plateforme)}"></div>`;
-    }
-    return `<a class="slide" href="produit.html?id=${p.id}">
-      ${media}
-      <div class="slide-overlay"></div>
-      <div class="slide-content">
-        <span class="slide-plat" style="background:rgba(0,0,0,.4);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
-        <div class="slide-title">${p.nom}</div>
-        <div class="slide-row">
-          <div class="slide-price">${fmt(p.prix)} <span style="font-size:14px;color:rgba(255,255,255,.6)">FCFA</span></div>
-          <div class="slide-btn">Voir →</div>
+  track.innerHTML = slides.map(s => {
+    if (s.type === 'produit') {
+      const p = s.data;
+      const color = pColor(p.plateforme);
+      const ytEmbed = getYouTubeEmbed(p.video_url);
+      let media;
+      if (ytEmbed) {
+        media = `<div class="slide-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${p.nom}"></iframe></div>`;
+      } else if (p.video_url) {
+        media = `<video class="slide-video" autoplay muted loop playsinline src="${p.video_url}"></video>`;
+      } else if (p.image_url) {
+        media = `<div class="slide-bg" style="background-image:url('${p.image_url}')"></div><div class="slide-fg" style="background-image:url('${p.image_url}')"></div>`;
+      } else {
+        media = `<div class="slide-bg ${pFbClass(p.plateforme)}"></div>`;
+      }
+      return `<a class="slide" href="produit.html?id=${p.id}">
+        ${media}
+        <div class="slide-overlay"></div>
+        <div class="slide-content">
+          <span class="slide-plat" style="background:rgba(0,0,0,.4);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
+          <div class="slide-title">${p.nom}</div>
+          <div class="slide-row">
+            <div class="slide-price">${fmt(p.prix)} <span style="font-size:14px;color:rgba(255,255,255,.6)">FCFA</span></div>
+            <div class="slide-btn">Voir →</div>
+          </div>
         </div>
-      </div>
-    </a>`;
+      </a>`;
+    } else {
+      // Bannière promo libre : pub, bande-annonce, collaboration — pas forcément liée à un produit
+      const b = s.data;
+      const ytEmbed = getYouTubeEmbed(b.video_url);
+      let media;
+      if (ytEmbed) {
+        media = `<div class="slide-yt-wrap"><iframe src="${ytEmbed}" allow="autoplay; encrypted-media" allowfullscreen title="${b.titre || ''}"></iframe></div>`;
+      } else if (b.video_url) {
+        media = `<video class="slide-video" autoplay muted loop playsinline src="${b.video_url}"></video>`;
+      } else if (b.image_url) {
+        media = `<div class="slide-bg" style="background-image:url('${b.image_url}')"></div><div class="slide-fg" style="background-image:url('${b.image_url}')"></div>`;
+      } else {
+        media = `<div class="slide-bg" style="background:linear-gradient(135deg,#1a1035,#2a1547,#3d1f1f)"></div>`;
+      }
+      const contenu = `
+        <div class="slide-overlay"></div>
+        <div class="slide-content">
+          <div class="slide-title">${b.titre || ''}</div>
+          ${b.sous_titre ? `<div style="font-size:13px;color:rgba(255,255,255,.75)">${b.sous_titre}</div>` : ''}
+        </div>`;
+      if (b.lien_type === 'produit' && b.produit_id) {
+        return `<a class="slide" href="produit.html?id=${b.produit_id}">${media}${contenu}</a>`;
+      } else if (b.lien_type === 'externe' && b.lien_externe) {
+        return `<a class="slide" href="${b.lien_externe}" target="_blank" rel="noopener">${media}${contenu}</a>`;
+      } else {
+        return `<div class="slide" style="cursor:default">${media}${contenu}</div>`;
+      }
+    }
   }).join('');
-  dots.innerHTML = sliderProds.map((_, i) => `<div class="sdot ${i === 0 ? 'active' : ''}" onclick="goSlide(${i})"></div>`).join('');
+  dots.innerHTML = slides.map((_, i) => `<div class="sdot ${i === 0 ? 'active' : ''}" onclick="goSlide(${i})"></div>`).join('');
+  slidesCount = slides.length;
   startSlider();
 }
 
@@ -555,8 +592,8 @@ function goSlide(n) {
   document.getElementById('slider-track').style.transform = `translateX(-${n * 100}%)`;
   document.querySelectorAll('.sdot').forEach((d, i) => d.classList.toggle('active', i === n));
 }
-function nextSlide() { goSlide((sliderIdx + 1) % Math.max(sliderProds.length, 1)); }
-function startSlider() { clearInterval(sliderTimer); if (sliderProds.length > 1) sliderTimer = setInterval(nextSlide, 5000); }
+function nextSlide() { goSlide((sliderIdx + 1) % Math.max(slidesCount, 1)); }
+function startSlider() { clearInterval(sliderTimer); if (slidesCount > 1) sliderTimer = setInterval(nextSlide, 5000); }
 
 // CATALOGUE EN SECTIONS
 function renderCatalogue(filter = currentFilter) {
