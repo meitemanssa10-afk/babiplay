@@ -25,6 +25,29 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ message: 'Statut ignoré' }) };
     }
 
+    const token = body.token || body.data?.token || null;
+
+    // Sans cette étape, n'importe qui connaissant l'adresse de ce webhook pourrait envoyer une
+    // fausse notification "paiement réussi" et recevoir un vrai code gratuitement. On ne fait
+    // jamais confiance au contenu reçu tel quel : on redemande directement à PayDunya, avec nos
+    // propres clés secrètes, si CE jeton précis correspond réellement à un paiement confirmé.
+    if (!token) {
+      console.error('⚠️ Webhook reçu sans jeton de transaction — ignoré par sécurité');
+      return { statusCode: 200, headers, body: JSON.stringify({ message: 'Jeton manquant, ignoré' }) };
+    }
+    const confirmRes = await fetch(`https://app.paydunya.com/api/v1/checkout-invoice/confirm/${token}`, {
+      headers: {
+        'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_MASTER_KEY,
+        'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
+        'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN
+      }
+    });
+    const confirmData = await confirmRes.json().catch(() => ({}));
+    if (confirmData.status !== 'completed') {
+      console.error(`⚠️ PayDunya ne confirme pas ce paiement (jeton ${token}) — statut réel: ${confirmData.status}. Notification ignorée, possible tentative frauduleuse.`);
+      return { statusCode: 200, headers, body: JSON.stringify({ message: 'Paiement non confirmé par PayDunya, ignoré' }) };
+    }
+
     // custom_data revient tel qu'on l'a envoyé au moment de créer la facture (voir checkout() côté
     // site) — c'est notre source fiable pour savoir QUELS produits exacts ont été achetés.
     const customData = body.custom_data || body.data?.custom_data || {};
@@ -32,7 +55,6 @@ exports.handler = async (event) => {
     const clientNom = customData.client_nom || body.customer?.name || 'Client';
     const adresseLivraison = customData.adresse_livraison || null;
     const telephoneLivraison = customData.telephone_livraison || null;
-    const token = body.token || body.data?.token || null;
 
     // Un panier peut contenir plusieurs articles (numériques et/ou physiques) : on traite chacun
     // séparément, avec sa propre commande de traitement, plutôt qu'un seul article pour tout le
