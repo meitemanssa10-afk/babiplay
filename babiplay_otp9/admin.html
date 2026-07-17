@@ -1060,11 +1060,19 @@ async function loadBanners(){
   allBanners=data||[];renderBanners();
 }
 
+function getYouTubeThumb(url){
+  if(!url)return null;
+  const m=url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return m?`https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`:null;
+}
+
 function renderBanners(){
   const tb=document.getElementById('banners-tbody');
   if(!allBanners.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">🎬</div><p>Aucune bannière pour l\'instant</p></div></td></tr>';return;}
   tb.innerHTML=allBanners.map(b=>{
-    const apercu=b.video_url?'🎬 Vidéo':(b.image_url?`<img src="${b.image_url}" style="width:56px;height:32px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:'—');
+    const ytThumb=getYouTubeThumb(b.video_url);
+    const apercuImg=ytThumb||(b.video_url?'':b.image_url);
+    const apercu=apercuImg?`<img src="${apercuImg}" style="width:56px;height:32px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:(b.video_url?'🎬 Vidéo (MP4)':'—');
     const lien=b.lien_type==='produit'?'🎮 Produit':b.lien_type==='externe'?'🔗 Externe':'— Aucun';
     return`
     <tr>
