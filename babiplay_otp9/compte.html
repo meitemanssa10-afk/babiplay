@@ -448,7 +448,9 @@ function statusBadge(s){
     paye:'<span class="badge badge-blue">💳 Payé</span>',
     en_cours:'<span class="badge badge-blue">⚙️ Traitement en cours</span>',
     code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',
-    livree:'<span class="badge badge-green">✅ Code envoyé</span>',
+    livree:'<span class="badge badge-green">✅ Livré</span>',
+    a_approvisionner:'<span class="badge badge-gold">📦 En préparation</span>',
+    en_livraison:'<span class="badge badge-blue">🚚 En cours de livraison</span>',
     erreur:'<span class="badge badge-red">⚠️ Problème — contactez le support</span>',
     annule:'<span class="badge badge-red">❌ Annulé</span>'
   }[s]||`<span class="badge badge-gray">${s}</span>`;
@@ -501,6 +503,12 @@ function renderOrders(){
           </div>`
         :o.statut==='en_attente'||o.statut==='paye'||o.statut==='en_cours'?
           '<span style="font-size:12px;color:var(--muted2)">⏳ Code en cours de traitement...</span>':
+          o.statut==='a_approvisionner'?
+          '<span style="font-size:12px;color:var(--muted2)">📦 Nous préparons votre commande</span>':
+          o.statut==='en_livraison'?
+          '<span style="font-size:12px;color:var(--muted2)">🚚 Vous serez contacté(e) pour la remise</span>':
+          o.statut==='livree'?
+          '<span style="font-size:12px;color:#7dd670">✅ Commande livrée</span>':
           o.statut==='erreur'?
           '<span style="font-size:12px;color:#ff6b6b">⚠️ Un problème est survenu, contactez le support</span>':
           '<span style="font-size:12px;color:var(--muted)">—</span>'}
