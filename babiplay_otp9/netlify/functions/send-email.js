@@ -14,6 +14,7 @@ exports.handler = async (event) => {
 
   try {
     const body = event.body;
+    console.log('📤 Appel Brevo, clé présente:', !!process.env.BREVO_API_KEY);
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -23,8 +24,10 @@ exports.handler = async (event) => {
       body
     });
     const data = await res.json().catch(() => ({}));
+    console.log('📥 Réponse Brevo — statut:', res.status, '— contenu:', JSON.stringify(data));
     return { statusCode: res.status, headers, body: JSON.stringify({ ok: res.ok, data }) };
   } catch (err) {
+    console.error('❌ Erreur send-email:', err.message);
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: err.message }) };
   }
 };
