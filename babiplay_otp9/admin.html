@@ -293,6 +293,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <option value="en_attente">En attente</option>
           <option value="paye">Payé</option>
           <option value="code_envoye">Code envoyé</option>
+          <option value="a_approvisionner">📦 À approvisionner</option>
+          <option value="en_livraison">🚚 En livraison</option>
+          <option value="livree">✅ Livré</option>
           <option value="annule">Annulé</option>
         </select>
       </div>
@@ -1069,7 +1072,7 @@ function renderOrders(filter){
 function filterOrders(val){renderOrders(val);}
 
 function statusBadge(s){
-  const map={en_attente:'<span class="badge badge-gold">⏳ En attente</span>',paye:'<span class="badge badge-blue">💳 Payé</span>',code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',annule:'<span class="badge badge-red">❌ Annulé</span>'};
+  const map={en_attente:'<span class="badge badge-gold">⏳ En attente</span>',paye:'<span class="badge badge-blue">💳 Payé</span>',code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',annule:'<span class="badge badge-red">❌ Annulé</span>',a_approvisionner:'<span class="badge badge-gold">📦 À approvisionner</span>',en_livraison:'<span class="badge badge-blue">🚚 En livraison</span>',livree:'<span class="badge badge-green">✅ Livré</span>'};
   return map[s]||s;
 }
 
@@ -1094,10 +1097,82 @@ function openOrderModal(o){
       <button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>
       <button class="btn btn-green" onclick="assignCode('${o.id}','${o.product_id}')">🔑 Attribuer un code</button>
       <button class="btn btn-danger" onclick="cancelOrder('${o.id}')">❌ Annuler</button>`;
+  }else if(o.statut==='a_approvisionner'){
+    foot.innerHTML=`
+      <button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>
+      <button class="btn btn-green" onclick="avancerLivraison('${o.id}','en_livraison')">🚚 Marquer en livraison</button>
+      <button class="btn btn-danger" onclick="cancelOrder('${o.id}')">❌ Annuler</button>`;
+  }else if(o.statut==='en_livraison'){
+    foot.innerHTML=`
+      <button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>
+      <button class="btn btn-green" onclick="avancerLivraison('${o.id}','livree')">✅ Marquer livré</button>`;
   }else{
     foot.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-commande')">Fermer</button>`;
   }
   document.getElementById('modal-commande').classList.add('open');
+}
+
+async function avancerLivraison(orderId,nouveauStatut){
+  const{error}=await sb.from('orders').update({statut:nouveauStatut}).eq('id',orderId);
+  if(error){showToast('Erreur : '+error.message,'err');return;}
+
+  const order=allOrders.find(o=>o.id===orderId);
+  if(order&&order.user_id){
+    const{data:profile}=await sb.from('profiles').select('*').eq('id',order.user_id).single();
+    if(profile){
+      const ok=await envoyerEmailLivraison(profile.email,profile.prenom||profile.nom||'Client',order.nom_produit||'Produit',nouveauStatut);
+      if(ok)showToast(nouveauStatut==='livree'?'✅ Commande marquée livrée, email envoyé !':'🚚 Commande en livraison, email envoyé !','ok');
+      else showToast('Statut mis à jour — email non envoyé (vérifier Brevo)','ok');
+    }
+  }else{
+    showToast('✅ Statut mis à jour !','ok');
+  }
+  closeModal('modal-commande');
+  await loadOrders();await loadDashboard();
+}
+
+async function envoyerEmailLivraison(email,prenom,produit,statut){
+  const estLivre=statut==='livree';
+  try{
+    const res=await fetch('/.netlify/functions/send-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+        to:[{email,name:prenom}],
+        subject:estLivre?`✅ Votre commande BabiPlay a été livrée !`:`🚚 Votre commande BabiPlay est en route !`,
+        htmlContent:`
+          <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
+            <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
+              <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:24px;text-align:center">
+                <h1 style="color:#000;margin:0;font-size:24px;letter-spacing:2px">BabiPlay CI</h1>
+                <p style="color:#000;margin:6px 0 0;font-size:13px">${estLivre?'📦 Commande livrée':'🚚 Commande en route'}</p>
+              </div>
+              <div style="padding:28px">
+                <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${prenom}</strong> 👋</p>
+                <p style="color:#9a9ab8;font-size:14px;line-height:1.7">
+                  ${estLivre
+                    ?`Votre commande <strong style="color:#f5a623">${produit}</strong> a bien été livrée. Merci de votre confiance !`
+                    :`Votre commande <strong style="color:#f5a623">${produit}</strong> est maintenant en cours de livraison. Vous serez contacté(e) prochainement pour organiser la remise.`}
+                </p>
+                <div style="text-align:center;margin-top:20px">
+                  <a href="https://babiplay.store/compte.html" style="background:linear-gradient(100deg,#f5a623,#ff8c00);color:#000;padding:12px 28px;border-radius:8px;font-weight:700;text-decoration:none;font-size:15px">
+                    📦 Suivre ma commande
+                  </a>
+                </div>
+                <p style="color:#6b6b88;font-size:12px;text-align:center;margin-top:20px">
+                  © 2026 BabiPlay CI — Abidjan, Côte d'Ivoire
+                </p>
+              </div>
+            </div>
+          </div>`
+      })
+    });
+    return res.ok;
+  }catch(e){
+    console.error('Erreur email livraison:',e);
+    return false;
+  }
 }
 
 async function assignCode(orderId,productId){
