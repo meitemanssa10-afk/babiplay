@@ -874,23 +874,26 @@ function showSection(name){
 // DASHBOARD
 // ============================================================
 async function loadDashboard(){
-  const[orders,clients,products,codes]=await Promise.all([
-    sb.from('orders').select('*'),
-    sb.from('profiles').select('*'),
-    sb.from('products').select('*').eq('est_actif',true),
-    sb.from('game_codes').select('*').eq('est_utilise',false)
+  const[ordersCount,clientsCount,productsCount,codesCount,ordersRecent,pendingCount,waitingBadge,sentCount]=await Promise.all([
+    sb.from('orders').select('*',{count:'exact',head:true}),
+    sb.from('profiles').select('*',{count:'exact',head:true}),
+    sb.from('products').select('*',{count:'exact',head:true}).eq('est_actif',true),
+    sb.from('game_codes').select('*',{count:'exact',head:true}).eq('est_utilise',false),
+    sb.from('orders').select('*').order('created_at',{ascending:false}).limit(8),
+    sb.from('orders').select('*',{count:'exact',head:true}).in('statut',['en_attente','paye']),
+    sb.from('orders').select('*',{count:'exact',head:true}).eq('statut','en_attente'),
+    sb.from('orders').select('*',{count:'exact',head:true}).eq('statut','code_envoye')
   ]);
-  const o=orders.data||[],c=clients.data||[],p=products.data||[],k=codes.data||[];
-  document.getElementById('stat-orders').textContent=o.length;
-  document.getElementById('stat-sent').textContent=o.filter(x=>x.statut==='code_envoye').length;
-  document.getElementById('stat-clients').textContent=c.length;
-  document.getElementById('stat-products').textContent=p.length;
-  document.getElementById('stat-codes').textContent=k.length;
-  document.getElementById('stat-pending').textContent=o.filter(x=>x.statut==='en_attente'||x.statut==='paye').length;
-  document.getElementById('badge-commandes').textContent=o.filter(x=>x.statut==='en_attente').length;
+  document.getElementById('stat-orders').textContent=ordersCount.count||0;
+  document.getElementById('stat-sent').textContent=sentCount.count||0;
+  document.getElementById('stat-clients').textContent=clientsCount.count||0;
+  document.getElementById('stat-products').textContent=productsCount.count||0;
+  document.getElementById('stat-codes').textContent=codesCount.count||0;
+  document.getElementById('stat-pending').textContent=pendingCount.count||0;
+  document.getElementById('badge-commandes').textContent=waitingBadge.count||0;
 
   // Dernières commandes
-  const recent=o.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,8);
+  const recent=ordersRecent.data||[];
   document.getElementById('recent-orders').innerHTML=recent.length?recent.map(r=>orderRow(r)).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucune commande</td></tr>';
 }
 
@@ -901,8 +904,20 @@ let prodFilterPlatform='all';
 let prodSearchQuery='';
 
 async function loadProducts(){
-  const{data}=await sb.from('products').select('*').order('created_at',{ascending:false});
-  allProducts=data||[];applyProductFilters();
+  // Supabase plafonne chaque requête à 1000 lignes par défaut — sans pagination, les produits
+  // au-delà des 1000 premiers (selon le tri) sont invisibles dans admin.html, y compris dans la
+  // recherche, même si le produit existe bien dans la base.
+  const pageSize=1000;
+  let from=0,all=[];
+  while(true){
+    const{data,error}=await sb.from('products').select('*').order('created_at',{ascending:false}).range(from,from+pageSize-1);
+    if(error){console.error('Erreur chargement produits:',error.message);break;}
+    if(!data||!data.length)break;
+    all=all.concat(data);
+    if(data.length<pageSize)break;
+    from+=pageSize;
+  }
+  allProducts=all;applyProductFilters();
 }
 
 function applyProductFilters(){
