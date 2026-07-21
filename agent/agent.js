@@ -437,7 +437,7 @@ async function runImportParCategories() {
     console.log(`   ${existingIds.size} produit(s) déjà en base (ignorés).`);
 
     const buckets = {};
-    for (const cat of CATEGORIES) buckets[catKey(cat)] = { populaires: [], autres: [] };
+    for (const cat of CATEGORIES) buckets[catKey(cat)] = { populaires: new Map(), autres: new Map() };
 
     let page = 1, totalCount = null;
     while (true) {
@@ -483,11 +483,17 @@ async function runImportParCategories() {
         if (!bucket) continue; // catégorie non suivie, on ignore
 
         const item = { product, plateforme, categorie, sousCategorie, imageUrl };
+        // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
+        // différent) — sans cette déduplication par nom, on importait la même carte plusieurs fois.
+        // On ne garde que la moins chère par nom.
+        const nomCle = (product.name || '').trim().toLowerCase();
         if (estPopulaire(product.name)) {
-          bucket.populaires.push(item);
-        } else if (bucket.autres.length < CAP_PAR_CATEGORIE * 3) {
+          const existant = bucket.populaires.get(nomCle);
+          if (!existant || eurPrice < (existant.product.price || Infinity)) bucket.populaires.set(nomCle, item);
+        } else if (bucket.autres.size < CAP_PAR_CATEGORIE * 3 || bucket.autres.has(nomCle)) {
           // on garde une petite marge (x3) pour avoir de quoi compléter, sans exploser la mémoire
-          bucket.autres.push(item);
+          const existant = bucket.autres.get(nomCle);
+          if (!existant || eurPrice < (existant.product.price || Infinity)) bucket.autres.set(nomCle, item);
         }
       }
 
@@ -505,8 +511,8 @@ async function runImportParCategories() {
     for (const cat of CATEGORIES) {
       const key = catKey(cat);
       const bucket = buckets[key];
-      const trouves = bucket.populaires.length + bucket.autres.length;
-      const selection = [...bucket.populaires, ...bucket.autres].slice(0, CAP_PAR_CATEGORIE);
+      const trouves = bucket.populaires.size + bucket.autres.size;
+      const selection = [...bucket.populaires.values(), ...bucket.autres.values()].slice(0, CAP_PAR_CATEGORIE);
 
       const rows = selection.map(({ product, plateforme, categorie, sousCategorie, imageUrl }) => ({
         nom: nomAffiche(product, plateforme, categorie, sousCategorie),
@@ -538,7 +544,7 @@ async function runImportParCategories() {
         }
       }
       totalImportes += rows.length;
-      console.log(`   ✅ ${cat.label} : ${rows.length} importés (sur ${trouves} trouvés, dont ${bucket.populaires.length} reconnus comme populaires)`);
+      console.log(`   ✅ ${cat.label} : ${rows.length} importés (sur ${trouves} trouvés, dont ${bucket.populaires.size} reconnus comme populaires)`);
     }
 
     console.log(`\n🎉 Import terminé ! ${totalImportes} produits importés au total (max ${CAP_PAR_CATEGORIE} × ${CATEGORIES.length} catégories).`);
@@ -597,6 +603,34 @@ async function runFixKinguinProducts() {
   fixEnCours = true;
   console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
+    // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
+    // différent) — d'anciens imports les ont enregistrés comme des fiches séparées. On ne garde
+    // que la moins chère par (plateforme + nom), on désactive le reste.
+    const { data: produitsActifs, error: errDoublons } = await supabase.from('products')
+      .select('id, nom, plateforme, prix').eq('est_actif', true);
+    let nombreDoublons = 0;
+    if (errDoublons) console.error('⚠️ Erreur lecture doublons:', errDoublons.message);
+    else {
+      const groupes = new Map();
+      for (const p of (produitsActifs || [])) {
+        const cle = p.plateforme + '|' + (p.nom || '').trim().toLowerCase();
+        if (!groupes.has(cle)) groupes.set(cle, []);
+        groupes.get(cle).push(p);
+      }
+      const idsADesactiver = [];
+      for (const [, produits] of groupes) {
+        if (produits.length < 2) continue;
+        produits.sort((a, b) => a.prix - b.prix);
+        for (let i = 1; i < produits.length; i++) idsADesactiver.push(produits[i].id);
+      }
+      for (let i = 0; i < idsADesactiver.length; i += 200) {
+        await supabase.from('products').update({ est_actif: false }).in('id', idsADesactiver.slice(i, i + 200));
+      }
+      nombreDoublons = idsADesactiver.length;
+      if (nombreDoublons) console.log(`🧹 ${nombreDoublons} doublon(s) désactivé(s) (même nom, on garde le moins cher).`);
+      else console.log('✅ Aucun doublon détecté.');
+    }
+
     // Nettoyage direct en base : désactive tout produit "compte partagé" résiduel, même si sa fiche
     // n'existe plus dans le catalogue Kinguin actuel (donc jamais touché par la boucle ci-dessous).
     const { data: comptesResiduels, error: errResiduels } = await supabase.from('products')
@@ -752,10 +786,11 @@ async function runFixKinguinProducts() {
       introuvables_count: produitsIntrouvables.length,
       desactives_count: totalCorriges,
       corriges_count: totalCorriges,
+      doublons_count: nombreDoublons,
       produits_introuvables: produitsIntrouvables.map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id, prix_actuel_fcfa: p.prix })),
       petites_cartes_a_surveiller: petitesCartesASurveiller
     });
-    console.log(`📋 Rapport d'audit enregistré : ${produitsIntrouvables.length} introuvable(s), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
+    console.log(`📋 Rapport d'audit enregistré : ${nombreDoublons} doublon(s), ${produitsIntrouvables.length} introuvable(s), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
 
     console.log(`✅ Correction terminée ! ${totalCorriges} produits mis à jour.`);
   } catch (e) {
