@@ -1220,6 +1220,7 @@ function renderAuditRapport(rapport){
     <div class="stats-grid" style="margin-bottom:20px">
       <div class="stat-card"><div class="stat-label">Produits vérifiés</div><div class="stat-value">${rapport.total_verifies||0}</div></div>
       <div class="stat-card"><div class="stat-label">ID introuvables (désactivés)</div><div class="stat-value" style="color:#ff6b6b">${rapport.introuvables_count||0}</div></div>
+      <div class="stat-card"><div class="stat-label">Doublons désactivés</div><div class="stat-value" style="color:#ff6b6b">${rapport.doublons_count||0}</div></div>
       <div class="stat-card"><div class="stat-label">Petites cartes à surveiller</div><div class="stat-value" style="color:var(--gold)">${petitesCartes.length}</div></div>
       <div class="stat-card"><div class="stat-label">Dernière vérification</div><div class="stat-value" style="font-size:16px">${new Date(rapport.created_at).toLocaleString('fr-FR')}</div></div>
     </div>
