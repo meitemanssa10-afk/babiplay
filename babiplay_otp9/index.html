@@ -466,6 +466,8 @@ let searchTimeout = null;
 })();
 
 const fmt = n => (n || 0).toLocaleString('fr-FR');
+const LABELS_TRI = { defaut: 'Par défaut', prix_asc: 'Prix croissant', prix_desc: 'Prix décroissant', nom: 'Nom (A-Z)' };
+let triDropdownOuvert = false;
 const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺', materiel:'🕹️' }[p] || '🎮');
 const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps', materiel:'Accessoires Gaming' }[p] || p);
 const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming', materiel:'card-badge-materiel' }[p] || 'card-badge-pc');
@@ -662,19 +664,27 @@ function renderCatalogue(filter = currentFilter) {
         <button class="type-tab ${currentType === 'points' ? 'active' : ''}" onclick="setType('points')">🪙 Points</button>
       </div>` : ''}
       <div style="padding:0 16px 10px;max-width:1200px;margin:0 auto;position:relative">
-        <button onclick="toggleFiltrePanel()" style="display:inline-flex;align-items:center;gap:6px;background:var(--bg2,#18181f);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:20px;padding:8px 16px;font-size:13px;cursor:pointer;position:relative">
-          ⚙️ Filtres
-          ${nbFiltresActifs > 0 ? `<span style="background:var(--gold,#f5a623);color:#000;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center">${nbFiltresActifs}</span>` : ''}
+        <button onclick="toggleFiltrePanel()" style="position:relative;width:44px;height:44px;border-radius:50%;background:var(--bg2,#18181f);border:1px solid var(--border,#2b2b3a);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--text,#e6e6f0)" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="var(--bg2,#18181f)"/>
+            <line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="var(--bg2,#18181f)"/>
+            <line x1="4" y1="18" x2="20" y2="18"/><circle cx="11" cy="18" r="2" fill="var(--bg2,#18181f)"/>
+          </svg>
+          ${nbFiltresActifs > 0 ? `<span style="position:absolute;top:-3px;right:-3px;background:var(--gold,#f5a623);color:#000;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center">${nbFiltresActifs}</span>` : ''}
         </button>
         ${filtrePanelOuvert ? `
         <div style="margin-top:8px;background:var(--bg2,#18181f);border:1px solid var(--border,#2b2b3a);border-radius:14px;padding:18px;max-width:340px">
           <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Trier par</div>
-          <select id="filtre-tri" style="width:100%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:14px">
-            <option value="defaut" ${currentSort === 'defaut' ? 'selected' : ''}>Par défaut</option>
-            <option value="prix_asc" ${currentSort === 'prix_asc' ? 'selected' : ''}>Prix croissant</option>
-            <option value="prix_desc" ${currentSort === 'prix_desc' ? 'selected' : ''}>Prix décroissant</option>
-            <option value="nom" ${currentSort === 'nom' ? 'selected' : ''}>Nom (A-Z)</option>
-          </select>
+          <div style="position:relative;margin-bottom:14px">
+            <button onclick="toggleTriDropdown()" style="width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer">
+              <span>${LABELS_TRI[currentSort]}</span><span style="color:var(--muted2,#9a9ab8)">▾</span>
+            </button>
+            ${triDropdownOuvert ? `
+            <div style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden;z-index:10">
+              ${Object.entries(LABELS_TRI).map(([val, label]) => `
+                <div onclick="choisirTri('${val}')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentSort === val ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentSort === val ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentSort === val ? '700' : '400'}">${label}</div>`).join('')}
+            </div>` : ''}
+          </div>
           <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Budget (FCFA)</div>
           <div style="position:relative;height:32px;margin:6px 0 4px">
             <div style="position:absolute;top:14px;left:0;right:0;height:4px;background:var(--border,#2b2b3a);border-radius:2px"></div>
@@ -784,6 +794,17 @@ function toggleFiltrePanel() {
   renderCatalogue(currentFilter);
 }
 
+function toggleTriDropdown() {
+  triDropdownOuvert = !triDropdownOuvert;
+  renderCatalogue(currentFilter);
+}
+
+function choisirTri(val) {
+  currentSort = val;
+  triDropdownOuvert = false;
+  renderCatalogue(currentFilter);
+}
+
 function majSliderVisuel() {
   const minEl = document.getElementById('filtre-prix-min');
   const maxEl = document.getElementById('filtre-prix-max');
@@ -802,7 +823,6 @@ function appliquerFiltres() {
   const maxEl = document.getElementById('filtre-prix-max');
   currentPriceMin = minEl ? parseInt(minEl.value) : null;
   currentPriceMax = maxEl ? parseInt(maxEl.value) : null;
-  currentSort = document.getElementById('filtre-tri')?.value || 'defaut';
   filtrePanelOuvert = false;
   renderCatalogue(currentFilter);
 }
