@@ -468,6 +468,8 @@ let searchTimeout = null;
 const fmt = n => (n || 0).toLocaleString('fr-FR');
 const LABELS_TRI = { defaut: 'Par défaut', prix_asc: 'Prix croissant', prix_desc: 'Prix décroissant', nom: 'Nom (A-Z)' };
 let triDropdownOuvert = false;
+let currentGenre = 'all';
+let genreDropdownOuvert = false;
 const pEmoji = p => ({ psn:'🎮', xbox:'🕹️', pc:'🖥️', nintendo:'🔴', streaming:'📺', materiel:'🕹️' }[p] || '🎮');
 const pLabel = p => ({ psn:'PlayStation', xbox:'Xbox', pc:'PC', nintendo:'Nintendo', streaming:'Streaming & Apps', materiel:'Accessoires Gaming' }[p] || p);
 const pBadgeClass = p => ({ psn:'card-badge-psn', xbox:'card-badge-xbox', pc:'card-badge-pc', nintendo:'card-badge-nintendo', streaming:'card-badge-streaming', materiel:'card-badge-materiel' }[p] || 'card-badge-pc');
@@ -636,11 +638,17 @@ function renderCatalogue(filter = currentFilter) {
     // trouver ceux dans son budget.
     if (currentPriceMin != null) filtered = filtered.filter(p => p.prix >= currentPriceMin);
     if (currentPriceMax != null) filtered = filtered.filter(p => p.prix <= currentPriceMax);
+    // Genres disponibles calculés sur toute la plateforme (pas juste ce qui reste après les autres
+    // filtres), pour que la liste de genres proposée ne se réduise pas au fil des sélections.
+    const genresDisponibles = [...new Set(list.flatMap(p => (p.genres || '').split(',').map(g => g.trim()).filter(Boolean)))].sort();
+    if (currentGenre !== 'all') {
+      filtered = filtered.filter(p => (p.genres || '').toLowerCase().split(',').map(g => g.trim()).includes(currentGenre.toLowerCase()));
+    }
     if (currentSort === 'prix_asc') filtered = [...filtered].sort((a, b) => a.prix - b.prix);
     else if (currentSort === 'prix_desc') filtered = [...filtered].sort((a, b) => b.prix - a.prix);
     else if (currentSort === 'nom') filtered = [...filtered].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
 
-    const nbFiltresActifs = (currentSort !== 'defaut' ? 1 : 0) + (currentPriceMin != null || currentPriceMax != null ? 1 : 0);
+    const nbFiltresActifs = (currentSort !== 'defaut' ? 1 : 0) + (currentPriceMin != null || currentPriceMax != null ? 1 : 0) + (currentGenre !== 'all' ? 1 : 0);
     const prixMaxCatalogue = Math.max(1000, ...list.map(p => p.prix || 0));
 
     cat.innerHTML = `
@@ -685,6 +693,19 @@ function renderCatalogue(filter = currentFilter) {
                 <div onclick="choisirTri('${val}')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentSort === val ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentSort === val ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentSort === val ? '700' : '400'}">${label}</div>`).join('')}
             </div>` : ''}
           </div>
+          ${genresDisponibles.length ? `
+          <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Genre</div>
+          <div style="position:relative;margin-bottom:14px">
+            <button onclick="toggleGenreDropdown()" style="width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer">
+              <span>${currentGenre === 'all' ? 'Tous les genres' : esc(currentGenre)}</span><span style="color:var(--muted2,#9a9ab8)">▾</span>
+            </button>
+            ${genreDropdownOuvert ? `
+            <div style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden;z-index:10;max-height:240px;overflow-y:auto">
+              <div onclick="choisirGenre('all')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentGenre === 'all' ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentGenre === 'all' ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentGenre === 'all' ? '700' : '400'}">Tous les genres</div>
+              ${genresDisponibles.map(g => `
+                <div onclick="choisirGenre('${esc(g)}')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentGenre === g ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentGenre === g ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentGenre === g ? '700' : '400'}">${g}</div>`).join('')}
+            </div>` : ''}
+          </div>` : ''}
           <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Budget (FCFA)</div>
           <div style="position:relative;height:32px;margin:6px 0 4px">
             <div style="position:absolute;top:14px;left:0;right:0;height:4px;background:var(--border,#2b2b3a);border-radius:2px"></div>
@@ -805,6 +826,17 @@ function choisirTri(val) {
   renderCatalogue(currentFilter);
 }
 
+function toggleGenreDropdown() {
+  genreDropdownOuvert = !genreDropdownOuvert;
+  renderCatalogue(currentFilter);
+}
+
+function choisirGenre(g) {
+  currentGenre = g;
+  genreDropdownOuvert = false;
+  renderCatalogue(currentFilter);
+}
+
 function majSliderVisuel() {
   const minEl = document.getElementById('filtre-prix-min');
   const maxEl = document.getElementById('filtre-prix-max');
@@ -831,6 +863,7 @@ function reinitialiserFiltres() {
   currentPriceMin = null;
   currentPriceMax = null;
   currentSort = 'defaut';
+  currentGenre = 'all';
   filtrePanelOuvert = false;
   renderCatalogue(currentFilter);
 }
