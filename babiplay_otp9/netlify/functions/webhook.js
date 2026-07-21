@@ -17,8 +17,36 @@ exports.handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body);
-    console.log('📥 Webhook PayDunya reçu:', JSON.stringify(body));
+    // La documentation PayDunya indique que leur notification de paiement (callback IPN) arrive
+    // en application/x-www-form-urlencoded, mais certains comptes/versions renvoient du JSON —
+    // on gère les deux pour ne jamais planter silencieusement sur un vrai paiement reçu.
+    const contentType = event.headers['content-type'] || event.headers['Content-Type'] || '';
+    console.log('📥 Webhook PayDunya reçu — content-type:', contentType);
+    console.log('📥 Corps brut reçu:', event.body);
+
+    let body;
+    if (contentType.includes('application/json')) {
+      body = JSON.parse(event.body);
+    } else {
+      // Parse le format x-www-form-urlencoded, y compris les clés imbriquées type "data[token]"
+      const params = new URLSearchParams(event.body);
+      body = {};
+      for (const [key, value] of params.entries()) {
+        const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
+        if (match) {
+          const [, parent, child] = match;
+          body[parent] = body[parent] || {};
+          body[parent][child] = value;
+        } else {
+          body[key] = value;
+        }
+      }
+      // Si tout le corps était en fait un unique bloc JSON envoyé avec ce content-type, on retente en JSON
+      if (Object.keys(body).length === 0 && event.body) {
+        try { body = JSON.parse(event.body); } catch (e) { /* on garde body tel quel */ }
+      }
+    }
+    console.log('📥 Corps interprété:', JSON.stringify(body));
 
     const statut = body.status || body.data?.status;
     if (statut !== 'completed') {
