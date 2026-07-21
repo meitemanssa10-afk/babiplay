@@ -437,6 +437,8 @@ let promoApplied = null;
 let currentFilter = 'all';
 let currentSousConsole = 'all';
 let currentType = 'tous';
+let currentSort = 'defaut';
+let currentPriceRange = 'all';
 let sliderProds = [], sliderIdx = 0, sliderTimer = null, activeBanners = [], slidesCount = 0;
 let searchTimeout = null;
 
@@ -621,6 +623,16 @@ function renderCatalogue(filter = currentFilter) {
     else if (currentType === 'points') filtered = filtered.filter(p => p.sous_categorie === 'Points');
     else if (currentType === 'precommandes') filtered = filtered.filter(p => p.est_precommande);
 
+    // Fourchette de prix : aide le client à ne pas devoir parcourir des centaines d'articles pour
+    // trouver ceux dans son budget.
+    if (currentPriceRange !== 'all') {
+      const [min, max] = currentPriceRange.split('-').map(Number);
+      filtered = filtered.filter(p => p.prix >= min && (max ? p.prix <= max : true));
+    }
+    if (currentSort === 'prix_asc') filtered = [...filtered].sort((a, b) => a.prix - b.prix);
+    else if (currentSort === 'prix_desc') filtered = [...filtered].sort((a, b) => b.prix - a.prix);
+    else if (currentSort === 'nom') filtered = [...filtered].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+
     cat.innerHTML = `
       <div class="cat-hero">
         <h1>${pLabel(filter)}</h1>
@@ -641,6 +653,19 @@ function renderCatalogue(filter = currentFilter) {
         <button class="type-tab ${currentType === 'abonnements' ? 'active' : ''}" onclick="setType('abonnements')">⭐ Abonnements</button>
         <button class="type-tab ${currentType === 'points' ? 'active' : ''}" onclick="setType('points')">🪙 Points</button>
       </div>` : ''}
+      <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 16px 12px;max-width:1200px;margin:0 auto">
+        <select onchange="setSort(this.value)" style="background:var(--bg2,#18181f);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:8px 12px;font-size:13px">
+          <option value="defaut" ${currentSort === 'defaut' ? 'selected' : ''}>Trier par...</option>
+          <option value="prix_asc" ${currentSort === 'prix_asc' ? 'selected' : ''}>Prix croissant</option>
+          <option value="prix_desc" ${currentSort === 'prix_desc' ? 'selected' : ''}>Prix décroissant</option>
+          <option value="nom" ${currentSort === 'nom' ? 'selected' : ''}>Nom (A-Z)</option>
+        </select>
+        <button class="subcon-chip ${currentPriceRange === 'all' ? 'active' : ''}" onclick="setPriceRange('all')">Tous les prix</button>
+        <button class="subcon-chip ${currentPriceRange === '0-20000' ? 'active' : ''}" onclick="setPriceRange('0-20000')">Moins de 20 000 FCFA</button>
+        <button class="subcon-chip ${currentPriceRange === '20000-50000' ? 'active' : ''}" onclick="setPriceRange('20000-50000')">20 000 - 50 000 FCFA</button>
+        <button class="subcon-chip ${currentPriceRange === '50000-100000' ? 'active' : ''}" onclick="setPriceRange('50000-100000')">50 000 - 100 000 FCFA</button>
+        <button class="subcon-chip ${currentPriceRange === '100000-0' ? 'active' : ''}" onclick="setPriceRange('100000-0')">Plus de 100 000 FCFA</button>
+      </div>
       <div class="section-block">
         <div class="section-head">
           <span style="font-size:12px;color:var(--muted2)">${filtered.length} article${filtered.length > 1 ? 's' : ''}</span>
@@ -722,6 +747,16 @@ function setSousConsole(c) {
 
 function setType(t) {
   currentType = t;
+  renderCatalogue(currentFilter);
+}
+
+function setSort(s) {
+  currentSort = s;
+  renderCatalogue(currentFilter);
+}
+
+function setPriceRange(r) {
+  currentPriceRange = r;
   renderCatalogue(currentFilter);
 }
 
