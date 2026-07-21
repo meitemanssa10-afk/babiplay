@@ -46,6 +46,19 @@ exports.handler = async (event) => {
       if (Object.keys(body).length === 0 && event.body) {
         try { body = JSON.parse(event.body); } catch (e) { /* on garde body tel quel */ }
       }
+      // Le format x-www-form-urlencoded transforme nos listes (ex: custom_data.articles, envoyé
+      // comme un tableau JSON au départ) en objets à clés numériques ("0","1","2"...) au lieu de
+      // vraies listes JS — sans cette étape, Array.isArray(customData.articles) renvoie toujours
+      // false et aucune commande n'est jamais créée, même quand tout le reste fonctionne.
+      const arrayify = (val) => {
+        if (val === null || typeof val !== 'object') return val;
+        const keys = Object.keys(val);
+        const estListe = keys.length > 0 && keys.every((k, i) => k === String(i));
+        const entries = keys.map(k => [k, arrayify(val[k])]);
+        if (estListe) return entries.map(([, v]) => v);
+        return Object.fromEntries(entries);
+      };
+      body = arrayify(body);
     }
     console.log('📥 Corps interprété:', JSON.stringify(body));
 
