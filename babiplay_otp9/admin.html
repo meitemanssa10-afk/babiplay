@@ -214,6 +214,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <button class="nav-item active" onclick="showSection('dashboard')"><span class="icon">📊</span> Tableau de bord</button>
       <button class="nav-item" onclick="showSection('produits')"><span class="icon">🎮</span> Produits</button>
       <button class="nav-item" onclick="showSection('bannieres')"><span class="icon">🎬</span> Bannières</button>
+      <button class="nav-item" onclick="showSection('audit')"><span class="icon">🔍</span> Audit catalogue</button>
       <button class="nav-item" onclick="showSection('codes')"><span class="icon">🔑</span> Codes de jeu</button>
       <button class="nav-item" onclick="showSection('commandes')"><span class="icon">📦</span> Commandes <span class="nav-badge" id="badge-commandes">0</span></button>
       <button class="nav-item" onclick="showSection('clients')"><span class="icon">👥</span> Clients</button>
@@ -281,6 +282,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <table><thead><tr><th>Aperçu</th><th>Titre</th><th>Lien</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr></thead>
         <tbody id="banners-tbody"></tbody></table>
       </div>
+    </div>
+
+    <!-- AUDIT CATALOGUE -->
+    <div class="section" id="section-audit">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1>🔍 Audit catalogue</h1><p>Vérifie tous les produits face au vrai catalogue Kinguin actuel</p></div>
+        <button class="btn btn-primary" id="audit-btn" onclick="lancerAudit()">▶️ Lancer une vérification</button>
+      </div>
+      <div class="table-wrap" style="margin-bottom:20px">
+        <div style="padding:20px;font-size:13px;color:var(--muted2);line-height:1.8">
+          Cette vérification parcourt <strong style="color:var(--text)">tout</strong> le catalogue Kinguin actuel (peut prendre plusieurs minutes) et :<br>
+          ✅ Recalcule les prix selon le vrai coût Kinguin du moment<br>
+          🚫 Désactive automatiquement les produits dont l'ID Kinguin n'existe plus (évite les commandes qui échouent, comme celle du 21/07)<br>
+          ⚠️ Signale les petites cartes cadeaux (≤5€) structurellement peu rentables, pour ta revue manuelle<br><br>
+          <strong style="color:var(--gold)">Le résultat n'apparaît pas tout de suite</strong> — la vérification tourne en arrière-plan sur le serveur. Reviens sur cette page dans quelques minutes et clique "🔄 Actualiser" pour voir le rapport.
+        </div>
+      </div>
+      <div id="audit-resultat"></div>
     </div>
 
     <!-- CODES -->
@@ -844,6 +863,7 @@ async function showAdmin(){
   await loadDashboard();
   await loadProducts();
   await loadBanners();
+  await loadAuditRapport();
   await loadOrders();
   await loadClients();
   await loadPromos();
@@ -1157,6 +1177,65 @@ async function saveBanner(){
 async function toggleBanner(id,current){
   await sb.from('banners').update({est_actif:!current}).eq('id',id);
   await loadBanners();showToast(current?'Bannière désactivée':'Bannière activée','ok');
+}
+
+// ============================================================
+// AUDIT CATALOGUE
+// ============================================================
+// Même secret que la variable d'environnement IMPORT_SECRET définie sur Render pour l'agent —
+// remplace la valeur ci-dessous par celle que tu as choisie côté Render, les deux doivent être identiques.
+const AGENT_SECRET='babiplay2026audit';
+const AGENT_URL='https://babiplay-agent.onrender.com';
+
+async function lancerAudit(){
+  const btn=document.getElementById('audit-btn');
+  btn.disabled=true;btn.textContent='⏳ Démarrage...';
+  try{
+    const res=await fetch(`${AGENT_URL}/fix-kinguin-products?secret=${AGENT_SECRET}`);
+    const texte=await res.text();
+    showToast(res.ok?'✅ Vérification démarrée en arrière-plan !':'Erreur : '+texte,res.ok?'ok':'err');
+  }catch(e){
+    showToast('Erreur de connexion à l\'agent : '+e.message,'err');
+  }finally{
+    btn.disabled=false;btn.textContent='▶️ Lancer une vérification';
+  }
+}
+
+async function loadAuditRapport(){
+  const{data}=await sb.from('audit_rapports').select('*').order('created_at',{ascending:false}).limit(1);
+  renderAuditRapport(data&&data[0]?data[0]:null);
+}
+
+function renderAuditRapport(rapport){
+  const el=document.getElementById('audit-resultat');
+  const boutonActualiser=`<button class="btn btn-secondary btn-sm" onclick="loadAuditRapport()" style="margin-bottom:14px">🔄 Actualiser</button>`;
+  if(!rapport){
+    el.innerHTML=boutonActualiser+'<div class="empty"><div class="empty-icon">🔍</div><p>Aucune vérification effectuée pour l\'instant</p></div>';
+    return;
+  }
+  const introuvables=rapport.produits_introuvables||[];
+  const petitesCartes=rapport.petites_cartes_a_surveiller||[];
+  el.innerHTML=`
+    ${boutonActualiser}
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card"><div class="stat-label">Produits vérifiés</div><div class="stat-value">${rapport.total_verifies||0}</div></div>
+      <div class="stat-card"><div class="stat-label">ID introuvables (désactivés)</div><div class="stat-value" style="color:#ff6b6b">${rapport.introuvables_count||0}</div></div>
+      <div class="stat-card"><div class="stat-label">Petites cartes à surveiller</div><div class="stat-value" style="color:var(--gold)">${petitesCartes.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Dernière vérification</div><div class="stat-value" style="font-size:16px">${new Date(rapport.created_at).toLocaleString('fr-FR')}</div></div>
+    </div>
+    ${introuvables.length?`
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head"><h3>🚫 Produits désactivés (ID Kinguin introuvable)</h3></div>
+      <table><thead><tr><th>Nom</th><th>ID Kinguin</th><th>Prix (avant désactivation)</th></tr></thead>
+      <tbody>${introuvables.map(p=>`<tr><td>${esc(p.nom)}</td><td style="font-size:11px;color:var(--muted2)">${esc(p.kinguin_product_id)}</td><td>${fmt(p.prix_actuel_fcfa)} FCFA</td></tr>`).join('')}</tbody></table>
+    </div>`:''}
+    ${petitesCartes.length?`
+    <div class="table-wrap">
+      <div class="table-head"><h3>⚠️ Petites cartes cadeaux à revoir manuellement (≤5€)</h3></div>
+      <table><thead><tr><th>Nom</th><th>Valeur faciale</th><th>Coût Kinguin</th><th>Prix de vente actuel</th></tr></thead>
+      <tbody>${petitesCartes.map(c=>`<tr><td>${esc(c.nom)}</td><td>${c.montant_facial_eur}€</td><td>${c.prix_kinguin_eur}€</td><td>${fmt(c.prix_vente_fcfa)} FCFA</td></tr>`).join('')}</tbody></table>
+    </div>`:''}
+  `;
 }
 
 // ============================================================
