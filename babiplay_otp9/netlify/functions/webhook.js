@@ -28,18 +28,19 @@ exports.handler = async (event) => {
     if (contentType.includes('application/json')) {
       body = JSON.parse(event.body);
     } else {
-      // Parse le format x-www-form-urlencoded, y compris les clés imbriquées type "data[token]"
+      // Parse le format x-www-form-urlencoded, avec des clés imbriquées à profondeur libre
+      // (ex: "data[invoice][token]=xxx" doit devenir body.data.invoice.token = "xxx").
       const params = new URLSearchParams(event.body);
       body = {};
       for (const [key, value] of params.entries()) {
-        const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
-        if (match) {
-          const [, parent, child] = match;
-          body[parent] = body[parent] || {};
-          body[parent][child] = value;
-        } else {
-          body[key] = value;
+        const parts = key.match(/[^\[\]]+/g); // ex: "data[invoice][token]" -> ["data","invoice","token"]
+        if (!parts) continue;
+        let cursor = body;
+        for (let i = 0; i < parts.length - 1; i++) {
+          cursor[parts[i]] = cursor[parts[i]] || {};
+          cursor = cursor[parts[i]];
         }
+        cursor[parts[parts.length - 1]] = value;
       }
       // Si tout le corps était en fait un unique bloc JSON envoyé avec ce content-type, on retente en JSON
       if (Object.keys(body).length === 0 && event.body) {
@@ -53,7 +54,10 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ message: 'Statut ignoré' }) };
     }
 
-    const token = body.token || body.data?.token || null;
+    // Le jeton de transaction est niché sous data.invoice.token dans la vraie réponse PayDunya
+    // (leur documentation officielle le confirme) — on garde aussi les anciens emplacements en
+    // secours, au cas où le format évoluerait encore.
+    const token = body.token || body.data?.token || body.data?.invoice?.token || body.invoice?.token || null;
 
     // Sans cette étape, n'importe qui connaissant l'adresse de ce webhook pourrait envoyer une
     // fausse notification "paiement réussi" et recevoir un vrai code gratuitement. On ne fait
@@ -95,7 +99,7 @@ exports.handler = async (event) => {
           order_id: customData.order_id,
           product_id: customData.product_id,
           produit_nom: customData.produit_nom,
-          prix: body.amount || body.data?.amount || 0
+          prix: body.amount || body.data?.amount || body.data?.invoice?.total_amount || 0
         }] : []);
 
     if (!articles.length) {
