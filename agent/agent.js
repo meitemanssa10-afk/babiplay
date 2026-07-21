@@ -174,7 +174,9 @@ setInterval(async () => {
 // ═════════════════════════════════════════════════════════════
 // IMPORT DU CATALOGUE — PLAFONNÉ PAR CATÉGORIE (100 max chacune)
 // ═════════════════════════════════════════════════════════════
-const IMPORT_SECRET = crypto.randomBytes(8).toString('hex');
+// Fixe (variable d'environnement) plutôt qu'aléatoire : sans ça, le secret changeait à chaque
+// redémarrage du serveur Render, rendant impossible tout appel fiable depuis admin.html.
+const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
 console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}`);
 console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
@@ -648,10 +650,12 @@ async function runFixKinguinProducts() {
       if (idsVersJeux.length) console.log(`🔀 ${idsVersJeux.length} produit(s) reclassé(s) de "Cartes cadeaux" vers "Jeux".`);
     }
 
-    const { data, error } = await supabase.from('products').select('id, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
+    const { data, error } = await supabase.from('products').select('id, nom, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
     if (error) throw new Error('Lecture produits: ' + error.message);
     const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
     console.log(`   ${existingMap.size} produit(s) à corriger.`);
+    const idsTrouves = new Set();
+    const petitesCartesASurveiller = [];
     let page = 1, totalCount = null, totalCorriges = 0;
     while (true) {
       let pageData;
@@ -663,6 +667,7 @@ async function runFixKinguinProducts() {
       for (const product of results) {
         const row = existingMap.get(product.productId);
         if (!row) continue;
+        idsTrouves.add(product.productId);
         if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
           await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
           totalCorriges++;
@@ -693,6 +698,12 @@ async function runFixKinguinProducts() {
               totalCorriges++;
               continue;
             }
+            // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
+            // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
+            // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
+            if (montant <= 5) {
+              petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
+            }
           }
         }
 
@@ -722,6 +733,30 @@ async function runFixKinguinProducts() {
       page++;
       await sleep(300);
     }
+
+    // Un ID Kinguin qu'on suit mais qui n'apparaît nulle part dans le catalogue Kinguin actuel =
+    // produit invendable (l'agent échouera à chaque tentative d'achat, exactement comme la carte
+    // PSN 5€ qui a bloqué une vraie commande cliente). On le désactive et on le signale clairement.
+    const idsIntrouvablesArr = [...existingMap.keys()].filter(id => !idsTrouves.has(id));
+    const produitsIntrouvables = idsIntrouvablesArr.map(id => existingMap.get(id));
+    if (produitsIntrouvables.length) {
+      for (let i = 0; i < produitsIntrouvables.length; i += 200) {
+        const lot = produitsIntrouvables.slice(i, i + 200).map(p => p.id);
+        await supabase.from('products').update({ est_actif: false }).in('id', lot);
+      }
+      console.log(`🚫 ${produitsIntrouvables.length} produit(s) avec un ID Kinguin introuvable — désactivé(s).`);
+    }
+
+    await supabase.from('audit_rapports').insert({
+      total_verifies: existingMap.size,
+      introuvables_count: produitsIntrouvables.length,
+      desactives_count: totalCorriges,
+      corriges_count: totalCorriges,
+      produits_introuvables: produitsIntrouvables.map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id, prix_actuel_fcfa: p.prix })),
+      petites_cartes_a_surveiller: petitesCartesASurveiller
+    });
+    console.log(`📋 Rapport d'audit enregistré : ${produitsIntrouvables.length} introuvable(s), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
+
     console.log(`✅ Correction terminée ! ${totalCorriges} produits mis à jour.`);
   } catch (e) {
     console.error('❌ Erreur fatale correction:', e);
@@ -735,6 +770,12 @@ async function runFixKinguinProducts() {
 // ─────────────────────────────────────────────
 const http = require('http');
 http.createServer((req, res) => {
+  // Sans ces en-têtes, le navigateur bloque la réponse quand admin.html (un autre domaine)
+  // appelle cet agent directement — même si la requête elle-même aboutit bien côté serveur.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
   const url = new URL(req.url, 'http://localhost');
   const secret = url.searchParams.get('secret');
 
