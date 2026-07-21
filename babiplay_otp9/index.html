@@ -72,6 +72,11 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .cat-hero p{font-size:13px;color:var(--muted2);margin-top:6px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6}
 .subcon-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:16px 16px 0}
 .subcon-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:6px 16px;border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;white-space:nowrap}
+.slider-doubleprix{-webkit-appearance:none;appearance:none;background:transparent;pointer-events:none}
+.slider-doubleprix::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--gold,#f5a623);cursor:pointer;pointer-events:auto}
+.slider-doubleprix::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--gold,#f5a623);cursor:pointer;pointer-events:auto}
+.slider-doubleprix::-webkit-slider-runnable-track{background:transparent;height:4px}
+.slider-doubleprix::-moz-range-track{background:transparent;height:4px}
 .subcon-chip.active{border-color:var(--fc,var(--gold));color:var(--text);background:var(--bg4)}
 .type-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;padding:16px 16px 20px;border-bottom:1px solid var(--border);margin-top:8px}
 .type-tab{background:none;border:none;color:var(--muted2);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:4px 0;border-bottom:2px solid transparent;transition:all .2s}
@@ -634,6 +639,7 @@ function renderCatalogue(filter = currentFilter) {
     else if (currentSort === 'nom') filtered = [...filtered].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
 
     const nbFiltresActifs = (currentSort !== 'defaut' ? 1 : 0) + (currentPriceMin != null || currentPriceMax != null ? 1 : 0);
+    const prixMaxCatalogue = Math.max(1000, ...list.map(p => p.prix || 0));
 
     cat.innerHTML = `
       <div class="cat-hero">
@@ -670,10 +676,13 @@ function renderCatalogue(filter = currentFilter) {
             <option value="nom" ${currentSort === 'nom' ? 'selected' : ''}>Nom (A-Z)</option>
           </select>
           <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Budget (FCFA)</div>
-          <div style="display:flex;gap:8px;margin-bottom:16px">
-            <input type="number" id="filtre-prix-min" placeholder="Min" value="${currentPriceMin ?? ''}" style="width:50%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 10px;font-size:13px">
-            <input type="number" id="filtre-prix-max" placeholder="Max" value="${currentPriceMax ?? ''}" style="width:50%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 10px;font-size:13px">
+          <div style="position:relative;height:32px;margin:6px 0 4px">
+            <div style="position:absolute;top:14px;left:0;right:0;height:4px;background:var(--border,#2b2b3a);border-radius:2px"></div>
+            <div id="filtre-slider-fill" style="position:absolute;top:14px;height:4px;background:var(--gold,#f5a623);border-radius:2px"></div>
+            <input type="range" class="slider-doubleprix" id="filtre-prix-min" min="0" max="${prixMaxCatalogue}" step="500" value="${currentPriceMin ?? 0}" oninput="majSliderVisuel()" style="position:absolute;width:100%;top:0;height:32px;margin:0;left:0">
+            <input type="range" class="slider-doubleprix" id="filtre-prix-max" min="0" max="${prixMaxCatalogue}" step="500" value="${currentPriceMax ?? prixMaxCatalogue}" oninput="majSliderVisuel()" style="position:absolute;width:100%;top:0;height:32px;margin:0;left:0">
           </div>
+          <div id="filtre-prix-texte" style="text-align:center;font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:16px">Entre ${fmt(currentPriceMin ?? 0)} et ${currentPriceMax != null ? fmt(currentPriceMax) : fmt(prixMaxCatalogue)} FCFA</div>
           <div style="display:flex;gap:8px">
             <button onclick="reinitialiserFiltres()" style="flex:1;background:transparent;color:var(--muted2,#9a9ab8);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px;font-size:13px;cursor:pointer">Réinitialiser</button>
             <button onclick="appliquerFiltres()" style="flex:1;background:var(--gold,#f5a623);color:#000;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">Appliquer</button>
@@ -688,6 +697,7 @@ function renderCatalogue(filter = currentFilter) {
           ? `<div class="prod-grid">${filtered.map(cardHtml).join('')}</div>`
           : '<div class="empty-state">Aucun produit dans cette catégorie pour le moment.</div>'}
       </div>`;
+    if (filtrePanelOuvert) setTimeout(majSliderVisuel, 0);
     return;
   }
 
@@ -774,11 +784,24 @@ function toggleFiltrePanel() {
   renderCatalogue(currentFilter);
 }
 
+function majSliderVisuel() {
+  const minEl = document.getElementById('filtre-prix-min');
+  const maxEl = document.getElementById('filtre-prix-max');
+  if (!minEl || !maxEl) return;
+  let minVal = parseInt(minEl.value), maxVal = parseInt(maxEl.value);
+  if (minVal > maxVal) { [minVal, maxVal] = [maxVal, minVal]; minEl.value = minVal; maxEl.value = maxVal; }
+  const bound = parseInt(minEl.max) || 1;
+  const fill = document.getElementById('filtre-slider-fill');
+  if (fill) { fill.style.left = (minVal / bound * 100) + '%'; fill.style.width = ((maxVal - minVal) / bound * 100) + '%'; }
+  const texte = document.getElementById('filtre-prix-texte');
+  if (texte) texte.textContent = `Entre ${fmt(minVal)} et ${fmt(maxVal)} FCFA`;
+}
+
 function appliquerFiltres() {
-  const min = document.getElementById('filtre-prix-min')?.value;
-  const max = document.getElementById('filtre-prix-max')?.value;
-  currentPriceMin = min ? parseInt(min) : null;
-  currentPriceMax = max ? parseInt(max) : null;
+  const minEl = document.getElementById('filtre-prix-min');
+  const maxEl = document.getElementById('filtre-prix-max');
+  currentPriceMin = minEl ? parseInt(minEl.value) : null;
+  currentPriceMax = maxEl ? parseInt(maxEl.value) : null;
   currentSort = document.getElementById('filtre-tri')?.value || 'defaut';
   filtrePanelOuvert = false;
   renderCatalogue(currentFilter);
