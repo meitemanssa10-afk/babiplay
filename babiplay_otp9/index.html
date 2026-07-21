@@ -438,7 +438,9 @@ let currentFilter = 'all';
 let currentSousConsole = 'all';
 let currentType = 'tous';
 let currentSort = 'defaut';
-let currentPriceRange = 'all';
+let currentPriceMin = null;
+let currentPriceMax = null;
+let filtrePanelOuvert = false;
 let sliderProds = [], sliderIdx = 0, sliderTimer = null, activeBanners = [], slidesCount = 0;
 let searchTimeout = null;
 
@@ -625,13 +627,13 @@ function renderCatalogue(filter = currentFilter) {
 
     // Fourchette de prix : aide le client à ne pas devoir parcourir des centaines d'articles pour
     // trouver ceux dans son budget.
-    if (currentPriceRange !== 'all') {
-      const [min, max] = currentPriceRange.split('-').map(Number);
-      filtered = filtered.filter(p => p.prix >= min && (max ? p.prix <= max : true));
-    }
+    if (currentPriceMin != null) filtered = filtered.filter(p => p.prix >= currentPriceMin);
+    if (currentPriceMax != null) filtered = filtered.filter(p => p.prix <= currentPriceMax);
     if (currentSort === 'prix_asc') filtered = [...filtered].sort((a, b) => a.prix - b.prix);
     else if (currentSort === 'prix_desc') filtered = [...filtered].sort((a, b) => b.prix - a.prix);
     else if (currentSort === 'nom') filtered = [...filtered].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+
+    const nbFiltresActifs = (currentSort !== 'defaut' ? 1 : 0) + (currentPriceMin != null || currentPriceMax != null ? 1 : 0);
 
     cat.innerHTML = `
       <div class="cat-hero">
@@ -653,18 +655,30 @@ function renderCatalogue(filter = currentFilter) {
         <button class="type-tab ${currentType === 'abonnements' ? 'active' : ''}" onclick="setType('abonnements')">⭐ Abonnements</button>
         <button class="type-tab ${currentType === 'points' ? 'active' : ''}" onclick="setType('points')">🪙 Points</button>
       </div>` : ''}
-      <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 16px 12px;max-width:1200px;margin:0 auto">
-        <select onchange="setSort(this.value)" style="background:var(--bg2,#18181f);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:8px 12px;font-size:13px">
-          <option value="defaut" ${currentSort === 'defaut' ? 'selected' : ''}>Trier par...</option>
-          <option value="prix_asc" ${currentSort === 'prix_asc' ? 'selected' : ''}>Prix croissant</option>
-          <option value="prix_desc" ${currentSort === 'prix_desc' ? 'selected' : ''}>Prix décroissant</option>
-          <option value="nom" ${currentSort === 'nom' ? 'selected' : ''}>Nom (A-Z)</option>
-        </select>
-        <button class="subcon-chip ${currentPriceRange === 'all' ? 'active' : ''}" onclick="setPriceRange('all')">Tous les prix</button>
-        <button class="subcon-chip ${currentPriceRange === '0-20000' ? 'active' : ''}" onclick="setPriceRange('0-20000')">Moins de 20 000 FCFA</button>
-        <button class="subcon-chip ${currentPriceRange === '20000-50000' ? 'active' : ''}" onclick="setPriceRange('20000-50000')">20 000 - 50 000 FCFA</button>
-        <button class="subcon-chip ${currentPriceRange === '50000-100000' ? 'active' : ''}" onclick="setPriceRange('50000-100000')">50 000 - 100 000 FCFA</button>
-        <button class="subcon-chip ${currentPriceRange === '100000-0' ? 'active' : ''}" onclick="setPriceRange('100000-0')">Plus de 100 000 FCFA</button>
+      <div style="padding:0 16px 10px;max-width:1200px;margin:0 auto;position:relative">
+        <button onclick="toggleFiltrePanel()" style="display:inline-flex;align-items:center;gap:6px;background:var(--bg2,#18181f);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:20px;padding:8px 16px;font-size:13px;cursor:pointer;position:relative">
+          ⚙️ Filtres
+          ${nbFiltresActifs > 0 ? `<span style="background:var(--gold,#f5a623);color:#000;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center">${nbFiltresActifs}</span>` : ''}
+        </button>
+        ${filtrePanelOuvert ? `
+        <div style="margin-top:8px;background:var(--bg2,#18181f);border:1px solid var(--border,#2b2b3a);border-radius:14px;padding:18px;max-width:340px">
+          <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Trier par</div>
+          <select id="filtre-tri" style="width:100%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:14px">
+            <option value="defaut" ${currentSort === 'defaut' ? 'selected' : ''}>Par défaut</option>
+            <option value="prix_asc" ${currentSort === 'prix_asc' ? 'selected' : ''}>Prix croissant</option>
+            <option value="prix_desc" ${currentSort === 'prix_desc' ? 'selected' : ''}>Prix décroissant</option>
+            <option value="nom" ${currentSort === 'nom' ? 'selected' : ''}>Nom (A-Z)</option>
+          </select>
+          <div style="font-size:12px;color:var(--muted2,#9a9ab8);margin-bottom:6px">Budget (FCFA)</div>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <input type="number" id="filtre-prix-min" placeholder="Min" value="${currentPriceMin ?? ''}" style="width:50%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 10px;font-size:13px">
+            <input type="number" id="filtre-prix-max" placeholder="Max" value="${currentPriceMax ?? ''}" style="width:50%;background:var(--bg3,#1e1e28);color:var(--text,#e6e6f0);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px 10px;font-size:13px">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="reinitialiserFiltres()" style="flex:1;background:transparent;color:var(--muted2,#9a9ab8);border:1px solid var(--border,#2b2b3a);border-radius:8px;padding:9px;font-size:13px;cursor:pointer">Réinitialiser</button>
+            <button onclick="appliquerFiltres()" style="flex:1;background:var(--gold,#f5a623);color:#000;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">Appliquer</button>
+          </div>
+        </div>` : ''}
       </div>
       <div class="section-block">
         <div class="section-head">
@@ -755,8 +769,26 @@ function setSort(s) {
   renderCatalogue(currentFilter);
 }
 
-function setPriceRange(r) {
-  currentPriceRange = r;
+function toggleFiltrePanel() {
+  filtrePanelOuvert = !filtrePanelOuvert;
+  renderCatalogue(currentFilter);
+}
+
+function appliquerFiltres() {
+  const min = document.getElementById('filtre-prix-min')?.value;
+  const max = document.getElementById('filtre-prix-max')?.value;
+  currentPriceMin = min ? parseInt(min) : null;
+  currentPriceMax = max ? parseInt(max) : null;
+  currentSort = document.getElementById('filtre-tri')?.value || 'defaut';
+  filtrePanelOuvert = false;
+  renderCatalogue(currentFilter);
+}
+
+function reinitialiserFiltres() {
+  currentPriceMin = null;
+  currentPriceMax = null;
+  currentSort = 'defaut';
+  filtrePanelOuvert = false;
   renderCatalogue(currentFilter);
 }
 
