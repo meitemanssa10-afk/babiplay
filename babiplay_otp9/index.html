@@ -688,7 +688,7 @@ function renderCatalogue(filter = currentFilter) {
               <span>${LABELS_TRI[currentSort]}</span><span style="color:var(--muted2,#9a9ab8)">▾</span>
             </button>
             ${triDropdownOuvert ? `
-            <div style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden;z-index:10">
+            <div style="margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden">
               ${Object.entries(LABELS_TRI).map(([val, label]) => `
                 <div onclick="choisirTri('${val}')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentSort === val ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentSort === val ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentSort === val ? '700' : '400'}">${label}</div>`).join('')}
             </div>` : ''}
@@ -700,7 +700,7 @@ function renderCatalogue(filter = currentFilter) {
               <span>${currentGenre === 'all' ? 'Tous les genres' : esc(currentGenre)}</span><span style="color:var(--muted2,#9a9ab8)">▾</span>
             </button>
             ${genreDropdownOuvert ? `
-            <div style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden;z-index:10;max-height:240px;overflow-y:auto">
+            <div style="margin-top:4px;background:var(--bg3,#1e1e28);border:1px solid var(--border,#2b2b3a);border-radius:8px;overflow:hidden;max-height:240px;overflow-y:auto">
               <div onclick="choisirGenre('all')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentGenre === 'all' ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentGenre === 'all' ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentGenre === 'all' ? '700' : '400'}">Tous les genres</div>
               ${genresDisponibles.map(g => `
                 <div onclick="choisirGenre('${esc(g)}')" style="padding:10px 14px;font-size:13px;cursor:pointer;background:${currentGenre === g ? 'var(--gold,#f5a623)' : 'transparent'};color:${currentGenre === g ? '#000' : 'var(--text,#e6e6f0)'};font-weight:${currentGenre === g ? '700' : '400'}">${g}</div>`).join('')}
