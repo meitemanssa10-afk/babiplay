@@ -606,8 +606,25 @@ async function runFixKinguinProducts() {
     // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
     // différent) — d'anciens imports les ont enregistrés comme des fiches séparées. On ne garde
     // que la moins chère par (plateforme + nom), on désactive le reste.
-    const { data: produitsActifs, error: errDoublons } = await supabase.from('products')
-      .select('id, nom, plateforme, prix').eq('est_actif', true);
+    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits
+    // actifs, il faut paginer avec .range() pour tous les récupérer — sinon les doublons situés
+    // au-delà de la 1000e ligne ne sont jamais vus ni désactivés.
+    let produitsActifs = [];
+    let errDoublons = null;
+    {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from('products')
+          .select('id, nom, plateforme, prix').eq('est_actif', true)
+          .order('id', { ascending: true }).range(from, from + pageSize - 1);
+        if (error) { errDoublons = error; break; }
+        if (!data || !data.length) break;
+        produitsActifs = produitsActifs.concat(data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+    }
     let nombreDoublons = 0;
     if (errDoublons) console.error('⚠️ Erreur lecture doublons:', errDoublons.message);
     else {
