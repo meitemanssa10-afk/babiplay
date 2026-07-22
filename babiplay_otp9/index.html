@@ -498,22 +498,35 @@ async function loadProducts() {
   // produits actifs, donc on doit paginer avec .range() pour tous les récupérer — sinon les
   // catégories sans produit "populaire" (PSN Cartes cadeaux, Nintendo eShop, Streaming...)
   // se retrouvaient triées en dernier et disparaissaient complètement au-delà de la 1000e ligne.
+  // On envoie toutes les pages EN MÊME TEMPS (au lieu d'une par une) : on demande d'abord juste
+  // le nombre total de produits, puis on lance tous les .range() en parallèle avec Promise.all.
   const pageSize = 1000;
-  let from = 0;
+  const selectCols = 'id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, est_slider, slider_ordre, est_physique, delai_livraison_jours';
+
+  const countPromise = sb.from('products').select('id', { count: 'exact', head: true }).eq('est_actif', true);
+  const banPromise = sb.from('banners').select('*').eq('est_actif', true).order('ordre', { ascending: true });
+
+  const { count, error: countErr } = await countPromise;
+  if (countErr) console.error('Erreur comptage produits:', countErr.message);
+  const totalPages = Math.max(1, Math.ceil((count || pageSize) / pageSize));
+
+  const pageRequests = Array.from({ length: totalPages }, (_, i) =>
+    sb.from('products').select(selectCols).eq('est_actif', true)
+      // 'id' en tri secondaire : garantit un découpage stable entre les pages (sinon des produits
+      // à égalité sur est_populaire pourraient être sautés ou dupliqués entre deux .range() parallèles)
+      .order('est_populaire', { ascending: false }).order('id', { ascending: true })
+      .range(i * pageSize, i * pageSize + pageSize - 1)
+  );
+
+  const [pageResults, { data: banData }] = await Promise.all([Promise.all(pageRequests), banPromise]);
+
   let all = [];
-  while (true) {
-    const { data, error } = await sb.from('products')
-      .select('id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, est_slider, slider_ordre, est_physique, delai_livraison_jours')
-      .eq('est_actif', true).order('est_populaire', { ascending: false }).range(from, from + pageSize - 1);
-    if (error) { console.error('Erreur chargement produits:', error.message); break; }
-    if (!data || !data.length) break;
-    all = all.concat(data);
-    if (data.length < pageSize) break;
-    from += pageSize;
+  for (const { data, error } of pageResults) {
+    if (error) { console.error('Erreur chargement produits:', error.message); continue; }
+    if (data) all = all.concat(data);
   }
   products = all;
-  const{data:banData}=await sb.from('banners').select('*').eq('est_actif',true).order('ordre',{ascending:true});
-  activeBanners = banData||[];
+  activeBanners = banData || [];
   renderSlider();
   renderCatalogue();
 }
