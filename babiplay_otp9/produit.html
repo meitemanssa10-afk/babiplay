@@ -209,35 +209,19 @@ const STEPS = {
 
   if (!prodId) { render404(); return; }
 
-  // Supabase plafonne chaque requête à 1000 lignes par défaut ; on a plus de 4000 produits
-  // actifs, donc on pagine avec .range() pour tout récupérer (sinon les sections "Autres
-  // éditions" / "Produits similaires" pouvaient être vides pour les produits au-delà de la 1000e ligne).
-  async function loadAllActiveProducts() {
-    const pageSize = 1000;
-    let from = 0;
-    let all = [];
-    while (true) {
-      const { data, error } = await sb.from('products')
-        .select('id, nom, prix, image_url, plateforme, sous_categorie')
-        .eq('est_actif', true).range(from, from + pageSize - 1);
-      if (error) { console.error('Erreur chargement produits:', error.message); break; }
-      if (!data || !data.length) break;
-      all = all.concat(data);
-      if (data.length < pageSize) break;
-      from += pageSize;
-    }
-    return all;
-  }
-
-  const [{ data: p }, all] = await Promise.all([
-    sb.from('products').select('*').eq('id', prodId).single(),
-    loadAllActiveProducts()
-  ]);
-
+  const { data: p } = await sb.from('products').select('*').eq('id', prodId).single();
   if (!p) { render404(); return; }
   produit = p;
-  allProducts = all || [];
   document.title = p.nom + ' — BabiPlay CI';
+
+  // On ne charge que les produits de la même plateforme (au lieu du catalogue entier,
+  // 4000+ produits) : c'est le seul sous-ensemble utilisé pour "Autres éditions" et
+  // "Produits similaires" plus bas. Une seule petite requête au lieu de 5 requêtes de 1000 lignes.
+  const { data: rel, error: relErr } = await sb.from('products')
+    .select('id, nom, prix, image_url, plateforme, sous_categorie')
+    .eq('est_actif', true).eq('plateforme', p.plateforme).neq('id', prodId).limit(40);
+  if (relErr) console.error('Erreur chargement produits similaires:', relErr.message);
+  allProducts = rel || [];
   renderPage();
 })();
 
