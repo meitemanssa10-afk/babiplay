@@ -194,11 +194,6 @@ async function checkCommandes() {
 checkCommandes();
 setInterval(checkCommandes, 30000);
 
-// Audit catalogue automatique (doublons + IDs Kinguin introuvables) — plus besoin de cliquer
-// manuellement sur "Audit catalogue" dans admin.html, ça tourne tout seul toutes les heures.
-runFixKinguinProducts();
-setInterval(runFixKinguinProducts, 60 * 60 * 1000);
-
 // ─────────────────────────────────────────────
 // Auto-ping : empêche Render (plan gratuit) de s'endormir
 // ─────────────────────────────────────────────
@@ -917,3 +912,10 @@ http.createServer((req, res) => {
   res.writeHead(200);
   res.end('BabiPlay Agent (Kinguin) OK');
 }).listen(process.env.PORT || 3000);
+
+// Audit catalogue automatique (doublons + IDs Kinguin introuvables) — plus besoin de cliquer
+// manuellement sur "Audit catalogue" dans admin.html, ça tourne tout seul toutes les heures.
+// Placé ici, après toutes les déclarations (fixEnCours, runFixKinguinProducts, etc.) pour éviter
+// l'erreur "Cannot access before initialization" au démarrage.
+runFixKinguinProducts();
+setInterval(runFixKinguinProducts, 60 * 60 * 1000);
