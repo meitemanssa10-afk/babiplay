@@ -107,6 +107,30 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   console.log(`📧 Code envoyé à ${clientEmail}`);
 }
 
+const WHATSAPP_SUPPORT = '2250797659178';
+
+async function envoyerEmailEchec(clientEmail, clientNom, produitNom) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: 'BabiPlay <noreply@babiplay.store>',
+    to: clientEmail,
+    subject: `⚠️ Un souci avec votre commande ${produitNom} - BabiPlay`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
+        <h2>Bonjour ${clientNom || 'Client'} !</h2>
+        <p>Votre paiement pour <strong>${produitNom}</strong> a bien été reçu, mais nous rencontrons un souci technique passager pour vous livrer votre code.</p>
+        <p>Notre équipe a été notifiée. Pour un traitement immédiat, contactez-nous directement sur WhatsApp :</p>
+        <p style="text-align:center">
+          <a href="https://wa.me/${WHATSAPP_SUPPORT}" style="background:#25D366;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block">💬 Contacter le support WhatsApp</a>
+        </p>
+        <p>Toutes nos excuses pour la gêne occasionnée.</p>
+      </div>
+    `
+  });
+  console.log(`📧 Email d'échec envoyé à ${clientEmail}`);
+}
+
 async function traiterCommande(commande) {
   console.log(`🔄 Traitement commande ${commande.id}...`);
   try {
@@ -137,8 +161,19 @@ async function traiterCommande(commande) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
     await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
     if (commande.order_id) await supabase.from('orders').update({ statut: 'erreur' }).eq('id', commande.order_id);
+    // Le client a payé mais n'a rien reçu : on le prévient tout de suite avec un lien de contact direct,
+    // au lieu de le laisser sans nouvelles pendant que la commande reste invisible en erreur.
+    if (commande.client_email) {
+      try {
+        await envoyerEmailEchec(commande.client_email, commande.client_nom, commande.produit_nom || commande.nom_produit);
+      } catch (emailErr) {
+        console.error(`⚠️ Échec envoi email d'alerte pour la commande ${commande.id}:`, emailErr.message);
+      }
+    }
   }
 }
+
+
 
 async function checkCommandes() {
   try {
@@ -158,6 +193,11 @@ async function checkCommandes() {
 
 checkCommandes();
 setInterval(checkCommandes, 30000);
+
+// Audit catalogue automatique (doublons + IDs Kinguin introuvables) — plus besoin de cliquer
+// manuellement sur "Audit catalogue" dans admin.html, ça tourne tout seul toutes les heures.
+runFixKinguinProducts();
+setInterval(runFixKinguinProducts, 60 * 60 * 1000);
 
 // ─────────────────────────────────────────────
 // Auto-ping : empêche Render (plan gratuit) de s'endormir
@@ -701,8 +741,25 @@ async function runFixKinguinProducts() {
       if (idsVersJeux.length) console.log(`🔀 ${idsVersJeux.length} produit(s) reclassé(s) de "Cartes cadeaux" vers "Jeux".`);
     }
 
-    const { data, error } = await supabase.from('products').select('id, nom, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null);
-    if (error) throw new Error('Lecture produits: ' + error.message);
+    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits liés
+    // à un ID Kinguin, il faut paginer avec .range() — sinon les produits au-delà de la 1000e ligne
+    // ne sont jamais vérifiés contre le catalogue Kinguin, et un ID cassé (404) peut rester actif
+    // indéfiniment et faire échouer de vraies commandes payées sans être jamais détecté.
+    let data = [];
+    {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data: pageRows, error: pageErr } = await supabase.from('products')
+          .select('id, nom, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null)
+          .order('id', { ascending: true }).range(from, from + pageSize - 1);
+        if (pageErr) throw new Error('Lecture produits: ' + pageErr.message);
+        if (!pageRows || !pageRows.length) break;
+        data = data.concat(pageRows);
+        if (pageRows.length < pageSize) break;
+        from += pageSize;
+      }
+    }
     const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
     console.log(`   ${existingMap.size} produit(s) à corriger.`);
     const idsTrouves = new Set();
