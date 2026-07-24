@@ -638,51 +638,6 @@ async function runFixKinguinProducts() {
   fixEnCours = true;
   console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
-    // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
-    // différent) — d'anciens imports les ont enregistrés comme des fiches séparées. On ne garde
-    // que la moins chère par (plateforme + nom), on désactive le reste.
-    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits
-    // actifs, il faut paginer avec .range() pour tous les récupérer — sinon les doublons situés
-    // au-delà de la 1000e ligne ne sont jamais vus ni désactivés.
-    let produitsActifs = [];
-    let errDoublons = null;
-    {
-      const pageSize = 1000;
-      let from = 0;
-      while (true) {
-        const { data, error } = await supabase.from('products')
-          .select('id, nom, plateforme, prix').eq('est_actif', true)
-          .order('id', { ascending: true }).range(from, from + pageSize - 1);
-        if (error) { errDoublons = error; break; }
-        if (!data || !data.length) break;
-        produitsActifs = produitsActifs.concat(data);
-        if (data.length < pageSize) break;
-        from += pageSize;
-      }
-    }
-    let nombreDoublons = 0;
-    if (errDoublons) console.error('⚠️ Erreur lecture doublons:', errDoublons.message);
-    else {
-      const groupes = new Map();
-      for (const p of (produitsActifs || [])) {
-        const cle = p.plateforme + '|' + (p.nom || '').trim().toLowerCase();
-        if (!groupes.has(cle)) groupes.set(cle, []);
-        groupes.get(cle).push(p);
-      }
-      const idsADesactiver = [];
-      for (const [, produits] of groupes) {
-        if (produits.length < 2) continue;
-        produits.sort((a, b) => a.prix - b.prix);
-        for (let i = 1; i < produits.length; i++) idsADesactiver.push(produits[i].id);
-      }
-      for (let i = 0; i < idsADesactiver.length; i += 200) {
-        await supabase.from('products').update({ est_actif: false }).in('id', idsADesactiver.slice(i, i + 200));
-      }
-      nombreDoublons = idsADesactiver.length;
-      if (nombreDoublons) console.log(`🧹 ${nombreDoublons} doublon(s) désactivé(s) (même nom, on garde le moins cher).`);
-      else console.log('✅ Aucun doublon détecté.');
-    }
-
     // Nettoyage direct en base : désactive tout produit "compte partagé" résiduel, même si sa fiche
     // n'existe plus dans le catalogue Kinguin actuel (donc jamais touché par la boucle ci-dessous).
     const { data: comptesResiduels, error: errResiduels } = await supabase.from('products')
@@ -848,6 +803,55 @@ async function runFixKinguinProducts() {
         await supabase.from('products').update({ est_actif: false }).in('id', lot);
       }
       console.log(`🚫 ${produitsIntrouvables.length} produit(s) avec un ID Kinguin introuvable — désactivé(s).`);
+    }
+
+    // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
+    // différent) — d'anciens imports les ont enregistrés comme des fiches séparées. On ne garde
+    // que la moins chère par (plateforme + nom), on désactive le reste.
+    // IMPORTANT : ce nettoyage tourne ICI, APRÈS la désactivation des IDs cassés ci-dessus (et non
+    // avant) — sinon le choix "on garde le moins cher" pouvait accidentellement garder une fiche à
+    // l'ID cassé et désactiver une autre fiche dont l'ID, lui, fonctionnait. En ne relisant que les
+    // produits encore actifs à ce stade, on ne compare et ne garde que des fiches déjà confirmées valides.
+    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits
+    // actifs, il faut paginer avec .range() pour tous les récupérer — sinon les doublons situés
+    // au-delà de la 1000e ligne ne sont jamais vus ni désactivés.
+    let produitsActifs = [];
+    let errDoublons = null;
+    {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from('products')
+          .select('id, nom, plateforme, prix').eq('est_actif', true)
+          .order('id', { ascending: true }).range(from, from + pageSize - 1);
+        if (error) { errDoublons = error; break; }
+        if (!data || !data.length) break;
+        produitsActifs = produitsActifs.concat(data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+    }
+    let nombreDoublons = 0;
+    if (errDoublons) console.error('⚠️ Erreur lecture doublons:', errDoublons.message);
+    else {
+      const groupes = new Map();
+      for (const p of (produitsActifs || [])) {
+        const cle = p.plateforme + '|' + (p.nom || '').trim().toLowerCase();
+        if (!groupes.has(cle)) groupes.set(cle, []);
+        groupes.get(cle).push(p);
+      }
+      const idsADesactiver = [];
+      for (const [, produits] of groupes) {
+        if (produits.length < 2) continue;
+        produits.sort((a, b) => a.prix - b.prix);
+        for (let i = 1; i < produits.length; i++) idsADesactiver.push(produits[i].id);
+      }
+      for (let i = 0; i < idsADesactiver.length; i += 200) {
+        await supabase.from('products').update({ est_actif: false }).in('id', idsADesactiver.slice(i, i + 200));
+      }
+      nombreDoublons = idsADesactiver.length;
+      if (nombreDoublons) console.log(`🧹 ${nombreDoublons} doublon(s) désactivé(s) (même nom, on garde le moins cher).`);
+      else console.log('✅ Aucun doublon détecté.');
     }
 
     await supabase.from('audit_rapports').insert({
