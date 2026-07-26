@@ -723,8 +723,18 @@ async function runFixKinguinProducts() {
         from += pageSize;
       }
     }
-    const existingMap = new Map((data || []).map(r => [r.kinguin_product_id, r]));
-    console.log(`   ${existingMap.size} produit(s) à corriger.`);
+    // Regroupe TOUTES les fiches par ID Kinguin (pas une simple Map id->fiche, qui écraserait
+    // silencieusement une fiche si deux fiches distinctes partagent le même ID Kinguin — un cas
+    // réel avec d'anciens imports faits avant le nettoyage des doublons). Avec un Map classique,
+    // si cet ID était cassé, une seule des deux fiches était désactivée et l'autre restait active
+    // indéfiniment avec le même ID mort — exactement le bug qui a laissé la carte Xbox 5€ active.
+    const existingGroups = new Map();
+    for (const r of (data || [])) {
+      if (!existingGroups.has(r.kinguin_product_id)) existingGroups.set(r.kinguin_product_id, []);
+      existingGroups.get(r.kinguin_product_id).push(r);
+    }
+    const nombreFichesSuivies = (data || []).length;
+    console.log(`   ${nombreFichesSuivies} produit(s) à corriger (${existingGroups.size} ID Kinguin distinct(s)).`);
     const idsTrouves = new Set();
     const petitesCartesASurveiller = [];
     let page = 1, totalCount = null, totalCorriges = 0;
@@ -752,68 +762,70 @@ async function runFixKinguinProducts() {
       const results = pageData.results || [];
       if (!results.length) break;
       for (const product of results) {
-        const row = existingMap.get(product.productId);
-        if (!row) continue;
+        const rows = existingGroups.get(product.productId);
+        if (!rows || !rows.length) continue;
         idsTrouves.add(product.productId);
-        if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
-          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-          totalCorriges++;
-          continue;
-        }
-        const { plateforme, categorie } = mapPlatform(product.platform, product.name);
-        const sousCategorie = guessSousCategorie(product, plateforme);
+        for (const row of rows) {
+          if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
+            await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+            totalCorriges++;
+            continue;
+          }
+          const { plateforme, categorie } = mapPlatform(product.platform, product.name);
+          const sousCategorie = guessSousCategorie(product, plateforme);
 
-        // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
-        // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
-        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
-          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-          totalCorriges++;
-          continue;
-        }
+          // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
+          // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
+          if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
+            await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+            totalCorriges++;
+            continue;
+          }
 
-        // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
-        // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
-        if (sousCategorie === 'Cartes cadeaux') {
-          const montant = extraireMontantFacial(product.name);
-          if (montant) {
-            const eurPriceCheck = product.price || 0;
-            const prixCalcule = priceToFCFA(eurPriceCheck);
-            const valeurFacialeFCFA = montant * EUR_TO_XOF;
-            const ratio = prixCalcule / valeurFacialeFCFA;
-            if (ratio < 0.75 || ratio > 1.05) {
-              await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-              totalCorriges++;
-              continue;
-            }
-            // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
-            // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
-            // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
-            if (montant <= 5) {
-              petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
+          // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
+          // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
+          if (sousCategorie === 'Cartes cadeaux') {
+            const montant = extraireMontantFacial(product.name);
+            if (montant) {
+              const eurPriceCheck = product.price || 0;
+              const prixCalcule = priceToFCFA(eurPriceCheck);
+              const valeurFacialeFCFA = montant * EUR_TO_XOF;
+              const ratio = prixCalcule / valeurFacialeFCFA;
+              if (ratio < 0.75 || ratio > 1.05) {
+                await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+                totalCorriges++;
+                continue;
+              }
+              // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
+              // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
+              // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
+              if (montant <= 5) {
+                petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
+              }
             }
           }
-        }
 
-        const fields = {
-          nom: nomAffiche(product, plateforme, categorie, sousCategorie),
-          sous_categorie: sousCategorie,
-          description: genererDescriptionFR(plateforme, categorie, sousCategorie),
-          developpeur: joinField(product.developers),
-          editeur: joinField(product.publishers),
-          genres: joinField(product.genres),
-          date_sortie: product.releaseDate || '',
-          note_metacritic: product.metacriticScore || null,
-          est_precommande: !!product.isPreorder,
-        };
-        const nouvelleImage = getImageUrl(product);
-        if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
-        const eurPrice = product.price || 0;
-        if (eurPrice >= PRIX_MIN_EUR) {
-          const nouveauPrix = priceToFCFA(eurPrice);
-          if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
+          const fields = {
+            nom: nomAffiche(product, plateforme, categorie, sousCategorie),
+            sous_categorie: sousCategorie,
+            description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+            developpeur: joinField(product.developers),
+            editeur: joinField(product.publishers),
+            genres: joinField(product.genres),
+            date_sortie: product.releaseDate || '',
+            note_metacritic: product.metacriticScore || null,
+            est_precommande: !!product.isPreorder,
+          };
+          const nouvelleImage = getImageUrl(product);
+          if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
+          const eurPrice = product.price || 0;
+          if (eurPrice >= PRIX_MIN_EUR) {
+            const nouveauPrix = priceToFCFA(eurPrice);
+            if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
+          }
+          const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
+          if (!updateErr) totalCorriges++;
         }
-        const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
-        if (!updateErr) totalCorriges++;
       }
       console.log(`Page ${page} traitée — corrigés: ${totalCorriges}`);
       if (page * PAGE_LIMIT >= totalCount) break;
@@ -823,9 +835,10 @@ async function runFixKinguinProducts() {
 
     // Un ID Kinguin qu'on suit mais qui n'apparaît nulle part dans le catalogue Kinguin actuel =
     // produit invendable (l'agent échouera à chaque tentative d'achat, exactement comme la carte
-    // PSN 5€ qui a bloqué une vraie commande cliente). On le désactive et on le signale clairement.
-    const idsIntrouvablesArr = [...existingMap.keys()].filter(id => !idsTrouves.has(id));
-    const produitsIntrouvables = idsIntrouvablesArr.map(id => existingMap.get(id));
+    // PSN 5€ qui a bloqué une vraie commande cliente). On désactive TOUTES les fiches partageant
+    // cet ID (pas une seule), et on les signale clairement.
+    const idsIntrouvablesArr = [...existingGroups.keys()].filter(id => !idsTrouves.has(id));
+    const produitsIntrouvables = idsIntrouvablesArr.flatMap(id => existingGroups.get(id));
     if (produitsIntrouvables.length) {
       for (let i = 0; i < produitsIntrouvables.length; i += 200) {
         const lot = produitsIntrouvables.slice(i, i + 200).map(p => p.id);
@@ -884,7 +897,7 @@ async function runFixKinguinProducts() {
     }
 
     await supabase.from('audit_rapports').insert({
-      total_verifies: existingMap.size,
+      total_verifies: nombreFichesSuivies,
       introuvables_count: produitsIntrouvables.length,
       desactives_count: totalCorriges,
       corriges_count: totalCorriges,
