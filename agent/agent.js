@@ -477,8 +477,21 @@ async function runImportParCategories() {
     let page = 1, totalCount = null;
     while (true) {
       let data;
-      try { data = await fetchKinguinPage(page); }
-      catch (e) { console.error(`⚠️ Erreur page ${page}: ${e.message} — retry dans 5s`); await sleep(5000); continue; }
+      let tentative = 0;
+      let dernierErreur = null;
+      while (tentative < 5) {
+        try { data = await fetchKinguinPage(page); dernierErreur = null; break; }
+        catch (e) {
+          dernierErreur = e;
+          tentative++;
+          console.error(`⚠️ Erreur page ${page}: ${e.message} — tentative ${tentative}/5, retry dans 5s`);
+          await sleep(5000);
+        }
+      }
+      if (dernierErreur) {
+        console.error(`🛑 Page ${page} inaccessible après 5 tentatives (${dernierErreur.message}) — arrêt de l'import à cette page.`);
+        break;
+      }
       if (totalCount === null) { totalCount = data.item_count; console.log(`📦 ${totalCount} produits au total chez Kinguin — analyse en cours...`); }
       const results = data.results || [];
       if (!results.length) break;
@@ -717,8 +730,24 @@ async function runFixKinguinProducts() {
     let page = 1, totalCount = null, totalCorriges = 0;
     while (true) {
       let pageData;
-      try { pageData = await fetchKinguinPage(page); }
-      catch (e) { console.error(`⚠️ Erreur page ${page}: ${e.message} — retry dans 5s`); await sleep(5000); continue; }
+      let tentative = 0;
+      let dernierErreur = null;
+      while (tentative < 5) {
+        try { pageData = await fetchKinguinPage(page); dernierErreur = null; break; }
+        catch (e) {
+          dernierErreur = e;
+          tentative++;
+          console.error(`⚠️ Erreur page ${page}: ${e.message} — tentative ${tentative}/5, retry dans 5s`);
+          await sleep(5000);
+        }
+      }
+      if (dernierErreur) {
+        // Après 5 échecs sur la même page (souvent la toute dernière page, en bordure du
+        // catalogue — Kinguin y répond parfois 400 au lieu d'une liste vide), on arrête le scan
+        // proprement au lieu de boucler à l'infini. Les pages déjà lues restent valides.
+        console.error(`🛑 Page ${page} inaccessible après 5 tentatives (${dernierErreur.message}) — arrêt du scan à cette page.`);
+        break;
+      }
       if (totalCount === null) { totalCount = pageData.item_count; console.log(`📦 ${totalCount} produits chez Kinguin.`); }
       const results = pageData.results || [];
       if (!results.length) break;
