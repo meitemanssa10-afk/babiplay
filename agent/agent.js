@@ -955,6 +955,24 @@ http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/check-product') {
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    const kinguinId = url.searchParams.get('id');
+    if (!kinguinId) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Paramètre id manquant.' })); return; }
+    // Interroge Kinguin EN DIRECT pour cet ID précis (le même appel que celui fait à l'achat),
+    // sans passer par le scan complet du catalogue — réponse en quelques secondes, pas en heures.
+    obtenirProduitKinguinParId(kinguinId)
+      .then(produit => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, nom: produit.name, prix: produit.price }));
+      })
+      .catch(err => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, erreur: err.message }));
+      });
+    return;
+  }
+
   res.writeHead(200);
   res.end('BabiPlay Agent (Kinguin) OK');
 }).listen(process.env.PORT || 3000);
