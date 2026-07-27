@@ -860,16 +860,20 @@ async function showAdmin(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('admin-otp-screen').style.display='none';
   document.getElementById('admin-wrap').style.display='flex';
-  await loadDashboard();
-  await loadProducts();
-  await loadBanners();
-  await loadAuditRapport();
-  await loadOrders();
-  await loadClients();
-  await loadPromos();
-  await loadRewards();
-  await loadEmailStats();
-  await loadPointsConfig();
+  // Ces 9 sections sont indépendantes les unes des autres (chacune remplit sa propre partie de
+  // l'écran) — les charger en même temps au lieu d'attendre chacune l'une après l'autre.
+  await Promise.all([
+    loadDashboard(),
+    loadProducts(),
+    loadBanners(),
+    loadAuditRapport(),
+    loadOrders(),
+    loadClients(),
+    loadPromos(),
+    loadRewards(),
+    loadEmailStats(),
+    loadPointsConfig(),
+  ]);
   populateProductSelects();
 }
 
