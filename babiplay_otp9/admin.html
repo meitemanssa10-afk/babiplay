@@ -1246,6 +1246,7 @@ function renderAuditRapport(rapport){
   }
   const introuvables=rapport.produits_introuvables||[];
   const petitesCartes=rapport.petites_cartes_a_surveiller||[];
+  const valides=rapport.produits_valides_echantillon||[];
   el.innerHTML=`
     ${boutonActualiser}
     <div class="stats-grid" style="margin-bottom:20px">
@@ -1255,6 +1256,12 @@ function renderAuditRapport(rapport){
       <div class="stat-card"><div class="stat-label">Petites cartes à surveiller</div><div class="stat-value" style="color:var(--gold)">${petitesCartes.length}</div></div>
       <div class="stat-card"><div class="stat-label">Dernière vérification</div><div class="stat-value" style="font-size:16px">${new Date(rapport.created_at).toLocaleString('fr-FR')}</div></div>
     </div>
+    ${valides.length?`
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head"><h3>✅ Échantillon de produits confirmés valides — teste-les toi-même</h3></div>
+      <table><thead><tr><th>Nom</th><th>ID Kinguin</th><th>Action</th></tr></thead>
+      <tbody>${valides.map(p=>`<tr><td>${esc(p.nom)}</td><td style="font-size:11px;color:var(--muted2)">${esc(p.kinguin_product_id)}</td><td><button class="btn btn-secondary btn-sm" id="verif-btn-${p.id}" onclick="verifierProduit('${p.id}','${p.kinguin_product_id}')">🔍 Vérifier</button> <span id="verif-result-${p.id}"></span></td></tr>`).join('')}</tbody></table>
+    </div>`:''}
     ${introuvables.length?`
     <div class="table-wrap" style="margin-bottom:20px">
       <div class="table-head"><h3>🚫 Produits désactivés (ID Kinguin introuvable)</h3></div>
