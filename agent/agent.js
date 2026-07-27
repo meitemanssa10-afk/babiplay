@@ -896,6 +896,14 @@ async function runFixKinguinProducts() {
       else console.log('✅ Aucun doublon détecté.');
     }
 
+    // Échantillon de produits CONFIRMÉS VALIDES (trouvés en direct dans le catalogue Kinguin
+    // pendant ce passage) — pour permettre de tester soi-même, via le bouton "Vérifier", que ce
+    // que l'audit désigne comme valide l'est vraiment, plutôt que de devoir nous faire confiance.
+    const idsValides = [...existingGroups.keys()].filter(id => idsTrouves.has(id));
+    const produitsValidesEchantillon = idsValides.slice(0, 50)
+      .flatMap(id => existingGroups.get(id))
+      .map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id }));
+
     await supabase.from('audit_rapports').insert({
       total_verifies: nombreFichesSuivies,
       introuvables_count: produitsIntrouvables.length,
@@ -903,7 +911,8 @@ async function runFixKinguinProducts() {
       corriges_count: totalCorriges,
       doublons_count: nombreDoublons,
       produits_introuvables: produitsIntrouvables.map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id, prix_actuel_fcfa: p.prix })),
-      petites_cartes_a_surveiller: petitesCartesASurveiller
+      petites_cartes_a_surveiller: petitesCartesASurveiller,
+      produits_valides_echantillon: produitsValidesEchantillon
     });
     console.log(`📋 Rapport d'audit enregistré : ${nombreDoublons} doublon(s), ${produitsIntrouvables.length} introuvable(s), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
 
