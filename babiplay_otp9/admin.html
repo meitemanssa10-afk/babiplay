@@ -927,15 +927,20 @@ async function loadProducts(){
   // Supabase plafonne chaque requête à 1000 lignes par défaut — sans pagination, les produits
   // au-delà des 1000 premiers (selon le tri) sont invisibles dans admin.html, y compris dans la
   // recherche, même si le produit existe bien dans la base.
+  // On envoie toutes les pages EN MÊME TEMPS (au lieu d'une par une) : on demande d'abord juste
+  // le nombre total de produits, puis on lance tous les .range() en parallèle avec Promise.all.
   const pageSize=1000;
-  let from=0,all=[];
-  while(true){
-    const{data,error}=await sb.from('products').select('*').order('created_at',{ascending:false}).range(from,from+pageSize-1);
-    if(error){console.error('Erreur chargement produits:',error.message);break;}
-    if(!data||!data.length)break;
-    all=all.concat(data);
-    if(data.length<pageSize)break;
-    from+=pageSize;
+  const{count,error:countErr}=await sb.from('products').select('id',{count:'exact',head:true});
+  if(countErr){console.error('Erreur comptage produits:',countErr.message);}
+  const totalPages=Math.max(1,Math.ceil((count||pageSize)/pageSize));
+  const pageRequests=Array.from({length:totalPages},(_,i)=>
+    sb.from('products').select('*').order('created_at',{ascending:false}).order('id',{ascending:true}).range(i*pageSize,i*pageSize+pageSize-1)
+  );
+  const pageResults=await Promise.all(pageRequests);
+  let all=[];
+  for(const{data,error}of pageResults){
+    if(error){console.error('Erreur chargement produits:',error.message);continue;}
+    if(data)all=all.concat(data);
   }
   allProducts=all;applyProductFilters();
 }
@@ -953,7 +958,7 @@ function renderProducts(list){
   if(!list.length){tb.innerHTML='<tr><td colspan="8"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun produit trouvé</p></div></td></tr>';return;}
   tb.innerHTML=list.map(p=>`
     <tr>
-      <td>${p.image_url?`<img src="${p.image_url}" style="width:48px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:platEmoji(p.plateforme)}</td>
+      <td>${p.image_url?`<img src="${p.image_url}" loading="lazy" style="width:48px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:platEmoji(p.plateforme)}</td>
       <td><strong>${p.nom}</strong>${p.est_populaire?' ⭐':''}</td>
       <td><span class="platform-dot dot-${platDot(p.plateforme)}"></span>${platLabel(p.plateforme)}</td>
       <td><strong style="color:var(--gold)">${fmt(p.prix)}</strong> <small>FCFA</small></td>
