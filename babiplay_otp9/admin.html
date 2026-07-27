@@ -963,8 +963,30 @@ function renderProducts(list){
       <td style="white-space:nowrap">
         <button class="btn btn-secondary btn-sm" onclick='editProduct(${JSON.stringify(p)})'>✏️ Modifier</button>
         <button class="btn btn-danger btn-sm" onclick="toggleProduct('${p.id}',${p.est_actif})">${p.est_actif?'🚫 Désactiver':'✅ Activer'}</button>
+        ${p.kinguin_product_id?`<button class="btn btn-secondary btn-sm" id="verif-btn-${p.id}" onclick="verifierProduit('${p.id}','${p.kinguin_product_id}')">🔍 Vérifier</button> <span id="verif-result-${p.id}"></span>`:''}
       </td>
     </tr>`).join('');
+}
+
+// Interroge l'agent (qui interroge Kinguin en direct) pour savoir instantanément si l'ID Kinguin
+// d'un produit précis fonctionne encore — sans attendre l'audit complet, sans dépenser d'argent.
+async function verifierProduit(produitId, kinguinId) {
+  const btn = document.getElementById(`verif-btn-${produitId}`);
+  const resultSpan = document.getElementById(`verif-result-${produitId}`);
+  btn.disabled = true;
+  resultSpan.innerHTML = '<span style="color:var(--muted2);font-size:12px">⏳ Vérification...</span>';
+  try {
+    const res = await fetch(`${AGENT_URL}/check-product?id=${encodeURIComponent(kinguinId)}&secret=${AGENT_SECRET}`);
+    const data = await res.json();
+    if (data.ok) {
+      resultSpan.innerHTML = `<span style="color:#52b043;font-size:12px">✅ OK — ${data.prix}€</span>`;
+    } else {
+      resultSpan.innerHTML = `<span style="color:#ff6b6b;font-size:12px">❌ ${data.erreur || data.error || 'Introuvable'}</span>`;
+    }
+  } catch (e) {
+    resultSpan.innerHTML = `<span style="color:#ff6b6b;font-size:12px">⚠️ Erreur réseau</span>`;
+  }
+  btn.disabled = false;
 }
 
 function filterProducts(val){prodFilterPlatform=val;applyProductFilters();}
