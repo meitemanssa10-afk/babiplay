@@ -735,110 +735,104 @@ async function runFixKinguinProducts() {
     }
     const nombreFichesSuivies = (data || []).length;
     console.log(`   ${nombreFichesSuivies} produit(s) à corriger (${existingGroups.size} ID Kinguin distinct(s)).`);
-    const idsTrouves = new Set();
     const petitesCartesASurveiller = [];
-    let page = 1, totalCount = null, totalCorriges = 0;
-    while (true) {
-      let pageData;
+    const produitsIntrouvables = [];
+    const idsValidesConfirmes = [];
+    let totalCorriges = 0;
+    let compteur = 0;
+
+    // On vérifie chaque ID INDIVIDUELLEMENT, avec le même appel exact que celui utilisé à l'achat
+    // (GET /v1/products/{id}) — plutôt que de parcourir la liste générale du catalogue Kinguin page
+    // par page. Ces deux méthodes chez Kinguin peuvent donner des réponses différentes pour un même
+    // produit (un produit peut apparaître dans la liste tout en étant introuvable en appel direct) —
+    // en utilisant systématiquement la méthode de l'achat réel, l'audit ne peut plus jamais dire
+    // "valide" pour un produit qui échouera en fait à l'achat.
+    for (const [kinguinId, rows] of existingGroups) {
+      compteur++;
+      let product = null;
       let tentative = 0;
-      let dernierErreur = null;
-      while (tentative < 5) {
-        try { pageData = await fetchKinguinPage(page); dernierErreur = null; break; }
+      while (tentative < 3) {
+        try { product = await obtenirProduitKinguinParId(kinguinId); break; }
         catch (e) {
-          dernierErreur = e;
           tentative++;
-          console.error(`⚠️ Erreur page ${page}: ${e.message} — tentative ${tentative}/5, retry dans 5s`);
-          await sleep(5000);
+          if (tentative >= 3) { product = null; break; }
+          await sleep(1000);
         }
       }
-      if (dernierErreur) {
-        // Après 5 échecs sur la même page (souvent la toute dernière page, en bordure du
-        // catalogue — Kinguin y répond parfois 400 au lieu d'une liste vide), on arrête le scan
-        // proprement au lieu de boucler à l'infini. Les pages déjà lues restent valides.
-        console.error(`🛑 Page ${page} inaccessible après 5 tentatives (${dernierErreur.message}) — arrêt du scan à cette page.`);
-        break;
+      if (!product) {
+        produitsIntrouvables.push(...rows);
+        continue;
       }
-      if (totalCount === null) { totalCount = pageData.item_count; console.log(`📦 ${totalCount} produits chez Kinguin.`); }
-      const results = pageData.results || [];
-      if (!results.length) break;
-      for (const product of results) {
-        const rows = existingGroups.get(product.productId);
-        if (!rows || !rows.length) continue;
-        idsTrouves.add(product.productId);
-        for (const row of rows) {
-          if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
-            await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-            totalCorriges++;
-            continue;
-          }
-          const { plateforme, categorie } = mapPlatform(product.platform, product.name);
-          const sousCategorie = guessSousCategorie(product, plateforme);
+      idsValidesConfirmes.push(kinguinId);
+      for (const row of rows) {
+        if (estCompteExclu(product) || contientDeviseNonEuro(product.name)) {
+          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+          totalCorriges++;
+          continue;
+        }
+        const { plateforme, categorie } = mapPlatform(product.platform, product.name);
+        const sousCategorie = guessSousCategorie(product, plateforme);
 
-          // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
-          // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
-          if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
-            await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-            totalCorriges++;
-            continue;
-          }
+        // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
+        // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
+        if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
+          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+          totalCorriges++;
+          continue;
+        }
 
-          // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
-          // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
-          if (sousCategorie === 'Cartes cadeaux') {
-            const montant = extraireMontantFacial(product.name);
-            if (montant) {
-              const eurPriceCheck = product.price || 0;
-              const prixCalcule = priceToFCFA(eurPriceCheck);
-              const valeurFacialeFCFA = montant * EUR_TO_XOF;
-              const ratio = prixCalcule / valeurFacialeFCFA;
-              if (ratio < 0.75 || ratio > 1.05) {
-                await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
-                totalCorriges++;
-                continue;
-              }
-              // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
-              // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
-              // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
-              if (montant <= 5) {
-                petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
-              }
+        // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
+        // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
+        if (sousCategorie === 'Cartes cadeaux') {
+          const montant = extraireMontantFacial(product.name);
+          if (montant) {
+            const eurPriceCheck = product.price || 0;
+            const prixCalcule = priceToFCFA(eurPriceCheck);
+            const valeurFacialeFCFA = montant * EUR_TO_XOF;
+            const ratio = prixCalcule / valeurFacialeFCFA;
+            if (ratio < 0.75 || ratio > 1.05) {
+              await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+              totalCorriges++;
+              continue;
+            }
+            // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
+            // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
+            // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
+            if (montant <= 5) {
+              petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
             }
           }
-
-          const fields = {
-            nom: nomAffiche(product, plateforme, categorie, sousCategorie),
-            sous_categorie: sousCategorie,
-            description: genererDescriptionFR(plateforme, categorie, sousCategorie),
-            developpeur: joinField(product.developers),
-            editeur: joinField(product.publishers),
-            genres: joinField(product.genres),
-            date_sortie: product.releaseDate || '',
-            note_metacritic: product.metacriticScore || null,
-            est_precommande: !!product.isPreorder,
-          };
-          const nouvelleImage = getImageUrl(product);
-          if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
-          const eurPrice = product.price || 0;
-          if (eurPrice >= PRIX_MIN_EUR) {
-            const nouveauPrix = priceToFCFA(eurPrice);
-            if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
-          }
-          const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
-          if (!updateErr) totalCorriges++;
         }
+
+        const fields = {
+          nom: nomAffiche(product, plateforme, categorie, sousCategorie),
+          sous_categorie: sousCategorie,
+          description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+          developpeur: joinField(product.developers),
+          editeur: joinField(product.publishers),
+          genres: joinField(product.genres),
+          date_sortie: product.releaseDate || '',
+          note_metacritic: product.metacriticScore || null,
+          est_precommande: !!product.isPreorder,
+        };
+        const nouvelleImage = getImageUrl(product);
+        if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
+        const eurPrice = product.price || 0;
+        if (eurPrice >= PRIX_MIN_EUR) {
+          const nouveauPrix = priceToFCFA(eurPrice);
+          if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
+        }
+        const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
+        if (!updateErr) totalCorriges++;
       }
-      console.log(`Page ${page} traitée — corrigés: ${totalCorriges}`);
-      if (page * PAGE_LIMIT >= totalCount) break;
-      page++;
-      await sleep(300);
+      if (compteur % 100 === 0) console.log(`${compteur}/${existingGroups.size} ID vérifiés — corrigés: ${totalCorriges}, introuvables: ${produitsIntrouvables.length}`);
+      await sleep(250);
     }
 
-    // Un ID Kinguin qu'on suit mais qui n'apparaît nulle part dans le catalogue Kinguin actuel =
-    // produit invendable (l'agent échouera à chaque tentative d'achat, exactement comme la carte
-    // PSN 5€ qui a bloqué une vraie commande cliente). On désactive TOUTES les fiches partageant
-    // cet ID (pas une seule), et on les signale clairement.
-    const idsIntrouvablesArr = [...existingGroups.keys()].filter(id => !idsTrouves.has(id));
-    const produitsIntrouvables = idsIntrouvablesArr.flatMap(id => existingGroups.get(id));
+    // Un ID Kinguin qu'on suit mais qui a échoué à la vérification directe (même méthode que
+    // l'achat réel) = produit invendable (l'agent échouera à chaque tentative d'achat, exactement
+    // comme la carte PSN 5€ qui a bloqué une vraie commande cliente). On désactive TOUTES les
+    // fiches partageant cet ID (pas une seule), et on les signale clairement.
     if (produitsIntrouvables.length) {
       for (let i = 0; i < produitsIntrouvables.length; i += 200) {
         const lot = produitsIntrouvables.slice(i, i + 200).map(p => p.id);
@@ -899,8 +893,7 @@ async function runFixKinguinProducts() {
     // Échantillon de produits CONFIRMÉS VALIDES (trouvés en direct dans le catalogue Kinguin
     // pendant ce passage) — pour permettre de tester soi-même, via le bouton "Vérifier", que ce
     // que l'audit désigne comme valide l'est vraiment, plutôt que de devoir nous faire confiance.
-    const idsValides = [...existingGroups.keys()].filter(id => idsTrouves.has(id));
-    const produitsValidesEchantillon = idsValides.slice(0, 50)
+    const produitsValidesEchantillon = idsValidesConfirmes.slice(0, 50)
       .flatMap(id => existingGroups.get(id))
       .map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id }));
 
