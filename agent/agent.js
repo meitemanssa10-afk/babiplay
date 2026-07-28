@@ -21,7 +21,15 @@ async function obtenirProduitKinguinParId(productId) {
   const res = await fetch(`${KINGUIN_BASE}/v2/products/${productId}`, {
     headers: { 'X-Api-Key': KINGUIN_KEY }
   });
-  if (!res.ok) throw new Error(`Produit Kinguin introuvable pour l'ID ${productId} (status ${res.status})`);
+  if (!res.ok) {
+    const err = new Error(`Produit Kinguin introuvable pour l'ID ${productId} (status ${res.status})`);
+    // 404 = le produit n'existe vraiment plus chez Kinguin. Tout le reste (429 rate-limit,
+    // 500/502/503/504 surcharge, etc.) est une erreur TEMPORAIRE — on ne doit jamais la traiter
+    // comme "produit cassé", seulement réessayer plus tard.
+    err.kinguinStatus = res.status;
+    err.estDefinitif = (res.status === 404);
+    throw err;
+  }
   return await res.json();
 }
 
@@ -217,6 +225,7 @@ const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toStrin
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
 console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}`);
 console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
+console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com/reactivate-false-positives?secret=${IMPORT_SECRET}`);
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
@@ -264,6 +273,7 @@ function estPopulaire(nom) {
 
 let importEnCours = false;
 let fixEnCours = false;
+let reactivationEnCours = false;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -739,6 +749,7 @@ async function runFixKinguinProducts() {
     console.log(`   ${nombreFichesSuivies} produit(s) à corriger (${existingGroups.size} ID Kinguin distinct(s)).`);
     const petitesCartesASurveiller = [];
     const produitsIntrouvables = [];
+    const erreursTemporaires = [];
     const idsValidesConfirmes = [];
     let totalCorriges = 0;
     let compteur = 0;
@@ -752,17 +763,29 @@ async function runFixKinguinProducts() {
     for (const [kinguinId, rows] of existingGroups) {
       compteur++;
       let product = null;
+      let confirmeCasse = false;
       let tentative = 0;
-      while (tentative < 3) {
+      const maxTentatives = 5;
+      while (tentative < maxTentatives) {
         try { product = await obtenirProduitKinguinParId(kinguinId); break; }
         catch (e) {
+          // Vrai 404 : le produit n'existe plus, pas besoin de réessayer davantage.
+          if (e.estDefinitif) { confirmeCasse = true; break; }
+          // Erreur temporaire (rate-limit / surcharge Kinguin) : on réessaie avec un délai croissant.
           tentative++;
-          if (tentative >= 3) { product = null; break; }
-          await sleep(1000);
+          if (tentative >= maxTentatives) break;
+          await sleep(1500 * tentative);
         }
       }
       if (!product) {
-        produitsIntrouvables.push(...rows);
+        if (confirmeCasse) {
+          produitsIntrouvables.push(...rows);
+        } else {
+          // Toujours pas de réponse après 5 tentatives espacées, mais jamais un vrai 404 confirmé —
+          // on NE désactive PAS le produit sur un doute : on le laisse tel quel pour cette passe,
+          // il sera re-testé au prochain audit automatique (dans l'heure).
+          erreursTemporaires.push({ kinguinId, rows });
+        }
         continue;
       }
       idsValidesConfirmes.push(kinguinId);
@@ -827,7 +850,7 @@ async function runFixKinguinProducts() {
         const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
         if (!updateErr) totalCorriges++;
       }
-      if (compteur % 100 === 0) console.log(`${compteur}/${existingGroups.size} ID vérifiés — corrigés: ${totalCorriges}, introuvables: ${produitsIntrouvables.length}`);
+      if (compteur % 100 === 0) console.log(`${compteur}/${existingGroups.size} ID vérifiés — corrigés: ${totalCorriges}, introuvables: ${produitsIntrouvables.length}, erreurs temporaires (ignorées): ${erreursTemporaires.length}`);
       await sleep(250);
     }
 
@@ -909,13 +932,86 @@ async function runFixKinguinProducts() {
       petites_cartes_a_surveiller: petitesCartesASurveiller,
       produits_valides_echantillon: produitsValidesEchantillon
     });
-    console.log(`📋 Rapport d'audit enregistré : ${nombreDoublons} doublon(s), ${produitsIntrouvables.length} introuvable(s), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
+    console.log(`📋 Rapport d'audit enregistré : ${nombreDoublons} doublon(s), ${produitsIntrouvables.length} introuvable(s) (404 confirmé), ${erreursTemporaires.length} erreur(s) temporaire(s) ignorée(s) (seront re-testés au prochain passage), ${petitesCartesASurveiller.length} petite(s) carte(s) à surveiller.`);
 
     console.log(`✅ Correction terminée ! ${totalCorriges} produits mis à jour.`);
   } catch (e) {
     console.error('❌ Erreur fatale correction:', e);
   } finally {
     fixEnCours = false;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════
+// RÉACTIVATION DES FAUX POSITIFS (audit précédent, avant le correctif retry/rate-limit)
+// ═════════════════════════════════════════════════════════════
+// L'ancienne version de l'audit traitait toute erreur Kinguin (y compris un simple rate-limit
+// temporaire pendant le scan de masse) comme "produit introuvable" et désactivait la fiche.
+// On reprend ici tous les produits actuellement INACTIFS avec un kinguin_product_id, on les
+// re-teste un par un avec la logique patiente corrigée (vrai 404 vs erreur temporaire), et on
+// réactive uniquement ceux confirmés valides. Rien n'est fait sur un doute.
+async function runReactivateFalsePositives() {
+  if (reactivationEnCours) return;
+  reactivationEnCours = true;
+  try {
+    console.log('🔁 Réactivation des faux positifs — recherche des produits inactifs à re-tester...');
+    let inactifs = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, kinguin_product_id, nom')
+        .eq('est_actif', false)
+        .not('kinguin_product_id', 'is', null)
+        .range(from, from + 999);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      inactifs.push(...data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    console.log(`🔎 ${inactifs.length} produit(s) inactif(s) avec ID Kinguin à re-tester.`);
+
+    const parId = new Map();
+    for (const p of inactifs) {
+      if (!parId.has(p.kinguin_product_id)) parId.set(p.kinguin_product_id, []);
+      parId.get(p.kinguin_product_id).push(p);
+    }
+
+    let reactives = 0;
+    let confirmesCasses = 0;
+    let compteur = 0;
+    for (const [kinguinId, rows] of parId) {
+      compteur++;
+      let product = null;
+      let confirmeCasse = false;
+      let tentative = 0;
+      const maxTentatives = 5;
+      while (tentative < maxTentatives) {
+        try { product = await obtenirProduitKinguinParId(kinguinId); break; }
+        catch (e) {
+          if (e.estDefinitif) { confirmeCasse = true; break; }
+          tentative++;
+          if (tentative >= maxTentatives) break;
+          await sleep(1500 * tentative);
+        }
+      }
+      if (product) {
+        const ids = rows.map(r => r.id);
+        await supabase.from('products').update({ est_actif: true }).in('id', ids);
+        reactives += ids.length;
+      } else if (confirmeCasse) {
+        confirmesCasses += rows.length;
+      }
+      // Sinon : toujours pas de réponse claire, on laisse tel quel, sera retesté au prochain audit.
+      if (compteur % 50 === 0) console.log(`${compteur}/${parId.size} ID re-testés — réactivés: ${reactives}, confirmés cassés: ${confirmesCasses}`);
+      await sleep(400);
+    }
+    console.log(`✅ Réactivation terminée : ${reactives} produit(s) remis actif(s), ${confirmesCasses} confirmé(s) réellement cassé(s) (laissés inactifs).`);
+  } catch (e) {
+    console.error('❌ Erreur fatale réactivation:', e);
+  } finally {
+    reactivationEnCours = false;
   }
 }
 
@@ -974,6 +1070,15 @@ http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, erreur: err.message }));
       });
+    return;
+  }
+
+  if (url.pathname === '/reactivate-false-positives') {
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (reactivationEnCours) { res.writeHead(200); res.end('Réactivation déjà en cours — voir logs Render.'); return; }
+    runReactivateFalsePositives();
+    res.writeHead(200);
+    res.end('✅ Réactivation des faux positifs démarrée ! Va dans Render → Logs pour suivre la progression.');
     return;
   }
 
