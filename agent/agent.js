@@ -16,7 +16,9 @@ console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
 // TRAITEMENT DES COMMANDES (achat + livraison auto)
 // ═════════════════════════════════════════════════════════════
 async function obtenirProduitKinguinParId(productId) {
-  const res = await fetch(`${KINGUIN_BASE}/v1/products/${productId}`, {
+  // v2 (pas v1) — l'achat réel (passerCommandeKinguin) utilise déjà /v2/order ; vérifier avec la
+  // même famille de version évite un écart possible entre ce que dit v1 et ce que fait v2 à l'achat.
+  const res = await fetch(`${KINGUIN_BASE}/v2/products/${productId}`, {
     headers: { 'X-Api-Key': KINGUIN_KEY }
   });
   if (!res.ok) throw new Error(`Produit Kinguin introuvable pour l'ID ${productId} (status ${res.status})`);
