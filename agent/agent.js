@@ -99,8 +99,87 @@ async function acheterViaKinguin(produitNom, kinguinProductId) {
   return { code, kinguinOrderId: commandeKinguin.orderId };
 }
 
+// Instructions d'activation adaptées à la plateforme (déduite du nom du produit) — chaque
+// plateforme a une procédure différente, donc un texte générique n'aide pas vraiment le client.
+function instructionsActivation(produitNom) {
+  const n = (produitNom || '').toLowerCase();
+  if (n.includes('psn') || n.includes('playstation') || n.includes('ps4') || n.includes('ps5')) {
+    return {
+      titre: '🎮 Comment activer sur PlayStation',
+      etapes: [
+        'Allumez votre PS4/PS5 et connectez-vous à votre compte PSN.',
+        'Allez dans le PlayStation Store, puis ouvrez le menu (icône profil en haut à droite).',
+        'Sélectionnez "Utiliser un code".',
+        'Entrez le code reçu et validez — le contenu s\'ajoute directement à votre compte.'
+      ]
+    };
+  }
+  if (n.includes('xbox') || n.includes('game pass')) {
+    return {
+      titre: '🕹️ Comment activer sur Xbox',
+      etapes: [
+        'Allumez votre Xbox (ou ouvrez l\'appli Xbox sur PC/mobile) et connectez-vous à votre compte.',
+        'Allez dans le Microsoft Store.',
+        'Sélectionnez "Utiliser un code" (ou "Redeem" en anglais).',
+        'Entrez le code reçu et validez.'
+      ]
+    };
+  }
+  if (n.includes('steam')) {
+    return {
+      titre: '💻 Comment activer sur Steam',
+      etapes: [
+        'Ouvrez l\'application Steam et connectez-vous.',
+        'Cliquez sur "Jeux" (en haut) puis "Activer un produit sur Steam...".',
+        'Suivez les instructions et entrez le code reçu.',
+        'Le jeu/produit apparaît directement dans votre bibliothèque Steam.'
+      ]
+    };
+  }
+  if (n.includes('nintendo') || n.includes('eshop') || n.includes('switch')) {
+    return {
+      titre: '🎮 Comment activer sur Nintendo',
+      etapes: [
+        'Sur votre console, ouvrez le Nintendo eShop.',
+        'Sélectionnez votre profil, puis "Ajouter du crédit / Saisir un code".',
+        'Entrez le code reçu et validez.'
+      ]
+    };
+  }
+  if (n.includes('netflix') || n.includes('disney') || n.includes('crunchyroll') || n.includes('spotify') || n.includes('subscription') || n.includes('abonnement')) {
+    return {
+      titre: '📺 Comment activer votre abonnement',
+      etapes: [
+        'Rendez-vous sur le site officiel du service (ex : netflix.com, disneyplus.com...).',
+        'Connectez-vous à votre compte, ou créez-en un si besoin.',
+        'Allez dans les paramètres du compte, section "Carte cadeau / Redeem a gift card".',
+        'Entrez le code reçu pour créditer votre abonnement.'
+      ]
+    };
+  }
+  if (n.includes('google play')) {
+    return {
+      titre: '📱 Comment activer sur Google Play',
+      etapes: [
+        'Ouvrez l\'application Google Play Store sur votre téléphone.',
+        'Appuyez sur votre photo de profil, puis "Utiliser un code cadeau".',
+        'Entrez le code reçu et validez.'
+      ]
+    };
+  }
+  return {
+    titre: '🔑 Comment utiliser votre code',
+    etapes: [
+      'Connectez-vous à la plateforme correspondant à votre produit.',
+      'Cherchez l\'option "Utiliser un code" / "Redeem code" dans les paramètres de votre compte.',
+      'Entrez le code reçu et validez.'
+    ]
+  };
+}
+
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   const resend = new Resend(process.env.RESEND_API_KEY);
+  const instructions = instructionsActivation(produitNom);
   await resend.emails.send({
     from: 'BabiPlay <noreply@babiplay.store>',
     to: clientEmail,
@@ -114,6 +193,12 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
           ${code}
         </div>
         <p>Produit : <strong>${produitNom}</strong></p>
+        <div style="background:#f7f7f9;border:1px solid #e5e5ea;border-radius:10px;padding:18px;margin-top:20px;">
+          <p style="margin:0 0 10px;font-weight:bold;color:#1a1a2e;">${instructions.titre}</p>
+          <ol style="margin:0;padding-left:18px;color:#333;">
+            ${instructions.etapes.map(e => `<li style="margin-bottom:6px;">${e}</li>`).join('')}
+          </ol>
+        </div>
         <p>Merci pour votre achat sur BabiPlay ! 🚀</p>
       </div>
     `
