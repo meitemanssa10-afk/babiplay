@@ -2175,27 +2175,92 @@ async function envoyerEmailMarketing(){
 // ============================================================
 const BREVO_TEMPLATE_CODE=1;
 
+function instructionsActivation(produitNom){
+  const n=(produitNom||'').toLowerCase();
+  if(n.includes('psn')||n.includes('playstation')||n.includes('ps4')||n.includes('ps5'))
+    return{titre:'🎮 Comment activer sur PlayStation',etapes:[
+      'Allumez votre PS4/PS5 et connectez-vous à votre compte PSN.',
+      'Allez dans le PlayStation Store, puis ouvrez le menu (icône profil en haut à droite).',
+      'Sélectionnez "Utiliser un code".',
+      'Entrez le code reçu et validez — le contenu s\'ajoute directement à votre compte.'
+    ]};
+  if(n.includes('xbox')||n.includes('game pass'))
+    return{titre:'🕹️ Comment activer sur Xbox',etapes:[
+      'Allumez votre Xbox (ou ouvrez l\'appli Xbox sur PC/mobile) et connectez-vous à votre compte.',
+      'Allez dans le Microsoft Store.',
+      'Sélectionnez "Utiliser un code" (ou "Redeem" en anglais).',
+      'Entrez le code reçu et validez.'
+    ]};
+  if(n.includes('steam'))
+    return{titre:'💻 Comment activer sur Steam',etapes:[
+      'Ouvrez l\'application Steam et connectez-vous.',
+      'Cliquez sur "Jeux" (en haut) puis "Activer un produit sur Steam...".',
+      'Suivez les instructions et entrez le code reçu.',
+      'Le jeu/produit apparaît directement dans votre bibliothèque Steam.'
+    ]};
+  if(n.includes('nintendo')||n.includes('eshop')||n.includes('switch'))
+    return{titre:'🎮 Comment activer sur Nintendo',etapes:[
+      'Sur votre console, ouvrez le Nintendo eShop.',
+      'Sélectionnez votre profil, puis "Ajouter du crédit / Saisir un code".',
+      'Entrez le code reçu et validez.'
+    ]};
+  if(n.includes('netflix')||n.includes('disney')||n.includes('crunchyroll')||n.includes('spotify')||n.includes('subscription')||n.includes('abonnement'))
+    return{titre:'📺 Comment activer votre abonnement',etapes:[
+      'Rendez-vous sur le site officiel du service (ex : netflix.com, disneyplus.com...).',
+      'Connectez-vous à votre compte, ou créez-en un si besoin.',
+      'Allez dans les paramètres du compte, section "Carte cadeau / Redeem a gift card".',
+      'Entrez le code reçu pour créditer votre abonnement.'
+    ]};
+  if(n.includes('google play'))
+    return{titre:'📱 Comment activer sur Google Play',etapes:[
+      'Ouvrez l\'application Google Play Store sur votre téléphone.',
+      'Appuyez sur votre photo de profil, puis "Utiliser un code cadeau".',
+      'Entrez le code reçu et validez.'
+    ]};
+  return{titre:'🔑 Comment utiliser votre code',etapes:[
+    'Connectez-vous à la plateforme correspondant à votre produit.',
+    'Cherchez l\'option "Utiliser un code" / "Redeem code" dans les paramètres de votre compte.',
+    'Entrez le code reçu et validez.'
+  ]};
+}
+
 async function envoyerEmailCode(email,prenom,produit,code,prix,points,commandeId){
+  const instructions=instructionsActivation(produit);
   try{
     const res=await fetch('/.netlify/functions/send-email',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        templateId:BREVO_TEMPLATE_CODE,
+        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
         to:[{email,name:prenom||'Client'}],
-        params:{
-          prenom:prenom||'Client',
-          produit,
-          code,
-          prix:fmt(prix),
-          points:points||0,
-          commande_id:(commandeId||'').substring(0,8).toUpperCase()
-        }
+        subject:`✅ Votre code ${produit} - BabiPlay`,
+        htmlContent:`
+          <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
+            <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
+              <div style="background:linear-gradient(135deg,#f5a623,#ff7f50);padding:24px;text-align:center">
+                <h1 style="color:#000;margin:0;font-size:24px;letter-spacing:2px">BabiPlay CI</h1>
+                <p style="color:#000;margin:6px 0 0;font-size:13px">✅ Code livré</p>
+              </div>
+              <div style="padding:28px">
+                <p style="color:#e6e6f0;font-size:15px">Bonjour <strong>${prenom||'Client'}</strong> 👋</p>
+                <p style="color:#9a9ab8;font-size:14px;">Voici votre code d'activation :</p>
+                <div style="background:#1a1a2e;color:#fff;padding:18px;border-radius:10px;text-align:center;font-size:22px;letter-spacing:2px;font-weight:bold;word-break:break-all">${code}</div>
+                <p style="color:#9a9ab8;font-size:13px;margin-top:14px">Produit : <strong style="color:#e6e6f0">${produit}</strong></p>
+                <div style="background:#1a1a24;border:1px solid #2b2b3a;border-radius:10px;padding:16px;margin-top:16px">
+                  <p style="margin:0 0 10px;font-weight:bold;color:#f5a623;font-size:14px">${instructions.titre}</p>
+                  <ol style="margin:0;padding-left:18px;color:#c7c7d8;font-size:13px;line-height:1.6">
+                    ${instructions.etapes.map(e=>`<li style="margin-bottom:6px">${e}</li>`).join('')}
+                  </ol>
+                </div>
+                <p style="color:#6b6b88;font-size:12px;text-align:center;margin-top:20px">© 2026 BabiPlay CI — Abidjan, Côte d'Ivoire</p>
+              </div>
+            </div>
+          </div>`
       })
     });
     return res.ok;
   }catch(e){
-    console.error('Erreur email Brevo:',e);
+    console.error('Erreur email code:',e);
     return false;
   }
 }
