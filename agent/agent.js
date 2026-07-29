@@ -64,12 +64,16 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
       const keys = order.products.flatMap(p => p.keys || []);
       const delivered = keys.find(k => k.status === 'DELIVERED');
       if (delivered) {
-        const keyRes = await fetch(`${KINGUIN_BASE}/v2/order/${orderId}/keys/return`, {
-          method: 'POST',
+        // IMPORTANT : /v2/order/{id}/keys/return NE renvoie JAMAIS le champ serial (confirmé dans
+        // la doc officielle Kinguin — sa réponse ne contient que { id, status }, rien d'autre).
+        // Le vrai code d'activation ne s'obtient que via GET /v2/order/{id}/keys (endpoint
+        // "Download keys"), qui renvoie bien { id, serial, type, name, ... }. Avant ce correctif,
+        // le code livré au client était donc TOUJOURS "undefined", quelle que soit la commande.
+        const keyRes = await fetch(`${KINGUIN_BASE}/v2/order/${orderId}/keys?page=1&limit=10`, {
           headers: { 'X-Api-Key': KINGUIN_KEY }
         });
         const keyData = await keyRes.json();
-        if (Array.isArray(keyData) && keyData.length) return keyData[0].serial;
+        if (Array.isArray(keyData) && keyData.length && keyData[0].serial) return keyData[0].serial;
       }
     }
     await new Promise(r => setTimeout(r, 3000));
@@ -88,11 +92,11 @@ async function acheterViaKinguin(produitNom, kinguinProductId) {
     produit = await chercherProduitKinguin(produitNom);
   }
   console.log(`📦 Produit trouvé : ${produit.name} — ${produit.price}€`);
-  const commande = await passerCommandeKinguin(produit.productId || produit.kinguinId, produit.price);
-  console.log(`✅ Commande Kinguin créée : ${commande.orderId}`);
-  const code = await recupererCleCommande(commande.orderId);
+  const commandeKinguin = await passerCommandeKinguin(produit.productId || produit.kinguinId, produit.price);
+  console.log(`✅ Commande Kinguin créée : ${commandeKinguin.orderId}`);
+  const code = await recupererCleCommande(commandeKinguin.orderId);
   console.log('✅ Clé récupérée !');
-  return code;
+  return { code, kinguinOrderId: commandeKinguin.orderId };
 }
 
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
@@ -153,18 +157,21 @@ async function traiterCommande(commande) {
         .from('products').select('kinguin_product_id').eq('id', produitId).single();
       kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
     }
-    const code = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
+    const { code, kinguinOrderId } = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
+    // Garde-fou : si jamais aucun code valide n'a pu être extrait (ex: format de réponse Kinguin
+    // inattendu), on traite ça comme un échec plutôt que de livrer/enregistrer "undefined" au client.
+    if (!code) throw new Error(`Code Kinguin vide/invalide pour la commande Kinguin ${kinguinOrderId}`);
     if (commande.client_email) {
       await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
     }
     await supabase.from('commandes').update({
       statut: 'livree', livraison_auto: true,
-      livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code
+      livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code, kinguin_order_id: kinguinOrderId
     }).eq('id', commande.id);
     // Répercute la livraison sur "orders" (table lue par l'espace client dans compte.html) — sans ça,
     // le client voyait "Payé" indéfiniment, sans jamais recevoir le code affiché sur son compte.
     if (commande.order_id) {
-      await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code }).eq('id', commande.order_id);
+      await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code, kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
     }
     console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
