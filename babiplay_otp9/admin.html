@@ -1410,6 +1410,15 @@ async function avancerLivraison(orderId,nouveauStatut){
   if(order&&order.user_id){
     const{data:profile}=await sb.from('profiles').select('*').eq('id',order.user_id).single();
     if(profile){
+      // Crédite les points de fidélité seulement au moment où la commande passe "livrée" (pas à
+      // "en_livraison") — sans ça, "points_gagnes" restait affiché sur la commande sans jamais être
+      // ajouté au profil du client (profiles.points / profiles.total_commandes).
+      if(nouveauStatut==='livree'){
+        await sb.from('profiles').update({
+          points:(profile.points||0)+(order.points_gagnes||10),
+          total_commandes:(profile.total_commandes||0)+1
+        }).eq('id',order.user_id);
+      }
       const ok=await envoyerEmailLivraison(profile.email,profile.prenom||profile.nom||'Client',order.nom_produit||'Produit',nouveauStatut);
       if(ok)showToast(nouveauStatut==='livree'?'✅ Commande marquée livrée, email envoyé !':'🚚 Commande en livraison, email envoyé !','ok');
       else showToast('Statut mis à jour — email non envoyé (vérifier Brevo)','ok');
@@ -1479,6 +1488,12 @@ async function assignCode(orderId,productId){
   if(order&&order.user_id){
     const{data:profile}=await sb.from('profiles').select('*').eq('id',order.user_id).single();
     if(profile){
+      // Même correctif que pour la livraison auto (agent.js) et avancerLivraison ci-dessus :
+      // l'attribution manuelle d'un code ne créditait jamais les points sur le profil.
+      await sb.from('profiles').update({
+        points:(profile.points||0)+(order.points_gagnes||10),
+        total_commandes:(profile.total_commandes||0)+1
+      }).eq('id',order.user_id);
       const ok=await envoyerEmailCode(
         profile.email,
         profile.prenom||profile.nom||'Client',
