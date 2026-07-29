@@ -466,6 +466,54 @@ function platLogoImg(p){
   return logos[p]||'';
 }
 
+function instructionsActivation(produitNom){
+  const n=(produitNom||'').toLowerCase();
+  if(n.includes('psn')||n.includes('playstation')||n.includes('ps4')||n.includes('ps5'))
+    return{titre:'🎮 Comment activer sur PlayStation',etapes:[
+      'Allumez votre PS4/PS5 et connectez-vous à votre compte PSN.',
+      'Allez dans le PlayStation Store, puis ouvrez le menu (icône profil en haut à droite).',
+      'Sélectionnez "Utiliser un code".',
+      'Entrez le code reçu et validez.'
+    ]};
+  if(n.includes('xbox')||n.includes('game pass'))
+    return{titre:'🕹️ Comment activer sur Xbox',etapes:[
+      'Allumez votre Xbox (ou ouvrez l\'appli Xbox sur PC/mobile) et connectez-vous.',
+      'Allez dans le Microsoft Store.',
+      'Sélectionnez "Utiliser un code" (ou "Redeem").',
+      'Entrez le code reçu et validez.'
+    ]};
+  if(n.includes('steam'))
+    return{titre:'💻 Comment activer sur Steam',etapes:[
+      'Ouvrez l\'application Steam et connectez-vous.',
+      'Cliquez sur "Jeux" puis "Activer un produit sur Steam...".',
+      'Entrez le code reçu — il apparaît directement dans votre bibliothèque.'
+    ]};
+  if(n.includes('nintendo')||n.includes('eshop')||n.includes('switch'))
+    return{titre:'🎮 Comment activer sur Nintendo',etapes:[
+      'Sur votre console, ouvrez le Nintendo eShop.',
+      'Sélectionnez votre profil, puis "Saisir un code".',
+      'Entrez le code reçu et validez.'
+    ]};
+  if(n.includes('netflix')||n.includes('disney')||n.includes('crunchyroll')||n.includes('spotify')||n.includes('subscription')||n.includes('abonnement'))
+    return{titre:'📺 Comment activer votre abonnement',etapes:[
+      'Rendez-vous sur le site officiel du service (netflix.com, disneyplus.com...).',
+      'Connectez-vous, ou créez un compte si besoin.',
+      'Dans les paramètres du compte, cherchez "Carte cadeau / Redeem a gift card".',
+      'Entrez le code reçu pour créditer votre abonnement.'
+    ]};
+  if(n.includes('google play'))
+    return{titre:'📱 Comment activer sur Google Play',etapes:[
+      'Ouvrez Google Play Store sur votre téléphone.',
+      'Appuyez sur votre photo de profil, puis "Utiliser un code cadeau".',
+      'Entrez le code reçu et validez.'
+    ]};
+  return{titre:'🔑 Comment utiliser votre code',etapes:[
+    'Connectez-vous à la plateforme correspondant à votre produit.',
+    'Cherchez l\'option "Utiliser un code" / "Redeem code" dans les paramètres du compte.',
+    'Entrez le code reçu et validez.'
+  ]};
+}
+
 function renderOrders(){
   const el=document.getElementById('orders-list');
   if(!userOrders.length){
@@ -500,6 +548,12 @@ function renderOrders(){
           <div class="code-box">
             🔑 <span id="code-${o.id}">${code}</span>
             <button class="copy-btn" onclick="copyCode('${o.id}','${code}')">📋 Copier</button>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px">
+            <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:6px">${instructionsActivation(o.nom_produit).titre}</div>
+            <ol style="margin:0;padding-left:16px;font-size:12px;color:var(--muted2);line-height:1.6">
+              ${instructionsActivation(o.nom_produit).etapes.map(e=>`<li style="margin-bottom:4px">${e}</li>`).join('')}
+            </ol>
           </div>`
         :o.statut==='en_attente'||o.statut==='paye'||o.statut==='en_cours'?
           '<span style="font-size:12px;color:var(--muted2)">⏳ Code en cours de traitement...</span>':
