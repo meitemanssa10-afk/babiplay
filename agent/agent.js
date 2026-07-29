@@ -172,6 +172,22 @@ async function traiterCommande(commande) {
     // le client voyait "Payé" indéfiniment, sans jamais recevoir le code affiché sur son compte.
     if (commande.order_id) {
       await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code, kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
+      // Crédite les points de fidélité + le compteur d'achats sur le PROFIL du client — jusqu'ici,
+      // "points_gagnes" (ex: +10) était bien écrit sur la ligne "orders" à la commande, mais rien
+      // n'ajoutait jamais ce total au profil (profiles.points / profiles.total_commandes) : le
+      // client voyait "+10 pts gagnés" sur sa commande, mais son solde de points réel ne bougeait
+      // jamais. On lit d'abord order+profil, puis on écrit le nouveau total (pas d'incrément atomique
+      // disponible directement via l'API Supabase JS, donc lecture puis écriture).
+      const { data: orderRow } = await supabase.from('orders').select('user_id, points_gagnes').eq('id', commande.order_id).single();
+      if (orderRow?.user_id) {
+        const { data: profil } = await supabase.from('profiles').select('points, total_commandes').eq('id', orderRow.user_id).single();
+        if (profil) {
+          const nouveauxPoints = (profil.points || 0) + (orderRow.points_gagnes || 10);
+          const nouveauTotal = (profil.total_commandes || 0) + 1;
+          await supabase.from('profiles').update({ points: nouveauxPoints, total_commandes: nouveauTotal }).eq('id', orderRow.user_id);
+          console.log(`⭐ Points crédités : +${orderRow.points_gagnes || 10} (total ${nouveauxPoints}) pour ${orderRow.user_id}`);
+        }
+      }
     }
     console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
