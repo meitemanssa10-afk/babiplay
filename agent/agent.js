@@ -230,9 +230,9 @@ setInterval(async () => {
 // redémarrage du serveur Render, rendant impossible tout appel fiable depuis admin.html.
 const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
-console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}`);
-console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}`);
-console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com/reactivate-false-positives?secret=${IMPORT_SECRET}`);
+console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
+console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
+console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com/reactivate-false-positives?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
@@ -1038,6 +1038,11 @@ http.createServer((req, res) => {
 
   if (url.pathname === '/import-categories') {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (url.searchParams.get('confirm') !== 'oui') {
+      res.writeHead(200);
+      res.end(`⚠️ Ceci va lancer un import réel. Pour confirmer, ouvre : ${url.pathname}?secret=${secret}&confirm=oui`);
+      return;
+    }
     if (importEnCours) { res.writeHead(200); res.end('Import déjà en cours — voir logs Render.'); return; }
     runImportParCategories();
     res.writeHead(200);
@@ -1047,6 +1052,11 @@ http.createServer((req, res) => {
 
   if (url.pathname === '/update-slider') {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (url.searchParams.get('confirm') !== 'oui') {
+      res.writeHead(200);
+      res.end(`⚠️ Ceci va lancer une action réelle. Pour confirmer, ouvre : ${url.pathname}?secret=${secret}&confirm=oui`);
+      return;
+    }
     marquerSliderPourHomepage();
     res.writeHead(200);
     res.end('✅ Mise à jour du slider démarrée ! Va dans Render → Logs.');
@@ -1055,6 +1065,11 @@ http.createServer((req, res) => {
 
   if (url.pathname === '/fix-kinguin-products') {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (url.searchParams.get('confirm') !== 'oui') {
+      res.writeHead(200);
+      res.end(`⚠️ Ceci va lancer une correction réelle. Pour confirmer, ouvre : ${url.pathname}?secret=${secret}&confirm=oui`);
+      return;
+    }
     if (fixEnCours) { res.writeHead(200); res.end('Correction déjà en cours — voir logs Render.'); return; }
     runFixKinguinProducts();
     res.writeHead(200);
@@ -1066,8 +1081,8 @@ http.createServer((req, res) => {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
     const kinguinId = url.searchParams.get('id');
     if (!kinguinId) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Paramètre id manquant.' })); return; }
-    // Interroge Kinguin EN DIRECT pour cet ID précis (le même appel que celui fait à l'achat),
-    // sans passer par le scan complet du catalogue — réponse en quelques secondes, pas en heures.
+    // Endpoint de LECTURE SEULE (ne modifie rien) — pas besoin de confirm, sans risque même si
+    // un aperçu de lien le charge tout seul.
     obtenirProduitKinguinParId(kinguinId)
       .then(produit => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1082,6 +1097,11 @@ http.createServer((req, res) => {
 
   if (url.pathname === '/reactivate-false-positives') {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    if (url.searchParams.get('confirm') !== 'oui') {
+      res.writeHead(200);
+      res.end(`⚠️ Ceci va lancer une réactivation réelle. Pour confirmer, ouvre : ${url.pathname}?secret=${secret}&confirm=oui`);
+      return;
+    }
     if (reactivationEnCours) { res.writeHead(200); res.end('Réactivation déjà en cours — voir logs Render.'); return; }
     runReactivateFalsePositives();
     res.writeHead(200);
