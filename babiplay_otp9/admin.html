@@ -707,9 +707,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
         </div>
       </div>
       <div class="form-group">
-        <label>Produits — un par ligne, format : <code>Nom ; Prix d'achat en € ; URL image (optionnel)</code></label>
-        <textarea class="codes-textarea" id="bulk-textarea" style="min-height:220px" placeholder="Manette PS5 DualSense Blanche ; 45 ; https://exemple.com/image1.jpg&#10;Manette Xbox Series Noire ; 38&#10;Casque Gaming HyperX ; 55 ; https://exemple.com/image2.jpg"></textarea>
-        <small style="color:var(--muted);font-size:12px">Le prix de vente FCFA est calculé automatiquement : (prix d'achat + frais de livraison) × marge, au taux 1€ = 655,957 FCFA. L'image est optionnelle.</small>
+        <label>Produits — un par ligne, format : <code>Nom ; Prix d'achat en € ; Description ; Image1 | Image2 | Image3</code></label>
+        <textarea class="codes-textarea" id="bulk-textarea" style="min-height:260px" placeholder="Manette PS5 DualSense Blanche ; 45 ; Manette officielle Sony pour PS5, retour haptique et gâchettes adaptatives ; https://exemple.com/1.jpg | https://exemple.com/2.jpg | https://exemple.com/3.jpg&#10;Manette Xbox Series Noire ; 38 ; Manette sans fil Xbox, compatible PC/Xbox Series ; https://exemple.com/4.jpg"></textarea>
+        <small style="color:var(--muted);font-size:12px">Le prix de vente FCFA est calculé automatiquement : (prix d'achat + frais de livraison) × marge, au taux 1€ = 655,957 FCFA. Description et images optionnelles — plusieurs images séparées par " | ".</small>
       </div>
       <div class="form-group">
         <label><input type="checkbox" id="bulk-physique" checked style="width:auto;margin-right:8px"> Produit physique (livraison ~7 jours)</label>
@@ -1201,11 +1201,13 @@ function parseBulkLines(){
     const parts=line.split(';').map(p=>p.trim());
     const prixAchatEur=parseFloat((parts[1]||'').replace(',','.'))||0;
     const prixVenteFcfa=Math.round((prixAchatEur+livraison)*(1+marge/100)*EUR_TO_XOF_ADMIN);
+    const images=(parts[3]||'').split('|').map(u=>u.trim()).filter(Boolean);
     return{
       nom:parts[0]||'',
       prixAchatEur,
       prix:prixVenteFcfa,
-      image_url:parts[2]||''
+      description:parts[2]||'',
+      images
     };
   }).filter(p=>p.nom&&p.prixAchatEur);
 }
@@ -1221,10 +1223,10 @@ async function importerEnMasse(){
     plateforme,
     categorie,
     sous_categorie:'',
-    description:'',
+    description:it.description||'',
     prix:it.prix,
-    image_url:it.image_url||'https://placehold.co/400x300/1a1a24/f5a623?text=BabiPlay',
-    images:it.image_url?[it.image_url]:[],
+    image_url:it.images[0]||'https://placehold.co/400x300/1a1a24/f5a623?text=BabiPlay',
+    images:it.images,
     video_url:'',
     est_slider:false,
     slider_ordre:1,
