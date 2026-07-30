@@ -992,6 +992,13 @@ async function runFixKinguinProducts() {
       while (true) {
         const { data, error } = await supabase.from('products')
           .select('id, nom, plateforme, prix').eq('est_actif', true)
+          // Le nettoyage de doublons ne concerne QUE le catalogue importé depuis Kinguin (où des
+          // doublons réels peuvent apparaître à cause d'imports répétés). Les accessoires physiques
+          // (manettes, consoles, PC gamer...) sont gérés à la main, un par un, et n'ont pas d'ID
+          // Kinguin — les inclure ici pouvait désactiver un produit juste parce qu'un autre partageait
+          // un nom/plateforme proche, ou dès qu'un changement de prix le rendait "le plus cher" du
+          // groupe.
+          .not('kinguin_product_id', 'is', null)
           .order('id', { ascending: true }).range(from, from + pageSize - 1);
         if (error) { errDoublons = error; break; }
         if (!data || !data.length) break;
