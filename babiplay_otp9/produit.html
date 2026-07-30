@@ -134,7 +134,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 <body>
 
 <nav>
-  <a class="back-btn" href="index.html">← Retour</a>
+  <a class="back-btn" href="index.html" onclick="if(document.referrer && document.referrer.includes(location.host) && history.length>1){history.back();return false;}">← Retour</a>
   <a class="logo" href="index.html">BabiPlay</a>
 </nav>
 
