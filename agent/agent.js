@@ -338,6 +338,10 @@ console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.12');
+// Marge plus élevée pour les titres très demandés (voir MOTS_CLES_POPULAIRES un peu plus bas) —
+// les clients paient pour la facilité (paiement local, pas besoin de carte internationale) peu
+// importe le prix sur ces titres-là, contrairement aux cartes cadeaux génériques très comparées.
+const MARGIN_POPULAIRE = parseFloat(process.env.MARGIN_POPULAIRE || '0.20');
 const EUR_TO_XOF = 655.957;
 const PRIX_MIN_EUR = 0.5;
 const CAP_PAR_CATEGORIE = parseInt(process.env.CAP_PAR_CATEGORIE || '100', 10);
@@ -535,8 +539,9 @@ function genererDescriptionFR(plateforme, categorie, sousCategorie) {
   return `Clé d'activation officielle pour ${storeLabel}. Téléchargement et activation immédiats après réception du code par email.`;
 }
 
-function priceToFCFA(eurPrice) {
-  return Math.round(eurPrice * (1 + MARGIN) * EUR_TO_XOF);
+function priceToFCFA(eurPrice, nom) {
+  const marge = estPopulaire(nom) ? MARGIN_POPULAIRE : MARGIN;
+  return Math.round(eurPrice * (1 + marge) * EUR_TO_XOF);
 }
 
 // Joint un tableau (développeurs, éditeurs, genres) en texte lisible, ou renvoie tel quel si déjà une chaîne
@@ -586,7 +591,7 @@ function catKey(cat) { return cat.plateforme + '|' + cat.sousCategorie; }
 async function runImportParCategories() {
   if (importEnCours) { console.log('⚠️ Import déjà en cours.'); return; }
   importEnCours = true;
-  console.log(`🗂️ Import par catégories | marge: ${MARGIN * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA | plafond: ${CAP_PAR_CATEGORIE}/catégorie`);
+  console.log(`🗂️ Import par catégories | marge standard: ${MARGIN * 100}% | marge titres populaires: ${MARGIN_POPULAIRE * 100}% | taux: 1€ = ${EUR_TO_XOF} FCFA | plafond: ${CAP_PAR_CATEGORIE}/catégorie`);
   try {
     const existingIds = await getExistingKinguinIds();
     console.log(`   ${existingIds.size} produit(s) déjà en base (ignorés).`);
@@ -639,10 +644,7 @@ async function runImportParCategories() {
         if (sousCategorie === 'Cartes cadeaux') {
           const montant = extraireMontantFacial(product.name);
           if (montant) {
-            const prixCalcule = priceToFCFA(eurPrice);
-            const valeurFacialeFCFA = montant * EUR_TO_XOF;
-            const ratio = prixCalcule / valeurFacialeFCFA;
-            if (ratio < 0.75 || ratio > 1.05) continue; // prix aberrant vs la valeur faciale → on ignore
+            const prixCalcule = priceToFCFA(eurPrice, product.name);
           }
         }
 
@@ -688,7 +690,7 @@ async function runImportParCategories() {
         categorie,
         sous_categorie: sousCategorie,
         description: genererDescriptionFR(plateforme, categorie, sousCategorie),
-        prix: priceToFCFA(product.price),
+        prix: priceToFCFA(product.price, product.name),
         image_url: imageUrl,
         video_url: '',
         developpeur: joinField(product.developers),
@@ -920,7 +922,7 @@ async function runFixKinguinProducts() {
           const montant = extraireMontantFacial(product.name);
           if (montant) {
             const eurPriceCheck = product.price || 0;
-            const prixCalcule = priceToFCFA(eurPriceCheck);
+            const prixCalcule = priceToFCFA(eurPriceCheck, product.name);
             const valeurFacialeFCFA = montant * EUR_TO_XOF;
             const ratio = prixCalcule / valeurFacialeFCFA;
             if (ratio < 0.75 || ratio > 1.05) {
@@ -952,7 +954,7 @@ async function runFixKinguinProducts() {
         if (nouvelleImage && nouvelleImage !== row.image_url) fields.image_url = nouvelleImage;
         const eurPrice = product.price || 0;
         if (eurPrice >= PRIX_MIN_EUR) {
-          const nouveauPrix = priceToFCFA(eurPrice);
+          const nouveauPrix = priceToFCFA(eurPrice, product.name);
           if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
         }
         const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
