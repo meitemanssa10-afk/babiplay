@@ -16,16 +16,11 @@ console.log('🤖 BabiPlay Agent (Kinguin API) démarré...');
 // TRAITEMENT DES COMMANDES (achat + livraison auto)
 // ═════════════════════════════════════════════════════════════
 async function obtenirProduitKinguinParId(productId) {
-  // v2 (pas v1) — l'achat réel (passerCommandeKinguin) utilise déjà /v2/order ; vérifier avec la
-  // même famille de version évite un écart possible entre ce que dit v1 et ce que fait v2 à l'achat.
   const res = await fetch(`${KINGUIN_BASE}/v2/products/${productId}`, {
     headers: { 'X-Api-Key': KINGUIN_KEY }
   });
   if (!res.ok) {
     const err = new Error(`Produit Kinguin introuvable pour l'ID ${productId} (status ${res.status})`);
-    // 404 = le produit n'existe vraiment plus chez Kinguin. Tout le reste (429 rate-limit,
-    // 500/502/503/504 surcharge, etc.) est une erreur TEMPORAIRE — on ne doit jamais la traiter
-    // comme "produit cassé", seulement réessayer plus tard.
     err.kinguinStatus = res.status;
     err.estDefinitif = (res.status === 404);
     throw err;
@@ -64,11 +59,6 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
       const keys = order.products.flatMap(p => p.keys || []);
       const delivered = keys.find(k => k.status === 'DELIVERED');
       if (delivered) {
-        // IMPORTANT : /v2/order/{id}/keys/return NE renvoie JAMAIS le champ serial (confirmé dans
-        // la doc officielle Kinguin — sa réponse ne contient que { id, status }, rien d'autre).
-        // Le vrai code d'activation ne s'obtient que via GET /v2/order/{id}/keys (endpoint
-        // "Download keys"), qui renvoie bien { id, serial, type, name, ... }. Avant ce correctif,
-        // le code livré au client était donc TOUJOURS "undefined", quelle que soit la commande.
         const keyRes = await fetch(`${KINGUIN_BASE}/v2/order/${orderId}/keys?page=1&limit=10`, {
           headers: { 'X-Api-Key': KINGUIN_KEY }
         });
@@ -99,8 +89,6 @@ async function acheterViaKinguin(produitNom, kinguinProductId) {
   return { code, kinguinOrderId: commandeKinguin.orderId };
 }
 
-// Instructions d'activation adaptées à la plateforme (déduite du nom du produit) — chaque
-// plateforme a une procédure différente, donc un texte générique n'aide pas vraiment le client.
 function instructionsActivation(produitNom) {
   const n = (produitNom || '').toLowerCase();
   if (n.includes('psn') || n.includes('playstation') || n.includes('ps4') || n.includes('ps5')) {
@@ -243,8 +231,6 @@ async function traiterCommande(commande) {
       kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
     }
     const { code, kinguinOrderId } = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
-    // Garde-fou : si jamais aucun code valide n'a pu être extrait (ex: format de réponse Kinguin
-    // inattendu), on traite ça comme un échec plutôt que de livrer/enregistrer "undefined" au client.
     if (!code) throw new Error(`Code Kinguin vide/invalide pour la commande Kinguin ${kinguinOrderId}`);
     if (commande.client_email) {
       await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
@@ -253,16 +239,8 @@ async function traiterCommande(commande) {
       statut: 'livree', livraison_auto: true,
       livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code, kinguin_order_id: kinguinOrderId
     }).eq('id', commande.id);
-    // Répercute la livraison sur "orders" (table lue par l'espace client dans compte.html) — sans ça,
-    // le client voyait "Payé" indéfiniment, sans jamais recevoir le code affiché sur son compte.
     if (commande.order_id) {
       await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code, kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
-      // Crédite les points de fidélité + le compteur d'achats sur le PROFIL du client — jusqu'ici,
-      // "points_gagnes" (ex: +10) était bien écrit sur la ligne "orders" à la commande, mais rien
-      // n'ajoutait jamais ce total au profil (profiles.points / profiles.total_commandes) : le
-      // client voyait "+10 pts gagnés" sur sa commande, mais son solde de points réel ne bougeait
-      // jamais. On lit d'abord order+profil, puis on écrit le nouveau total (pas d'incrément atomique
-      // disponible directement via l'API Supabase JS, donc lecture puis écriture).
       const { data: orderRow } = await supabase.from('orders').select('user_id, points_gagnes').eq('id', commande.order_id).single();
       if (orderRow?.user_id) {
         const { data: profil } = await supabase.from('profiles').select('points, total_commandes').eq('id', orderRow.user_id).single();
@@ -279,8 +257,6 @@ async function traiterCommande(commande) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
     await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
     if (commande.order_id) await supabase.from('orders').update({ statut: 'erreur' }).eq('id', commande.order_id);
-    // Le client a payé mais n'a rien reçu : on le prévient tout de suite avec un lien de contact direct,
-    // au lieu de le laisser sans nouvelles pendant que la commande reste invisible en erreur.
     if (commande.client_email) {
       try {
         await envoyerEmailEchec(commande.client_email, commande.client_nom, commande.produit_nom || commande.nom_produit);
@@ -290,8 +266,6 @@ async function traiterCommande(commande) {
     }
   }
 }
-
-
 
 async function checkCommandes() {
   try {
@@ -312,9 +286,6 @@ async function checkCommandes() {
 checkCommandes();
 setInterval(checkCommandes, 30000);
 
-// ─────────────────────────────────────────────
-// Auto-ping : empêche Render (plan gratuit) de s'endormir
-// ─────────────────────────────────────────────
 setInterval(async () => {
   try {
     await fetch('https://babiplay-agent.onrender.com');
@@ -324,11 +295,6 @@ setInterval(async () => {
   }
 }, 4 * 60 * 1000);
 
-// ═════════════════════════════════════════════════════════════
-// IMPORT DU CATALOGUE — PLAFONNÉ PAR CATÉGORIE (100 max chacune)
-// ═════════════════════════════════════════════════════════════
-// Fixe (variable d'environnement) plutôt qu'aléatoire : sans ça, le secret changeait à chaque
-// redémarrage du serveur Render, rendant impossible tout appel fiable depuis admin.html.
 const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toString('hex');
 console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
 console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
@@ -338,15 +304,11 @@ console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
 const MARGIN = parseFloat(process.env.MARGIN || '0.12');
-// Marge plus élevée pour les titres très demandés (voir MOTS_CLES_POPULAIRES un peu plus bas) —
-// les clients paient pour la facilité (paiement local, pas besoin de carte internationale) peu
-// importe le prix sur ces titres-là, contrairement aux cartes cadeaux génériques très comparées.
 const MARGIN_POPULAIRE = parseFloat(process.env.MARGIN_POPULAIRE || '0.20');
 const EUR_TO_XOF = 655.957;
 const PRIX_MIN_EUR = 0.5;
 const CAP_PAR_CATEGORIE = parseInt(process.env.CAP_PAR_CATEGORIE || '100', 10);
 
-// Les 10 catégories suivies. Facile à modifier : ajoute/retire une ligne pour changer la sélection.
 const CATEGORIES = [
   { plateforme: 'psn',      sousCategorie: 'Cartes cadeaux', label: 'PSN — Cartes cadeaux' },
   { plateforme: 'psn',      sousCategorie: 'Abonnements',    label: 'PSN — Abonnements (PS Plus)' },
@@ -366,8 +328,6 @@ const CATEGORIES = [
   { plateforme: 'streaming', sousCategorie: 'Abonnements',    label: 'Streaming — Abonnements (Spotify, Crunchyroll...)' },
 ];
 
-// Titres/services connus → mis en avant dans chaque catégorie (proxy de "popularité",
-// Kinguin ne fournit pas de note/bestseller sur cette API vendeur).
 const MOTS_CLES_POPULAIRES = [
   'gta', 'grand theft auto', 'fifa', 'fc 24', 'fc 25', 'fc 26', 'fc 27', 'ea sports fc',
   'call of duty', 'modern warfare', 'fortnite', 'v-bucks', 'minecraft',
@@ -389,20 +349,16 @@ let reactivationEnCours = false;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Kinguin fournit "regionalLimitations" (ex: "Region free", "Europe", "United States"...)
-// et "countryLimitation" qui est la LISTE DES PAYS OÙ LE PRODUIT FONCTIONNE (pas une liste d'exclusion).
 function estCompatibleEurope(product) {
   const rl = (product.regionalLimitations || '').toLowerCase().trim();
   if (rl.includes('region free') || rl.includes('worldwide')) return true;
   if (rl.includes('europe')) return true;
 
   const liste = product.countryLimitation || [];
-  if (rl === '' && liste.length === 0) return true; // aucune info de restriction → considéré compatible
+  if (rl === '' && liste.length === 0) return true;
   return liste.includes('FR');
 }
 
-// Exclut les cartes explicitement libellées dans une autre devise que l'euro (ex: "15 USD Gift Card US"),
-// même si les autres filtres de région les auraient laissées passer. Gardé pour les JEUX (moins strict).
 function contientDeviseNonEuro(nom) {
   const n = (nom || '').toLowerCase();
   const aAutreDevise = /\busd\b|\$\s*\d|\d\s*\$|\bgbp\b|£|\btry\b|\bpln\b/.test(n);
@@ -410,12 +366,6 @@ function contientDeviseNonEuro(nom) {
   return aAutreDevise && !aEuro;
 }
 
-// Filtre STRICT réservé aux cartes cadeaux / abonnements / points : Kinguin vend ces produits en
-// dizaines de pays et devises différents (ZAR, JPY, INR, CAD, CZK, SEK, HKD, BRL, TRY, USD, GBP, AED,
-// MAD, CHF...). Pour les cartes cadeaux le code pays est en général à la toute fin ("... Gift Card
-// FR"), mais pour les "Points" il apparaît souvent au milieu ("FC Points 12000 UK XBOX One..."). On
-// cherche donc le code n'importe où dans le nom. On ne garde QUE la France ("FR"). S'il n'y a aucun
-// code pays ni devise suspecte détecté, on considère le produit compatible (générique / région libre).
 const CODES_PAYS_NON_FRANCE = [
   'US','UK','GB','CA','AU','NZ','JP','KR','CN','HK','TW','IN','BR','MX','ZA','TR','PL','CZ','HU','RO',
   'SK','SI','HR','BG','GR','PT','ES','IT','DE','NL','BE','AT','CH','SE','NO','DK','FI','IE','IS','AE',
@@ -427,17 +377,16 @@ const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','
 function estCarteFrance(nomOriginal) {
   const n = (nomOriginal || '').trim();
   const nLower = n.toLowerCase();
-  if (/\bFR\b/.test(n)) return true; // code FR trouvé quelque part → inclus, priorité absolue
+  if (/\bFR\b/.test(n)) return true;
   for (const code of CODES_PAYS_NON_FRANCE) {
-    if (new RegExp('\\b' + code + '\\b').test(n)) return false; // pays étranger explicite → exclu
+    if (new RegExp('\\b' + code + '\\b').test(n)) return false;
   }
   const aDeviseNonEuro = CODES_DEVISE_NON_EURO.some(c => nLower.includes(c)) || /\$|£|₺|₹|¥|₩|₪|kr\b/.test(n);
   const aEuro = nLower.includes('eur') || n.includes('€');
   if (aDeviseNonEuro && !aEuro) return false;
-  return true; // rien de suspect → considéré compatible France/Europe
+  return true;
 }
 
-// Récupère la meilleure image disponible en testant tous les champs possibles de l'API Kinguin
 function getImageUrl(product) {
   if (product.coverImageOriginal) return product.coverImageOriginal;
   if (product.coverImage) return product.coverImage;
@@ -451,17 +400,12 @@ function mapPlatform(kinguinPlatform, productName) {
   const p = (kinguinPlatform || '').toLowerCase();
   const n = (productName || '').toLowerCase();
 
-  // Streaming & apps — détecté par le NOM (le champ "platform" de Kinguin dit juste "Other" pour ces produits)
   if (n.includes('netflix')) return { plateforme: 'streaming', categorie: 'Netflix' };
   if (n.includes('spotify')) return { plateforme: 'streaming', categorie: 'Spotify' };
   if (n.includes('disney')) return { plateforme: 'streaming', categorie: 'Disney+' };
   if (n.includes('crunchyroll')) return { plateforme: 'streaming', categorie: 'Crunchyroll' };
 
   if (p.includes('playstation') || p.includes('psn')) {
-    // Les cartes cadeaux/abonnements PSN sont valables sur PS4 ET PS5 — on ne les rattache à une
-    // sous-console que si le nom le précise explicitement (cas des jeux). Sinon on laisse vide : le
-    // site les affichera dans "Tous" plutôt que de les perdre dans un onglet PS4/PS5 qui ne leur
-    // correspond pas vraiment.
     let categorie = '';
     if (n.includes('ps5')) categorie = 'PS5';
     else if (n.includes('ps4')) categorie = 'PS4';
@@ -482,9 +426,6 @@ function mapPlatform(kinguinPlatform, productName) {
   return { plateforme: 'pc', categorie };
 }
 
-// Produits livrés comme "compte partagé" (ex: "... ACCOUNT", identifiants tout faits envoyés par le
-// vendeur) plutôt qu'un vrai code à activer soi-même. Jamais compatibles avec notre livraison auto —
-// on les exclut systématiquement, quelle que soit la catégorie.
 function estCompteExclu(product) {
   const n = (product.name || '').toLowerCase();
   return n.includes('account') || n.includes('compte partagé') || n.includes('login details');
@@ -493,26 +434,14 @@ function estCompteExclu(product) {
 function guessSousCategorie(product, plateforme) {
   const tags = product.tags || [];
   const name = (product.name || '').toLowerCase().trim();
-  // Abonnements / Game Pass vérifiés EN PREMIER : Kinguin étiquette souvent ces produits avec le
-  // même tag "prepaid" que les vraies cartes cadeaux, ce qui les faisait atterrir au mauvais endroit.
   if (name.includes('game pass')) return 'Game Pass';
   const motsAbonnement = ['subscription', 'membership', 'switch online', 'ea play', 'ubisoft+', 'xbox live gold'];
   if (motsAbonnement.some(k => name.includes(k)) || (name.includes('plus') && (name.includes('xbox') || name.includes('playstation') || name.includes('psn')))) return 'Abonnements';
 
-  // "gift card" / "wallet" dans le nom = carte cadeau générique fiable, quel que soit le début du nom.
   if (name.includes('gift card') || name.includes('wallet')) return 'Cartes cadeaux';
 
-  // Monnaie interne à un jeu précis (FIFA/FC Points, COD Points, Warzone Points, V-Bucks, EVO
-  // Points...) : ce n'est PAS une carte cadeau de plateforme (le client ne peut pas l'utiliser où il
-  // veut, seulement dans CE jeu), mais on la vend quand même, dans son propre rayon "Points" par
-  // plateforme, pour ne pas la mélanger avec les vraies cartes cadeaux.
   if (name.includes('points') || name.includes('v-bucks') || name.includes('vbucks')) return 'Points';
 
-  // Le tag "prepaid" seul est TROP large chez Kinguin : il s'applique aussi aux jeux précis vendus via
-  // crédit de compte (ex: "God of War Ragnarök PlayStation Network Card €80" ou "EA Sports FC 24
-  // PlayStation Network Card" — ce sont des JEUX, pas des cartes cadeaux génériques). On vérifie que le
-  // nom commence par la marque DE LA PLATEFORME DÉTECTÉE précisément (pas n'importe quelle marque —
-  // "EA Sports FC 24" commence par "EA " mais n'est pas une carte EA App générique).
   const marquesParPlateforme = {
     psn: ['playstation', 'psn'],
     xbox: ['xbox'],
@@ -544,19 +473,16 @@ function priceToFCFA(eurPrice, nom) {
   return Math.round(eurPrice * (1 + marge) * EUR_TO_XOF);
 }
 
-// Joint un tableau (développeurs, éditeurs, genres) en texte lisible, ou renvoie tel quel si déjà une chaîne
 function joinField(val) {
   if (Array.isArray(val)) return val.filter(Boolean).join(', ');
   return val || '';
 }
 
-// Extrait le montant nominal d'une carte cadeau depuis son nom Kinguin (ex: "PSN Card 20 EUR" -> 20)
 function extraireMontantFacial(nom) {
   const m = (nom || '').match(/(\d{1,4})\s*(?:€|eur|euros?)\b/i);
   return m ? parseInt(m[1], 10) : null;
 }
 
-// Nom propre et uniforme pour les cartes cadeaux (ex: "Carte PSN 20€"). Pour tout le reste, on garde le nom Kinguin.
 function nomAffiche(product, plateforme, categorie, sousCategorie) {
   if (sousCategorie === 'Cartes cadeaux') {
     const montant = extraireMontantFacial(product.name);
@@ -585,9 +511,6 @@ async function getExistingKinguinIds() {
 
 function catKey(cat) { return cat.plateforme + '|' + cat.sousCategorie; }
 
-// ─────────────────────────────────────────────
-// IMPORT PAR CATÉGORIES (100 max chacune, connus en priorité)
-// ─────────────────────────────────────────────
 async function runImportParCategories() {
   if (importEnCours) { console.log('⚠️ Import déjà en cours.'); return; }
   importEnCours = true;
@@ -622,25 +545,21 @@ async function runImportParCategories() {
       if (!results.length) break;
 
       for (const product of results) {
-        if (estCompteExclu(product)) continue; // "ACCOUNT" = compte partagé, jamais livrable automatiquement
-        if (contientDeviseNonEuro(product.name)) continue; // carte en dollars/livres/etc. sans mention euro
+        if (estCompteExclu(product)) continue;
+        if (contientDeviseNonEuro(product.name)) continue;
         if (!estCompatibleEurope(product)) continue;
         if (!product.productId || existingIds.has(product.productId)) continue;
         const eurPrice = product.price || 0;
         if (eurPrice < PRIX_MIN_EUR) continue;
 
         const imageUrl = getImageUrl(product);
-        if (!imageUrl) continue; // pas de photo trouvée → produit ignoré (jamais de produit sans image sur le site)
+        if (!imageUrl) continue;
 
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
 
-        // Cartes cadeaux / abonnements / points : uniquement les versions France (voir estCarteFrance).
-        // Les jeux restent soumis au filtre devise plus permissif déjà appliqué plus haut.
         if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) continue;
 
-        // Pour les cartes cadeaux : le prix doit rester cohérent avec la valeur faciale (ex: une carte
-        // "20€" ne doit pas ressortir à 700 FCFA). Pour les jeux, les prix très variables sont normaux.
         if (sousCategorie === 'Cartes cadeaux') {
           const montant = extraireMontantFacial(product.name);
           if (montant) {
@@ -650,18 +569,14 @@ async function runImportParCategories() {
 
         const key = plateforme + '|' + sousCategorie;
         const bucket = buckets[key];
-        if (!bucket) continue; // catégorie non suivie, on ignore
+        if (!bucket) continue;
 
         const item = { product, plateforme, categorie, sousCategorie, imageUrl };
-        // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
-        // différent) — sans cette déduplication par nom, on importait la même carte plusieurs fois.
-        // On ne garde que la moins chère par nom.
         const nomCle = (product.name || '').trim().toLowerCase();
         if (estPopulaire(product.name)) {
           const existant = bucket.populaires.get(nomCle);
           if (!existant || eurPrice < (existant.product.price || Infinity)) bucket.populaires.set(nomCle, item);
         } else if (bucket.autres.size < CAP_PAR_CATEGORIE * 3 || bucket.autres.has(nomCle)) {
-          // on garde une petite marge (x3) pour avoir de quoi compléter, sans exploser la mémoire
           const existant = bucket.autres.get(nomCle);
           if (!existant || eurPrice < (existant.product.price || Infinity)) bucket.autres.set(nomCle, item);
         }
@@ -726,14 +641,10 @@ async function runImportParCategories() {
   }
 }
 
-// ─────────────────────────────────────────────
-// SLIDER DE LA PAGE D'ACCUEIL : met en avant 2 produits populaires par plateforme
-// ─────────────────────────────────────────────
 async function marquerSliderPourHomepage() {
   const PLATEFORMES = ['psn', 'xbox', 'pc', 'nintendo'];
   let ordre = 1;
   for (const plateforme of PLATEFORMES) {
-    // Priorité 1 : précommandes / jeux très attendus (GTA VI, prochains FC/FIFA...)
     const { data: precommandes, error: err1 } = await supabase.from('products')
       .select('id')
       .eq('plateforme', plateforme)
@@ -744,7 +655,6 @@ async function marquerSliderPourHomepage() {
     if (err1) console.error(`   ⚠️ Erreur sélection précommandes (${plateforme}):`, err1.message);
     let choisis = precommandes || [];
 
-    // Priorité 2 : complète avec des produits populaires si pas assez de précommandes
     if (choisis.length < 2) {
       const idsExclus = choisis.map(c => c.id);
       let requete = supabase.from('products')
@@ -773,16 +683,11 @@ async function runFixKinguinProducts() {
   fixEnCours = true;
   console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
-    // Nettoyage direct en base : désactive tout produit "compte partagé" résiduel, même si sa fiche
-    // n'existe plus dans le catalogue Kinguin actuel (donc jamais touché par la boucle ci-dessous).
     const { data: comptesResiduels, error: errResiduels } = await supabase.from('products')
       .update({ est_actif: false }).ilike('nom', '%account%').eq('est_actif', true).select('id');
     if (errResiduels) console.error('⚠️ Erreur nettoyage comptes résiduels:', errResiduels.message);
     else if (comptesResiduels?.length) console.log(`🧹 ${comptesResiduels.length} produit(s) "compte partagé" résiduel(s) désactivé(s).`);
 
-    // Même chose pour les cartes cadeaux / abonnements / points non-françaises importées AVANT le
-    // filtre estCarteFrance : on les repasse directement en base plutôt que de compter sur le fait
-    // qu'elles réapparaissent dans le catalogue Kinguin du jour (qui change constamment).
     const { data: cartesNonFrance, error: errCartesNonFrance } = await supabase.from('products')
       .select('id, nom').eq('est_actif', true).in('sous_categorie', ['Cartes cadeaux', 'Abonnements', 'Points']);
     if (errCartesNonFrance) console.error('⚠️ Erreur lecture cartes cadeaux/abonnements:', errCartesNonFrance.message);
@@ -796,9 +701,6 @@ async function runFixKinguinProducts() {
       }
     }
 
-    // Reclasse les produits marqués "Cartes cadeaux" à tort (avant l'ajout du rayon "Points") : vers
-    // "Points" si c'est une monnaie de jeu (FIFA Points, COD Points, V-Bucks...), sinon vers "Jeux".
-    // On ne dépend pas de Kinguin ici, donc ça marche même si la fiche a disparu de son catalogue depuis.
     const { data: fauxesCartes, error: errFaussesCartes } = await supabase.from('products')
       .select('id, nom, plateforme').eq('est_actif', true).eq('sous_categorie', 'Cartes cadeaux');
     if (errFaussesCartes) console.error('⚠️ Erreur lecture cartes cadeaux:', errFaussesCartes.message);
@@ -810,9 +712,9 @@ async function runFixKinguinProducts() {
       const idsVersPoints = [], idsVersJeux = [];
       for (const r of (fauxesCartes || [])) {
         const n = (r.nom || '').toLowerCase();
-        if (n.includes('gift card') || n.includes('wallet')) continue; // vraie carte, on garde
+        if (n.includes('gift card') || n.includes('wallet')) continue;
         const regexMarque = marquesParPlateformeCheck[r.plateforme];
-        if (regexMarque && regexMarque.test(r.nom || '')) continue; // commence par la bonne marque, on garde
+        if (regexMarque && regexMarque.test(r.nom || '')) continue;
         if (n.includes('points') || n.includes('v-bucks') || n.includes('vbucks')) idsVersPoints.push(r.id);
         else idsVersJeux.push(r.id);
       }
@@ -826,17 +728,15 @@ async function runFixKinguinProducts() {
       if (idsVersJeux.length) console.log(`🔀 ${idsVersJeux.length} produit(s) reclassé(s) de "Cartes cadeaux" vers "Jeux".`);
     }
 
-    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits liés
-    // à un ID Kinguin, il faut paginer avec .range() — sinon les produits au-delà de la 1000e ligne
-    // ne sont jamais vérifiés contre le catalogue Kinguin, et un ID cassé (404) peut rester actif
-    // indéfiniment et faire échouer de vraies commandes payées sans être jamais détecté.
     let data = [];
     {
       const pageSize = 1000;
       let from = 0;
       while (true) {
         const { data: pageRows, error: pageErr } = await supabase.from('products')
-          .select('id, nom, kinguin_product_id, image_url, prix').not('kinguin_product_id', 'is', null)
+          .select('id, nom, kinguin_product_id, image_url, prix')
+          .not('kinguin_product_id', 'is', null)
+          .neq('kinguin_product_id', '')
           .order('id', { ascending: true }).range(from, from + pageSize - 1);
         if (pageErr) throw new Error('Lecture produits: ' + pageErr.message);
         if (!pageRows || !pageRows.length) break;
@@ -845,11 +745,6 @@ async function runFixKinguinProducts() {
         from += pageSize;
       }
     }
-    // Regroupe TOUTES les fiches par ID Kinguin (pas une simple Map id->fiche, qui écraserait
-    // silencieusement une fiche si deux fiches distinctes partagent le même ID Kinguin — un cas
-    // réel avec d'anciens imports faits avant le nettoyage des doublons). Avec un Map classique,
-    // si cet ID était cassé, une seule des deux fiches était désactivée et l'autre restait active
-    // indéfiniment avec le même ID mort — exactement le bug qui a laissé la carte Xbox 5€ active.
     const existingGroups = new Map();
     for (const r of (data || [])) {
       if (!existingGroups.has(r.kinguin_product_id)) existingGroups.set(r.kinguin_product_id, []);
@@ -864,12 +759,6 @@ async function runFixKinguinProducts() {
     let totalCorriges = 0;
     let compteur = 0;
 
-    // On vérifie chaque ID INDIVIDUELLEMENT, avec le même appel exact que celui utilisé à l'achat
-    // (GET /v1/products/{id}) — plutôt que de parcourir la liste générale du catalogue Kinguin page
-    // par page. Ces deux méthodes chez Kinguin peuvent donner des réponses différentes pour un même
-    // produit (un produit peut apparaître dans la liste tout en étant introuvable en appel direct) —
-    // en utilisant systématiquement la méthode de l'achat réel, l'audit ne peut plus jamais dire
-    // "valide" pour un produit qui échouera en fait à l'achat.
     for (const [kinguinId, rows] of existingGroups) {
       compteur++;
       let product = null;
@@ -879,9 +768,7 @@ async function runFixKinguinProducts() {
       while (tentative < maxTentatives) {
         try { product = await obtenirProduitKinguinParId(kinguinId); break; }
         catch (e) {
-          // Vrai 404 : le produit n'existe plus, pas besoin de réessayer davantage.
           if (e.estDefinitif) { confirmeCasse = true; break; }
-          // Erreur temporaire (rate-limit / surcharge Kinguin) : on réessaie avec un délai croissant.
           tentative++;
           if (tentative >= maxTentatives) break;
           await sleep(1500 * tentative);
@@ -891,9 +778,6 @@ async function runFixKinguinProducts() {
         if (confirmeCasse) {
           produitsIntrouvables.push(...rows);
         } else {
-          // Toujours pas de réponse après 5 tentatives espacées, mais jamais un vrai 404 confirmé —
-          // on NE désactive PAS le produit sur un doute : on le laisse tel quel pour cette passe,
-          // il sera re-testé au prochain audit automatique (dans l'heure).
           erreursTemporaires.push({ kinguinId, rows });
         }
         continue;
@@ -908,16 +792,12 @@ async function runFixKinguinProducts() {
         const { plateforme, categorie } = mapPlatform(product.platform, product.name);
         const sousCategorie = guessSousCategorie(product, plateforme);
 
-        // Cartes cadeaux / abonnements / points non-France (ZAR, JPY, INR, CAD, CZK, SEK, HKD, USD,
-        // GBP, CHF, LU, CY...) déjà importées avant le correctif : on les désactive.
         if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) {
           await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
           totalCorriges++;
           continue;
         }
 
-        // Le même contrôle de cohérence que pour l'import : si le prix recalculé s'écarte trop de la
-        // valeur faciale d'une carte cadeau, on désactive plutôt que d'enregistrer un prix aberrant.
         if (sousCategorie === 'Cartes cadeaux') {
           const montant = extraireMontantFacial(product.name);
           if (montant) {
@@ -930,9 +810,6 @@ async function runFixKinguinProducts() {
               totalCorriges++;
               continue;
             }
-            // Les petites valeurs faciales (≤5€) restent structurellement peu rentables chez Kinguin
-            // (frais fixes trop lourds proportionnellement) même quand le ratio passe le contrôle —
-            // on les signale pour une revue manuelle plutôt que de les désactiver automatiquement.
             if (montant <= 5) {
               petitesCartesASurveiller.push({ id: row.id, nom: product.name, montant_facial_eur: montant, prix_kinguin_eur: eurPriceCheck, prix_vente_fcfa: prixCalcule });
             }
@@ -964,10 +841,6 @@ async function runFixKinguinProducts() {
       await sleep(250);
     }
 
-    // Un ID Kinguin qu'on suit mais qui a échoué à la vérification directe (même méthode que
-    // l'achat réel) = produit invendable (l'agent échouera à chaque tentative d'achat, exactement
-    // comme la carte PSN 5€ qui a bloqué une vraie commande cliente). On désactive TOUTES les
-    // fiches partageant cet ID (pas une seule), et on les signale clairement.
     if (produitsIntrouvables.length) {
       for (let i = 0; i < produitsIntrouvables.length; i += 200) {
         const lot = produitsIntrouvables.slice(i, i + 200).map(p => p.id);
@@ -976,16 +849,6 @@ async function runFixKinguinProducts() {
       console.log(`🚫 ${produitsIntrouvables.length} produit(s) avec un ID Kinguin introuvable — désactivé(s).`);
     }
 
-    // Plusieurs vendeurs Kinguin proposent souvent EXACTEMENT le même produit (même nom, ID
-    // différent) — d'anciens imports les ont enregistrés comme des fiches séparées. On ne garde
-    // que la moins chère par (plateforme + nom), on désactive le reste.
-    // IMPORTANT : ce nettoyage tourne ICI, APRÈS la désactivation des IDs cassés ci-dessus (et non
-    // avant) — sinon le choix "on garde le moins cher" pouvait accidentellement garder une fiche à
-    // l'ID cassé et désactiver une autre fiche dont l'ID, lui, fonctionnait. En ne relisant que les
-    // produits encore actifs à ce stade, on ne compare et ne garde que des fiches déjà confirmées valides.
-    // Supabase plafonne chaque requête à 1000 lignes par défaut ; avec plus de 4000 produits
-    // actifs, il faut paginer avec .range() pour tous les récupérer — sinon les doublons situés
-    // au-delà de la 1000e ligne ne sont jamais vus ni désactivés.
     let produitsActifs = [];
     let errDoublons = null;
     {
@@ -994,13 +857,8 @@ async function runFixKinguinProducts() {
       while (true) {
         const { data, error } = await supabase.from('products')
           .select('id, nom, plateforme, prix').eq('est_actif', true)
-          // Le nettoyage de doublons ne concerne QUE le catalogue importé depuis Kinguin (où des
-          // doublons réels peuvent apparaître à cause d'imports répétés). Les accessoires physiques
-          // (manettes, consoles, PC gamer...) sont gérés à la main, un par un, et n'ont pas d'ID
-          // Kinguin — les inclure ici pouvait désactiver un produit juste parce qu'un autre partageait
-          // un nom/plateforme proche, ou dès qu'un changement de prix le rendait "le plus cher" du
-          // groupe.
           .not('kinguin_product_id', 'is', null)
+          .neq('kinguin_product_id', '')
           .order('id', { ascending: true }).range(from, from + pageSize - 1);
         if (error) { errDoublons = error; break; }
         if (!data || !data.length) break;
@@ -1032,9 +890,6 @@ async function runFixKinguinProducts() {
       else console.log('✅ Aucun doublon détecté.');
     }
 
-    // Échantillon de produits CONFIRMÉS VALIDES (trouvés en direct dans le catalogue Kinguin
-    // pendant ce passage) — pour permettre de tester soi-même, via le bouton "Vérifier", que ce
-    // que l'audit désigne comme valide l'est vraiment, plutôt que de devoir nous faire confiance.
     const produitsValidesEchantillon = idsValidesConfirmes.slice(0, 50)
       .flatMap(id => existingGroups.get(id))
       .map(p => ({ id: p.id, nom: p.nom, kinguin_product_id: p.kinguin_product_id }));
@@ -1059,14 +914,6 @@ async function runFixKinguinProducts() {
   }
 }
 
-// ═════════════════════════════════════════════════════════════
-// RÉACTIVATION DES FAUX POSITIFS (audit précédent, avant le correctif retry/rate-limit)
-// ═════════════════════════════════════════════════════════════
-// L'ancienne version de l'audit traitait toute erreur Kinguin (y compris un simple rate-limit
-// temporaire pendant le scan de masse) comme "produit introuvable" et désactivait la fiche.
-// On reprend ici tous les produits actuellement INACTIFS avec un kinguin_product_id, on les
-// re-teste un par un avec la logique patiente corrigée (vrai 404 vs erreur temporaire), et on
-// réactive uniquement ceux confirmés valides. Rien n'est fait sur un doute.
 async function runReactivateFalsePositives() {
   if (reactivationEnCours) return;
   reactivationEnCours = true;
@@ -1080,6 +927,7 @@ async function runReactivateFalsePositives() {
         .select('id, kinguin_product_id, nom')
         .eq('est_actif', false)
         .not('kinguin_product_id', 'is', null)
+        .neq('kinguin_product_id', '')
         .range(from, from + 999);
       if (error) throw error;
       if (!data || !data.length) break;
@@ -1120,7 +968,6 @@ async function runReactivateFalsePositives() {
       } else if (confirmeCasse) {
         confirmesCasses += rows.length;
       }
-      // Sinon : toujours pas de réponse claire, on laisse tel quel, sera retesté au prochain audit.
       if (compteur % 50 === 0) console.log(`${compteur}/${parId.size} ID re-testés — réactivés: ${reactives}, confirmés cassés: ${confirmesCasses}`);
       await sleep(400);
     }
@@ -1132,13 +979,8 @@ async function runReactivateFalsePositives() {
   }
 }
 
-// ─────────────────────────────────────────────
-// Serveur HTTP
-// ─────────────────────────────────────────────
 const http = require('http');
 http.createServer((req, res) => {
-  // Sans ces en-têtes, le navigateur bloque la réponse quand admin.html (un autre domaine)
-  // appelle cet agent directement — même si la requête elle-même aboutit bien côté serveur.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
@@ -1191,8 +1033,6 @@ http.createServer((req, res) => {
     if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
     const kinguinId = url.searchParams.get('id');
     if (!kinguinId) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Paramètre id manquant.' })); return; }
-    // Endpoint de LECTURE SEULE (ne modifie rien) — pas besoin de confirm, sans risque même si
-    // un aperçu de lien le charge tout seul.
     obtenirProduitKinguinParId(kinguinId)
       .then(produit => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1223,17 +1063,9 @@ http.createServer((req, res) => {
   res.end('BabiPlay Agent (Kinguin) OK');
 }).listen(process.env.PORT || 3000);
 
-// Audit catalogue automatique (doublons + IDs Kinguin introuvables) — plus besoin de cliquer
-// manuellement sur "Audit catalogue" dans admin.html, ça tourne tout seul toutes les heures.
-// Placé ici, après toutes les déclarations (fixEnCours, runFixKinguinProducts, etc.) pour éviter
-// l'erreur "Cannot access before initialization" au démarrage.
 runFixKinguinProducts();
 setInterval(runFixKinguinProducts, 60 * 60 * 1000);
 
-// Import automatique hebdomadaire des nouveaux produits Kinguin — n'ajoute que ce qui n'existe pas
-// déjà (comparaison par ID Kinguin), ne supprime et ne désactive JAMAIS un produit existant. Lancé
-// 5 minutes après le démarrage (pour ne pas cumuler avec l'audit qui tourne déjà au démarrage), puis
-// toutes les 7 jours.
 setTimeout(() => {
   runImportParCategories();
   setInterval(runImportParCategories, 7 * 24 * 60 * 60 * 1000);
