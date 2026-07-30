@@ -1227,3 +1227,12 @@ http.createServer((req, res) => {
 // l'erreur "Cannot access before initialization" au démarrage.
 runFixKinguinProducts();
 setInterval(runFixKinguinProducts, 60 * 60 * 1000);
+
+// Import automatique hebdomadaire des nouveaux produits Kinguin — n'ajoute que ce qui n'existe pas
+// déjà (comparaison par ID Kinguin), ne supprime et ne désactive JAMAIS un produit existant. Lancé
+// 5 minutes après le démarrage (pour ne pas cumuler avec l'audit qui tourne déjà au démarrage), puis
+// toutes les 7 jours.
+setTimeout(() => {
+  runImportParCategories();
+  setInterval(runImportParCategories, 7 * 24 * 60 * 60 * 1000);
+}, 5 * 60 * 1000);
