@@ -1027,7 +1027,7 @@ function renderProducts(list){
       <td>${p.est_slider?'<span class="badge badge-gold">✓ Slider</span>':'<span class="badge badge-gray">Non</span>'}</td>
       <td>${p.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-secondary btn-sm" onclick='editProduct(${JSON.stringify(p)})'>✏️ Modifier</button>
+        <button class="btn btn-secondary btn-sm" onclick="editProductById('${p.id}')">✏️ Modifier</button>
         <button class="btn btn-danger btn-sm" onclick="toggleProduct('${p.id}',${p.est_actif})">${p.est_actif?'🚫 Désactiver':'✅ Activer'}</button>
         ${p.kinguin_product_id?`<button class="btn btn-secondary btn-sm" id="verif-btn-${p.id}" onclick="verifierProduit('${p.id}','${p.kinguin_product_id}')">🔍 Vérifier</button> <span id="verif-result-${p.id}"></span>`:''}
       </td>
@@ -1091,6 +1091,11 @@ function openProductModal(p=null){
 }
 
 function editProduct(p){openProductModal(p);}
+function editProductById(id){
+  const p=allProducts.find(x=>String(x.id)===String(id));
+  if(!p){showToast('Produit introuvable — recharge la page','err');return;}
+  openProductModal(p);
+}
 
 async function importFromLink(){
   const url=document.getElementById('import-url').value.trim();
@@ -1484,7 +1489,7 @@ function orderRow(o){
     <td><strong style="color:var(--gold)">${fmt(o.prix_paye)}</strong> FCFA</td>
     <td>${badge}</td>
     <td style="color:var(--muted);font-size:12px">${new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
-    <td><button class="btn btn-secondary btn-sm" onclick='openOrderModal(${JSON.stringify(o)})'>👁️ Voir</button></td>
+    <td><button class="btn btn-secondary btn-sm" onclick="openOrderModalById('${o.id}')">👁️ Voir</button></td>
   </tr>`;
 }
 
@@ -1500,6 +1505,11 @@ function statusBadge(s){
   return map[s]||s;
 }
 
+function openOrderModalById(id){
+  const o=allOrders.find(x=>String(x.id)===String(id));
+  if(!o){showToast('Commande introuvable — recharge la page','err');return;}
+  openOrderModal(o);
+}
 function openOrderModal(o){
   document.getElementById('modal-commande-body').innerHTML=`
     <div class="order-detail">
@@ -1695,7 +1705,7 @@ function renderPromos(){
       <td style="color:var(--muted);font-size:12px">${p.expire_le?new Date(p.expire_le).toLocaleDateString('fr-FR'):'Pas de limite'}</td>
       <td>${p.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-secondary btn-sm" onclick='editPromo(${JSON.stringify(p)})'>✏️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editPromoById('${p.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="togglePromo('${p.id}',${p.est_actif})">${p.est_actif?'🚫':'✅'}</button>
       </td>
     </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun code promo</td></tr>';
@@ -1710,6 +1720,11 @@ function openPromoModal(){
   document.getElementById('promo-actif').checked=true;
   document.getElementById('modal-promo-title').textContent='Nouveau code promo';
   document.getElementById('modal-promo').classList.add('open');
+}
+function editPromoById(id){
+  const p=allPromos.find(x=>String(x.id)===String(id));
+  if(!p){showToast('Code promo introuvable — recharge la page','err');return;}
+  editPromo(p);
 }
 function editPromo(p){
   document.getElementById('promo-id').value=p.id;
