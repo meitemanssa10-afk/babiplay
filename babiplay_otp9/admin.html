@@ -254,7 +254,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="section" id="section-produits">
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
         <div><h1>Produits</h1><p>Gérez votre catalogue gaming</p></div>
-        <button class="btn btn-primary" onclick="openProductModal()">+ Ajouter un produit</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-secondary" onclick="openBulkImportModal()">📥 Import en masse</button>
+          <button class="btn btn-primary" onclick="openProductModal()">+ Ajouter un produit</button>
+        </div>
       </div>
       <div class="filter-row">
         <select class="filter-select" onchange="filterProducts(this.value)">
@@ -667,8 +670,62 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </div>
 
+<!-- MODAL IMPORT EN MASSE -->
+<div class="modal-overlay" id="modal-bulk-import">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📥 Import en masse</h3>
+      <button class="modal-x" onclick="closeModal('modal-bulk-import')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Plateforme (appliquée à tous les produits collés ci-dessous)</label>
+        <select id="bulk-plateforme">
+          <option value="materiel">Accessoires (manettes, consoles, PC gamer)</option>
+          <option value="psn">PSN</option>
+          <option value="xbox">Xbox</option>
+          <option value="pc">PC</option>
+          <option value="nintendo">Nintendo</option>
+        </select>
+      </div>
+      <div class="form-group" id="bulk-categorie-group">
+        <label>Catégorie (appliquée à tous)</label>
+        <select id="bulk-categorie">
+          <option value="Manettes">Manettes</option>
+          <option value="Consoles">Consoles</option>
+          <option value="PC Gamer">PC Gamer</option>
+        </select>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="form-group">
+          <label>Marge (%)</label>
+          <input type="number" id="bulk-marge" value="15" step="1">
+        </div>
+        <div class="form-group">
+          <label>Frais de livraison par produit (€)</label>
+          <input type="number" id="bulk-livraison" value="10" step="0.5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Produits — un par ligne, format : <code>Nom ; Prix d'achat en € ; URL image (optionnel)</code></label>
+        <textarea class="codes-textarea" id="bulk-textarea" style="min-height:220px" placeholder="Manette PS5 DualSense Blanche ; 45 ; https://exemple.com/image1.jpg&#10;Manette Xbox Series Noire ; 38&#10;Casque Gaming HyperX ; 55 ; https://exemple.com/image2.jpg"></textarea>
+        <small style="color:var(--muted);font-size:12px">Le prix de vente FCFA est calculé automatiquement : (prix d'achat + frais de livraison) × marge, au taux 1€ = 655,957 FCFA. L'image est optionnelle.</small>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="bulk-physique" checked style="width:auto;margin-right:8px"> Produit physique (livraison ~7 jours)</label>
+      </div>
+      <div id="bulk-preview" style="font-size:13px;color:var(--muted2);margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-bulk-import')">Annuler</button>
+      <button class="btn btn-primary" onclick="importerEnMasse()">📥 Importer tous ces produits</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL COMMANDE -->
 <div class="modal-overlay" id="modal-commande">
+
   <div class="modal-box">
     <div class="modal-header">
       <h3>Détail de la commande</h3>
@@ -1122,6 +1179,76 @@ async function toggleProduct(id,current){
   await sb.from('products').update({est_actif:!current}).eq('id',id);
   await loadProducts();showToast(current?'Produit désactivé':'Produit activé','ok');
 }
+
+function openBulkImportModal(){
+  document.getElementById('bulk-textarea').value='';
+  document.getElementById('bulk-preview').textContent='';
+  document.getElementById('modal-bulk-import').classList.add('open');
+}
+
+const EUR_TO_XOF_ADMIN = 655.957;
+
+function parseBulkLines(){
+  const marge=parseFloat(document.getElementById('bulk-marge').value)||0;
+  const livraison=parseFloat(document.getElementById('bulk-livraison').value)||0;
+  const raw=document.getElementById('bulk-textarea').value;
+  return raw.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const parts=line.split(';').map(p=>p.trim());
+    const prixAchatEur=parseFloat((parts[1]||'').replace(',','.'))||0;
+    const prixVenteFcfa=Math.round((prixAchatEur+livraison)*(1+marge/100)*EUR_TO_XOF_ADMIN);
+    return{
+      nom:parts[0]||'',
+      prixAchatEur,
+      prix:prixVenteFcfa,
+      image_url:parts[2]||''
+    };
+  }).filter(p=>p.nom&&p.prixAchatEur);
+}
+
+async function importerEnMasse(){
+  const items=parseBulkLines();
+  if(!items.length){showToast('Aucun produit valide détecté — vérifie le format (Nom ; Prix d\'achat en €)','err');return;}
+  const plateforme=document.getElementById('bulk-plateforme').value;
+  const estPhysique=plateforme==='materiel'&&document.getElementById('bulk-physique').checked;
+  const categorie=plateforme==='materiel'?document.getElementById('bulk-categorie').value:'';
+  const rows=items.map(it=>({
+    nom:it.nom,
+    plateforme,
+    categorie,
+    sous_categorie:'',
+    description:'',
+    prix:it.prix,
+    image_url:it.image_url||'https://placehold.co/400x300/1a1a24/f5a623?text=BabiPlay',
+    images:it.image_url?[it.image_url]:[],
+    video_url:'',
+    est_slider:false,
+    slider_ordre:1,
+    est_populaire:false,
+    est_actif:true,
+    kinguin_product_id:'',
+    est_physique:estPhysique,
+    delai_livraison_jours:estPhysique?7:null,
+    stock:999
+  }));
+  const{error}=await sb.from('products').insert(rows);
+  if(error){showToast('Erreur import : '+error.message,'err');return;}
+  closeModal('modal-bulk-import');
+  showToast(`✅ ${rows.length} produit(s) importé(s) !`,'ok');
+  await loadProducts();populateProductSelects();
+}
+
+document.getElementById('bulk-textarea')?.addEventListener('input',majApercuBulk);
+document.getElementById('bulk-marge')?.addEventListener('input',majApercuBulk);
+document.getElementById('bulk-livraison')?.addEventListener('input',majApercuBulk);
+function majApercuBulk(){
+  const items=parseBulkLines();
+  if(!items.length){document.getElementById('bulk-preview').textContent='';return;}
+  const apercu=items.slice(0,3).map(it=>`${it.nom} → ${it.prix.toLocaleString('fr-FR')} FCFA`).join(' · ');
+  document.getElementById('bulk-preview').textContent=`✅ ${items.length} produit(s) détecté(s). Aperçu : ${apercu}${items.length>3?'...':''}`;
+}
+document.getElementById('bulk-plateforme')?.addEventListener('change',function(){
+  document.getElementById('bulk-categorie-group').style.display=this.value==='materiel'?'':'none';
+});
 
 // ============================================================
 // BANNIERES PROMO
