@@ -999,7 +999,14 @@ async function verifierProduit(produitId, kinguinId) {
 }
 
 function filterProducts(val){prodFilterPlatform=val;applyProductFilters();}
-function searchProducts(val){prodSearchQuery=val.trim().toLowerCase();applyProductFilters();}
+let searchProductsTimer=null;
+function searchProducts(val){
+  clearTimeout(searchProductsTimer);
+  searchProductsTimer=setTimeout(()=>{
+    prodSearchQuery=val.trim().toLowerCase();
+    applyProductFilters();
+  },300);
+}
 
 function openProductModal(p=null){
   document.getElementById('modal-product-title').textContent=p?'Modifier le produit':'Ajouter un produit';
