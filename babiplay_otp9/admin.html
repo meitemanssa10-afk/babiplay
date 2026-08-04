@@ -583,6 +583,15 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <input type="number" id="prod-delai" placeholder="7" value="7">
         </div>
       </div>
+      <div class="form-group" id="prod-options-group" style="display:none;background:rgba(100,140,255,.06);border:1px solid rgba(100,140,255,.2);border-radius:10px;padding:14px">
+        <label style="color:#8ab4ff">🧩 Options configurables (PC gamer, packs...)</label>
+        <textarea class="codes-textarea" id="prod-options" style="min-height:180px" placeholder="Choix 1 : Boîtier&#10;BEASTCOM Q5 PACK ; 0 ; https://exemple.com/boitier1.jpg&#10;Version blanche ; 15000 ; https://exemple.com/boitier2.jpg&#10;&#10;Choix 2 : Carte graphique&#10;GeForce RTX 3050 ; 0&#10;GeForce RTX 5060 ; 80000&#10;GeForce RTX 5070 ; 120000 ; ; indisponible"></textarea>
+        <small style="color:var(--muted2);font-size:12px;display:block;margin-top:6px">
+          Ligne <strong>sans</strong> point-virgule = titre d'un groupe de choix.<br>
+          Ligne <strong>avec</strong> point-virgule = un choix : <code>Libellé ; supplément FCFA ; lien image (optionnel) ; indisponible (optionnel)</code><br>
+          Prix affiché au client = prix de base du produit + suppléments des options choisies.
+        </small>
+      </div>
       <div class="form-group"><label>Description</label><textarea id="prod-desc" placeholder="20€ de crédit PlayStation Store..."></textarea></div>
       <div class="form-row">
         <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="prod-prix" placeholder="14500"></div>
@@ -1084,6 +1093,7 @@ function openProductModal(p=null){
   document.getElementById('prod-kinguin-id').value=p?p.kinguin_product_id||'':'';
   document.getElementById('prod-physique').checked=p?!!p.est_physique:true;
   document.getElementById('prod-delai').value=p?p.delai_livraison_jours||7:7;
+  document.getElementById('prod-options').value=p?optionsVersTexte(p.options):'';
   galerieImages = p ? (Array.isArray(p.images) && p.images.length ? [...p.images] : (p.image_url ? [p.image_url] : [])) : [];
   document.getElementById('prod-image').value='';
   renderGalerieImages();
@@ -1120,6 +1130,36 @@ async function importFromLink(){
   }finally{
     btn.textContent=btnTexteOrigine;btn.disabled=false;
   }
+}
+
+// Convertit la zone de texte du back-office en structure enregistrable, et inversement.
+// Une ligne sans point-virgule ouvre un nouveau groupe de choix ; les lignes suivantes sont
+// ses options, au format : Libellé ; supplément FCFA ; image ; indisponible
+function texteVersOptions(texte){
+  const groupes=[];let courant=null;
+  (texte||'').split('\n').forEach(ligne=>{
+    const l=ligne.trim();
+    if(!l)return;
+    if(!l.includes(';')){courant={titre:l,choix:[]};groupes.push(courant);return;}
+    if(!courant){courant={titre:'Options',choix:[]};groupes.push(courant);}
+    const p=l.split(';').map(x=>x.trim());
+    courant.choix.push({
+      label:p[0]||'',
+      supplement:parseInt(p[1])||0,
+      image:p[2]||'',
+      dispo:!(p[3]||'').toLowerCase().startsWith('indispo')
+    });
+  });
+  return groupes.filter(g=>g.choix.length);
+}
+
+function optionsVersTexte(options){
+  if(!Array.isArray(options)||!options.length)return'';
+  return options.map(g=>
+    g.titre+'\n'+g.choix.map(c=>
+      [c.label,c.supplement||0,c.image||'',c.dispo===false?'indisponible':''].join(' ; ').replace(/(\s*;\s*)+$/,'')
+    ).join('\n')
+  ).join('\n\n');
 }
 
 let galerieImages=[];
@@ -1170,6 +1210,7 @@ async function saveProduct(){
     kinguin_product_id:document.getElementById('prod-kinguin-id').value.trim(),
     est_physique:estPhysique,
     delai_livraison_jours:estPhysique?(parseInt(document.getElementById('prod-delai').value)||7):null,
+    options:texteVersOptions(document.getElementById('prod-options').value),
   };
   if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
   let error;
@@ -2431,6 +2472,7 @@ function updateCatOptions(){
   // s'applique) et affichent à la place les champs livraison.
   document.getElementById('prod-sous-categorie-group').style.display = plat==='materiel' ? 'none' : '';
   document.getElementById('prod-physique-group').style.display = plat==='materiel' ? '' : 'none';
+  document.getElementById('prod-options-group').style.display = plat==='materiel' ? '' : 'none';
   document.getElementById('prod-kinguin-group').style.display = plat==='materiel' ? 'none' : '';
 }
 
