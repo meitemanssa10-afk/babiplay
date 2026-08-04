@@ -7,6 +7,12 @@ exports.handler = async (event) => {
     const { type, email, phone, name } = JSON.parse(event.body);
     const identifiant = email || phone;
 
+    // La table otp_codes contient les codes de connexion : elle ne doit JAMAIS être accessible
+    // avec la clé publique (celle-ci est visible dans le JavaScript du site, donc par tout le
+    // monde — n'importe qui pourrait lire le code envoyé à une autre adresse et se connecter à
+    // sa place). On utilise donc la clé secrète, qui n'est connue que du serveur Netlify.
+    const CLE_SERVEUR = process.env.SUPABASE_KEY;
+
     // Anti-spam : sans cette limite, n'importe qui pouvait appeler cette fonction en boucle et
     // épuiser le quota Resend gratuit (bloquant TOUS les emails, y compris les codes de jeux déjà
     // payés par de vrais clients) ou remplir la table otp_codes à l'infini.
@@ -14,8 +20,8 @@ exports.handler = async (event) => {
       `${process.env.SUPABASE_URL}/rest/v1/otp_codes?identifier=eq.${encodeURIComponent(identifiant)}&order=created_at.desc&limit=5`,
       {
         headers: {
-          'apikey': process.env.SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
+          'apikey': CLE_SERVEUR,
+          'Authorization': `Bearer ${CLE_SERVEUR}`
         }
       }
     );
@@ -50,8 +56,8 @@ exports.handler = async (event) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        'apikey': CLE_SERVEUR,
+        'Authorization': `Bearer ${CLE_SERVEUR}`,
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({ identifier: identifiant, code: otp, expires_at: expires, type: type || 'login' })
