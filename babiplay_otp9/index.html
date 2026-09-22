@@ -238,6 +238,15 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 
 /* MOT DE PASSE OUBLIÉ + AUTH steps */
 .btn-link{background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+/* Recherche sur mobile : liste des résultats en pleine largeur, juste sous l'en-tête.
+   Sans ça, la liste restait coincée dans la largeur de la petite barre de recherche
+   (on ne voyait que les images, sans nom ni prix). */
+.search-results{top:calc(100% + 8px)}
+.user-dropdown{top:calc(100% + 8px)}
+@media(max-width:700px){
+  .search-results{position:fixed;top:62px;left:10px;right:10px;max-height:65vh}
+}
 </style>
 </head>
 <body>
