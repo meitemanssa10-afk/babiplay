@@ -194,8 +194,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="login-screen" id="admin-otp-screen" style="display:none">
   <div class="login-box">
     <h1>🔐 Vérification</h1>
-    <p id="admin-otp-msg">Code envoyé sur votre email</p>
-    <input type="number" id="admin-otp-input" placeholder="Code à 6 chiffres" style="text-align:center;font-size:24px;font-weight:700;letter-spacing:8px">
+    <p id="admin-otp-msg">Ouvre Google Authenticator et entre le code BabiPlay</p>
+    <div id="mfa-qr-zone" style="display:none;margin-bottom:18px">
+      <div style="background:#fff;border-radius:12px;padding:10px;display:inline-block"><img id="mfa-qr" alt="QR code" style="width:180px;height:180px;display:block"></div>
+      <p style="font-size:12px;color:var(--muted2);margin:10px 0 0">Impossible de scanner ? Saisis cette clé dans l'appli :<br><code id="mfa-secret" style="color:var(--gold);word-break:break-all"></code></p>
+    </div>
+    <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="admin-otp-input" placeholder="Code à 6 chiffres" style="text-align:center;font-size:24px;font-weight:700;letter-spacing:8px">
     <button class="login-btn" onclick="verifyAdminOTP()">Vérifier →</button>
     <div class="login-err" id="admin-otp-err"></div>
   </div>
@@ -866,16 +870,9 @@ let allOrders=[],allClients=[],allProducts=[],allCodes=[],allPromos=[];
   // Check session au chargement
   const{data:{session}}=await sb.auth.getSession();
   if(session&&session.user.email===ADMIN_EMAIL){
-    // Vérification OTP admin aussi
-    const otpOk=sessionStorage.getItem('admin_otp_ok');
-    if(otpOk==='1') showAdmin();
-    else{
-      await fetch('/.netlify/functions/send-otp',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({type:'admin',email:session.user.email,name:'Admin'})
-      });
-      showAdminOTP(session.user.email);
-    }
+    // Double vérification obligatoire : le back-office ne s'ouvre qu'une fois la session
+    // validée par Google Authenticator (niveau "aal2" chez Supabase).
+    await demarrerMFA();
   }
 })();
 
@@ -891,34 +888,66 @@ async function adminLogin(){
   if(email!==ADMIN_EMAIL){errEl.textContent='Accès refusé';return;}
   const{error}=await sb.auth.signInWithPassword({email,password});
   if(error){errEl.textContent='Mot de passe incorrect';return;}
-  // Mot de passe OK → envoyer code OTP par email
-  errEl.textContent='Envoi du code...';
-  await fetch('/.netlify/functions/send-otp',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({type:'admin',email,name:'Admin'})
-  });
   errEl.textContent='';
-  showAdminOTP(email);
+  await demarrerMFA();
 }
 
-function showAdminOTP(email){
+// ============================================================
+// DOUBLE VÉRIFICATION (Google Authenticator)
+// ============================================================
+// Avant : un code envoyé par email, mais la session était déjà ouverte dès le mot de passe —
+// le code n'était qu'un écran. Maintenant, c'est Supabase lui-même qui vérifie le code de
+// l'appli et élève la session au niveau "aal2" ; la base refuse les données admin sans lui.
+let mfaFactorId=null;
+
+async function demarrerMFA(){
+  const errEl=document.getElementById('login-err');
+  const{data:niveau}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(niveau&&niveau.currentLevel==='aal2'){showAdmin();return;}
+
+  const{data:facteurs,error}=await sb.auth.mfa.listFactors();
+  if(error){errEl.textContent='Erreur : '+error.message;return;}
+
+  // Appli déjà configurée → on demande juste le code
+  const actif=(facteurs.totp||[]).find(f=>f.status==='verified');
+  if(actif){mfaFactorId=actif.id;afficherEcranMFA(false);return;}
+
+  // Première fois → on nettoie une éventuelle configuration inachevée, puis on crée le QR code
+  for(const f of (facteurs.all||[])){
+    if(f.status!=='verified')await sb.auth.mfa.unenroll({factorId:f.id});
+  }
+  const{data:inscription,error:errInscription}=await sb.auth.mfa.enroll({
+    factorType:'totp',
+    friendlyName:'BabiPlay admin '+Date.now()
+  });
+  if(errInscription){errEl.textContent='Erreur 2FA : '+errInscription.message;return;}
+  mfaFactorId=inscription.id;
+  document.getElementById('mfa-qr').src=inscription.totp.qr_code;
+  document.getElementById('mfa-secret').textContent=inscription.totp.secret;
+  afficherEcranMFA(true);
+}
+
+function afficherEcranMFA(premiereFois){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('admin-otp-screen').style.display='flex';
-  document.getElementById('admin-otp-msg').textContent='Code envoyé sur '+email;
+  document.getElementById('mfa-qr-zone').style.display=premiereFois?'block':'none';
+  document.getElementById('admin-otp-msg').textContent=premiereFois
+    ?'Première connexion : scanne ce QR code avec Google Authenticator, puis entre le code à 6 chiffres affiché dans l\'appli.'
+    :'Ouvre Google Authenticator et entre le code BabiPlay à 6 chiffres.';
+  document.getElementById('admin-otp-err').textContent='';
+  document.getElementById('admin-otp-input').value='';
+  document.getElementById('admin-otp-input').focus();
 }
 
 async function verifyAdminOTP(){
   const code=document.getElementById('admin-otp-input').value.trim();
   const errEl=document.getElementById('admin-otp-err');
   if(code.length!==6){errEl.textContent='Code à 6 chiffres';return;}
+  if(!mfaFactorId){errEl.textContent='Recharge la page et reconnecte-toi';return;}
   errEl.textContent='Vérification...';
-  const res=await fetch('/.netlify/functions/verify-otp',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({identifier:ADMIN_EMAIL,code})
-  });
-  const data=await res.json();
-  if(!data.valid){errEl.textContent=data.reason||'Code incorrect';return;}
-  sessionStorage.setItem('admin_otp_ok','1');
+  const{error}=await sb.auth.mfa.challengeAndVerify({factorId:mfaFactorId,code});
+  if(error){errEl.textContent='Code incorrect ou expiré — prends le code affiché en ce moment dans l\'appli';return;}
+  errEl.textContent='';
   showAdmin();
 }
 
@@ -944,7 +973,6 @@ async function showAdmin(){
 }
 
 async function adminLogout(){
-  sessionStorage.removeItem('admin_otp_ok');
   await sb.auth.signOut();
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('admin-wrap').style.display='none';
