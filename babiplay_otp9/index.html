@@ -378,65 +378,31 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
         <button class="auth-tab" id="tab-register" onclick="switchTab('register')">S'inscrire</button>
       </div>
       <div id="form-login">
-        <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com"></div>
-        <div class="fg"><label>Mot de passe</label><input type="password" id="login-pw" placeholder="••••••••"></div>
-        <button class="btn-auth" onclick="loginStep1()">Se connecter →</button>
-        <p style="text-align:center;margin-top:10px"><button class="btn-link" onclick="showForgotPassword()">Mot de passe oublié ?</button></p>
+        <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email"></div>
+        <p style="font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:4px">Pas de mot de passe à retenir : on vous envoie un code par email.</p>
+        <button class="btn-auth" onclick="loginStep1()">Recevoir mon code →</button>
       </div>
       <div id="form-register" style="display:none">
         <div class="fg-row">
           <div class="fg"><label>Prénom</label><input type="text" id="reg-prenom" placeholder="Kouamé"></div>
           <div class="fg"><label>Nom</label><input type="text" id="reg-nom" placeholder="Koffi"></div>
         </div>
-        <div class="fg"><label>Email</label><input type="email" id="reg-email" placeholder="votre@email.com"></div>
+        <div class="fg"><label>Email</label><input type="email" id="reg-email" placeholder="votre@email.com" autocomplete="email"></div>
         <div class="fg" style="display:none"><label>WhatsApp</label><input type="tel" id="reg-tel" placeholder="+225 07 00 00 00 00"></div>
-        <div class="fg"><label>Mot de passe</label><input type="password" id="reg-pw" placeholder="•••••••• (8 min)"></div>
-        <div style="margin-bottom:14px; display:none">
-          <label style="font-size:12px;color:var(--muted2);margin-bottom:6px;display:block">Recevoir le code par :</label>
-          <div style="display:flex;gap:8px">
-            <button id="reg-method-email-btn" onclick="setRegMethod('email')" style="flex:1;padding:8px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:12px;cursor:pointer">📧 Email</button>
-            <button id="reg-method-wa-btn" onclick="setRegMethod('whatsapp')" style="display:none">💬 WhatsApp</button>
-          </div>
-        </div>
+        <p style="font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:4px">Aucun mot de passe : votre compte est protégé par un code envoyé à cette adresse.</p>
         <button class="btn-auth" onclick="sendRegisterOTP()">Créer mon compte →</button>
       </div>
     </div>
-    <div id="auth-step-method" style="display:none">
-      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Vérification en 2 étapes — Comment recevoir votre code ?</p>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="method-email-btn" onclick="setMethod('email')" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer">📧 Email</button>
-        <button id="method-wa-btn" onclick="setMethod('whatsapp')" style="display:none">💬 WhatsApp</button>
-      </div>
-      <button class="btn-auth" onclick="sendLoginOTP()">Envoyer le code →</button>
-      <p style="text-align:center;margin-top:10px"><button class="btn-link" onclick="backToStep1()" style="color:var(--muted2)">← Retour</button></p>
-    </div>
     <div id="auth-step2" style="display:none">
       <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:6px" id="otp-sent-msg">Code envoyé !</p>
-      <div class="fg"><label style="text-align:center;display:block;margin-bottom:10px">Code à 6 chiffres</label>
-        <input type="number" id="otp-input" placeholder="000000" style="text-align:center;font-size:28px;font-weight:700;letter-spacing:8px" maxlength="6">
+      <div class="fg"><label style="text-align:center;display:block;margin-bottom:10px">Code reçu par email</label>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" id="otp-input" placeholder="00000000" style="text-align:center;font-size:26px;font-weight:700;letter-spacing:6px" maxlength="8">
       </div>
       <button class="btn-auth" onclick="verifyOTP()">Vérifier →</button>
       <p style="text-align:center;margin-top:10px">
         <button class="btn-link" onclick="backToStep1()" style="color:var(--muted2)">← Retour</button>
         <button class="btn-link" onclick="resendOTP()" style="margin-left:16px">Renvoyer le code</button>
       </p>
-    </div>
-    <div id="auth-forgot" style="display:none">
-      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Réinitialiser votre mot de passe</p>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="forgot-email-btn" onclick="setForgotMethod('email')" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:13px;cursor:pointer">📧 Email</button>
-        <button id="forgot-wa-btn" onclick="setForgotMethod('whatsapp')" style="display:none">💬 WhatsApp</button>
-      </div>
-      <div class="fg" id="forgot-email-field"><label>Email</label><input type="email" id="forgot-email" placeholder="votre@email.com"></div>
-      <div class="fg" id="forgot-wa-field" style="display:none"><label>WhatsApp</label><input type="tel" id="forgot-wa" placeholder="+225 07 00 00 00 00"></div>
-      <button class="btn-auth" onclick="sendForgotOTP()">Envoyer le code →</button>
-      <p style="text-align:center;margin-top:10px"><button class="btn-link" onclick="backToStep1()" style="color:var(--muted2)">← Retour</button></p>
-    </div>
-    <div id="auth-newpw" style="display:none">
-      <p style="font-size:13px;color:var(--muted2);text-align:center;margin-bottom:16px">Identité vérifiée ✅<br>Choisissez votre nouveau mot de passe</p>
-      <div class="fg"><label>Nouveau mot de passe</label><input type="password" id="newpw-1" placeholder="•••••••• (8 min)"></div>
-      <div class="fg"><label>Confirmer</label><input type="password" id="newpw-2" placeholder="••••••••"></div>
-      <button class="btn-auth" onclick="submitNewPassword()">Valider →</button>
     </div>
     <div class="auth-err" id="auth-err"></div>
   </div>
@@ -1104,6 +1070,7 @@ async function proceedToPayment() {
 // AUTH
 function openAuth(tab) {
   document.getElementById('auth-overlay').classList.add('open');
+  backToStep1();
   switchTab(tab);
 }
 function closeAuthOverlay(e) {
@@ -1117,160 +1084,99 @@ function switchTab(tab) {
   document.getElementById('auth-err').textContent = '';
 }
 
-let otpMethod = 'email', otpRegMethod = 'email', otpForgotMethod = 'email';
-let otpContext = 'login', otpIdentifier = '', otpRegData = {}, forgotEmailVerified = '';
+// ---------------------------------------------------------------------------
+// CONNEXION SANS MOT DE PASSE (code envoyé par email, vérifié par Supabase)
+//
+// Avant : signInWithPassword ouvrait la session dès le bon mot de passe, et le code
+// email n'était qu'un écran supplémentaire côté navigateur — quelqu'un qui connaissait
+// le mot de passe pouvait appeler l'API Supabase directement et être connecté.
+// Maintenant : Supabase n'ouvre AUCUNE session tant que le code reçu par email
+// n'a pas été validé côté serveur. Le mot de passe client n'existe plus.
+// (Le back-office admin.html reste, lui, en mot de passe + Google Authenticator.)
+// ---------------------------------------------------------------------------
+let otpContext = 'login', otpIdentifier = '', otpRegData = {};
 
-function setMethod(m) {
-  otpMethod = m;
-  document.getElementById('method-email-btn').style.cssText = m === 'email' ? 'flex:1;padding:14px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer' : 'flex:1;padding:14px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:14px;cursor:pointer';
-  document.getElementById('method-wa-btn').style.cssText = m === 'whatsapp' ? 'flex:1;padding:14px;border-radius:10px;border:2px solid #25D366;background:#25D366;color:#fff;font-weight:700;font-size:14px;cursor:pointer' : 'flex:1;padding:14px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:14px;cursor:pointer';
-}
-function setRegMethod(m) {
-  otpRegMethod = m;
-  document.getElementById('reg-method-email-btn').style.cssText = m === 'email' ? 'flex:1;padding:8px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:12px;cursor:pointer' : 'flex:1;padding:8px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:12px;cursor:pointer';
-  document.getElementById('reg-method-wa-btn').style.cssText = m === 'whatsapp' ? 'flex:1;padding:8px;border-radius:10px;border:2px solid #25D366;background:#25D366;color:#fff;font-weight:700;font-size:12px;cursor:pointer' : 'flex:1;padding:8px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:12px;cursor:pointer';
-}
-function setForgotMethod(m) {
-  otpForgotMethod = m;
-  document.getElementById('forgot-email-btn').style.cssText = m === 'email' ? 'flex:1;padding:10px;border-radius:10px;border:2px solid var(--gold);background:var(--gold);color:#000;font-weight:700;font-size:13px;cursor:pointer' : 'flex:1;padding:10px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:13px;cursor:pointer';
-  document.getElementById('forgot-wa-btn').style.cssText = m === 'whatsapp' ? 'flex:1;padding:10px;border-radius:10px;border:2px solid #25D366;background:#25D366;color:#fff;font-weight:700;font-size:13px;cursor:pointer' : 'flex:1;padding:10px;border-radius:10px;border:2px solid var(--border2);background:none;color:var(--text);font-weight:700;font-size:13px;cursor:pointer';
-  document.getElementById('forgot-email-field').style.display = m === 'email' ? 'block' : 'none';
-  document.getElementById('forgot-wa-field').style.display = m === 'whatsapp' ? 'block' : 'none';
-}
-async function sendOTP(identifier, method, type, name = '') {
-  const res = await fetch('/.netlify/functions/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, name, email: method === 'email' ? identifier : null, phone: method === 'whatsapp' ? identifier : null }) });
-  if (res.ok) return { ok: true };
-  const data = await res.json().catch(() => ({}));
-  return { ok: false, message: data.error || 'Erreur envoi. Réessayez.' };
-}
 async function loginStep1() {
   const err = document.getElementById('auth-err');
   const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-pw').value;
-  if (!email || !pw) { err.textContent = 'Remplissez tous les champs'; return; }
-  err.textContent = 'Vérification...';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  if (error) { err.textContent = 'Email ou mot de passe incorrect'; return; }
-  err.textContent = ''; otpContext = 'login'; otpIdentifier = email;
-  showStepMethod();
-}
-async function sendLoginOTP() {
-  const err = document.getElementById('auth-err');
-  err.textContent = 'Envoi en cours...';
-  const r = await sendOTP(otpIdentifier, otpMethod, 'login');
-  if (!r.ok) { err.textContent = r.message; return; }
+  if (!email) { err.textContent = 'Entrez votre email'; return; }
+  err.textContent = 'Envoi du code...';
+  // shouldCreateUser: false — on ne crée pas de compte depuis l'écran de connexion
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  if (error) {
+    err.textContent = /not found|user|signup/i.test(error.message || '')
+      ? "Aucun compte avec cet email. Passez par « S'inscrire »."
+      : "Envoi impossible pour le moment. Réessayez.";
+    return;
+  }
   err.textContent = '';
-  document.getElementById('otp-sent-msg').textContent = 'Code envoyé sur ' + (otpMethod === 'email' ? otpIdentifier : 'WhatsApp') + ' ✅';
+  otpContext = 'login'; otpIdentifier = email;
+  document.getElementById('otp-sent-msg').textContent = 'Code envoyé à ' + email + ' ✅';
   showStep(2);
 }
+
 async function sendRegisterOTP() {
   const err = document.getElementById('auth-err');
   const prenom = document.getElementById('reg-prenom').value.trim();
   const nom = document.getElementById('reg-nom').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const tel = document.getElementById('reg-tel').value.trim();
-  const pw = document.getElementById('reg-pw').value;
   if (!prenom || !nom || !email) { err.textContent = 'Remplissez tous les champs'; return; }
-  if (!pw || pw.length < 8) { err.textContent = 'Mot de passe : 8 caractères minimum'; return; }
-  const id = otpRegMethod === 'email' ? email : tel;
-  if (!id) { err.textContent = 'Entrez votre ' + (otpRegMethod === 'email' ? 'email' : 'WhatsApp'); return; }
-  err.textContent = 'Envoi en cours...';
-  otpContext = 'register'; otpIdentifier = id; otpRegData = { prenom, nom, email, tel, pw };
-  const r = await sendOTP(id, otpRegMethod, 'register', prenom);
-  if (!r.ok) { err.textContent = r.message; return; }
+  err.textContent = 'Envoi du code...';
+  // Le compte n'est réellement créé qu'à la validation du code (verifyOtp).
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true, data: { prenom, nom, telephone: tel || null } }
+  });
+  if (error) { err.textContent = "Envoi impossible pour le moment. Réessayez."; return; }
   err.textContent = '';
-  document.getElementById('otp-sent-msg').textContent = 'Code envoyé sur ' + (otpRegMethod === 'email' ? id : 'WhatsApp ' + id) + ' ✅';
+  otpContext = 'register'; otpIdentifier = email; otpRegData = { prenom, nom, email, tel };
+  document.getElementById('otp-sent-msg').textContent = 'Code envoyé à ' + email + ' ✅';
   showStep(2);
 }
-async function sendForgotOTP() {
-  const err = document.getElementById('auth-err');
-  const id = otpForgotMethod === 'email' ? document.getElementById('forgot-email').value.trim() : document.getElementById('forgot-wa').value.trim();
-  if (!id) { err.textContent = 'Entrez votre ' + (otpForgotMethod === 'email' ? 'email' : 'WhatsApp'); return; }
-  err.textContent = 'Envoi en cours...';
-  otpContext = 'forgot'; otpIdentifier = id;
-  const r = await sendOTP(id, otpForgotMethod, 'reset');
-  if (!r.ok) { err.textContent = r.message; return; }
-  err.textContent = '';
-  document.getElementById('otp-sent-msg').textContent = 'Code envoyé ✅';
-  showStep(2);
-}
+
 async function verifyOTP() {
   const err = document.getElementById('auth-err');
   const code = document.getElementById('otp-input').value.trim();
-  if (code.length !== 6) { err.textContent = 'Code à 6 chiffres'; return; }
+  if (code.length < 6) { err.textContent = 'Entrez le code reçu par email'; return; }
   err.textContent = 'Vérification...';
-  // Inscription : le code et la création du compte sont vérifiés ensemble côté serveur
-  // (fonction register), pour qu'on ne puisse plus créer de compte sans code valide.
+  const { data, error } = await sb.auth.verifyOtp({ email: otpIdentifier, token: code, type: 'email' });
+  if (error || !data || !data.user) { err.textContent = 'Code incorrect ou expiré'; return; }
+  // Inscription : on complète la fiche client maintenant que le compte existe vraiment
   if (otpContext === 'register') {
-    const r = await fetch('/.netlify/functions/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: otpRegData.email, password: otpRegData.pw, prenom: otpRegData.prenom, nom: otpRegData.nom, telephone: otpRegData.tel, code }) });
-    const d = await r.json().catch(() => ({}));
-    if (!d.success) { err.textContent = d.error || 'Erreur, réessayez'; return; }
-    err.textContent = ''; document.getElementById('auth-overlay').classList.remove('open');
-    showToast('✅ Compte créé ! Connectez-vous.', 'ok'); showStep(1); switchTab('login');
-    return;
+    const { error: pErr } = await sb.from('profiles').upsert({
+      id: data.user.id,
+      email: otpRegData.email,
+      prenom: otpRegData.prenom,
+      nom: otpRegData.nom,
+      telephone: otpRegData.tel || null
+    }, { onConflict: 'id' });
+    if (pErr) console.error('Profil non enregistré:', pErr.message);
   }
-  const res = await fetch('/.netlify/functions/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: otpIdentifier, code }) });
-  const data = await res.json();
-  if (!data.valid) { err.textContent = data.reason || 'Code incorrect'; return; }
-  if (otpContext === 'login') {
-    err.textContent = ''; document.getElementById('auth-overlay').classList.remove('open');
-    showToast('✅ Connecté !', 'ok'); location.reload();
-  } else if (otpContext === 'forgot') {
-    err.textContent = '';
-    forgotEmailVerified = otpForgotMethod === 'email' ? otpIdentifier : '';
-    if (otpForgotMethod === 'whatsapp') {
-      const { data: prof } = await sb.from('profiles').select('email').eq('telephone', otpIdentifier).single();
-      forgotEmailVerified = prof?.email || forgotEmailVerified;
-    }
-    document.getElementById('auth-step2').style.display = 'none';
-    document.getElementById('auth-newpw').style.display = 'block';
-  }
+  err.textContent = '';
+  document.getElementById('auth-overlay').classList.remove('open');
+  showToast('✅ Connecté !', 'ok');
+  location.reload();
 }
+
 async function resendOTP() {
-  const method = otpContext === 'register' ? otpRegMethod : otpContext === 'forgot' ? otpForgotMethod : otpMethod;
-  const r = await sendOTP(otpIdentifier, method, otpContext);
-  document.getElementById('auth-err').textContent = r.ok ? 'Code renvoyé ✅' : r.message;
-}
-async function submitNewPassword() {
   const err = document.getElementById('auth-err');
-  const p1 = document.getElementById('newpw-1').value;
-  const p2 = document.getElementById('newpw-2').value;
-  if (!p1 || !p2) { err.textContent = 'Remplissez les deux champs'; return; }
-  if (p1.length < 8) { err.textContent = 'Minimum 8 caractères'; return; }
-  if (p1 !== p2) { err.textContent = 'Les mots de passe ne correspondent pas'; return; }
-  if (!forgotEmailVerified) { err.textContent = 'Erreur : recommencez la procédure'; return; }
-  err.textContent = 'Mise à jour...';
-  const res = await fetch('/.netlify/functions/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: forgotEmailVerified, newPassword: p1, otpAlreadyVerified: true }) });
-  const data = await res.json();
-  if (!data.success) { err.textContent = data.error || 'Erreur'; return; }
-  err.textContent = ''; document.getElementById('auth-overlay').classList.remove('open');
-  showToast('✅ Mot de passe modifié ! Connectez-vous.', 'ok'); showStep(1); switchTab('login');
+  err.textContent = 'Envoi...';
+  const options = otpContext === 'register'
+    ? { shouldCreateUser: true, data: { prenom: otpRegData.prenom, nom: otpRegData.nom, telephone: otpRegData.tel || null } }
+    : { shouldCreateUser: false };
+  const { error } = await sb.auth.signInWithOtp({ email: otpIdentifier, options });
+  err.textContent = error ? "Envoi impossible pour le moment." : 'Code renvoyé ✅';
 }
-function showStepMethod() {
-  document.getElementById('auth-step1').style.display = 'none';
-  document.getElementById('auth-step-method').style.display = 'block';
-  document.getElementById('auth-step2').style.display = 'none';
-  document.getElementById('auth-forgot').style.display = 'none';
-  document.getElementById('auth-err').textContent = '';
-}
+
 function showStep(n) {
   document.getElementById('auth-step1').style.display = n === 1 ? 'block' : 'none';
   document.getElementById('auth-step2').style.display = n === 2 ? 'block' : 'none';
-  document.getElementById('auth-forgot').style.display = 'none';
-  document.getElementById('auth-newpw').style.display = 'none';
   document.getElementById('otp-input').value = '';
 }
 function backToStep1() {
   document.getElementById('auth-step1').style.display = 'block';
-  document.getElementById('auth-step-method').style.display = 'none';
   document.getElementById('auth-step2').style.display = 'none';
-  document.getElementById('auth-forgot').style.display = 'none';
-  document.getElementById('auth-newpw').style.display = 'none';
-  document.getElementById('auth-err').textContent = '';
-}
-function showForgotPassword() {
-  document.getElementById('auth-step1').style.display = 'none';
-  document.getElementById('auth-forgot').style.display = 'block';
   document.getElementById('auth-err').textContent = '';
 }
 async function logout() {
