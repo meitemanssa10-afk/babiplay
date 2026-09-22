@@ -1096,6 +1096,29 @@ function switchTab(tab) {
 // ---------------------------------------------------------------------------
 let otpContext = 'login', otpIdentifier = '', otpRegData = {};
 
+// Traduit les erreurs techniques de Supabase en messages compréhensibles par le client.
+// Le cas le plus fréquent est la limite d'un envoi par minute et par adresse : sans
+// explication, le client croit que le site est en panne et réessaie en boucle.
+function messageErreurEnvoi(error, contexte) {
+  const m = (error && error.message) || '';
+  const secondes = m.match(/after (\d+) seconds?/i);
+  if (error && error.status === 429) {
+    return secondes
+      ? `Un code vient déjà d'être envoyé. Patientez ${secondes[1]} secondes avant d'en redemander un.`
+      : "Trop de demandes d'affilée. Patientez une minute, puis réessayez.";
+  }
+  if (/rate limit|only request this after|too many/i.test(m)) {
+    return "Un code vient déjà d'être envoyé. Patientez une minute avant d'en redemander un.";
+  }
+  if (contexte === 'login' && /not found|signups? not allowed|user/i.test(m)) {
+    return "Aucun compte avec cet email. Passez par l'onglet « S'inscrire ».";
+  }
+  if (/invalid.*email|email.*invalid/i.test(m)) {
+    return "Cette adresse email ne semble pas valide. Vérifiez la saisie.";
+  }
+  return "L'envoi du code a échoué. Vérifiez votre connexion et réessayez dans une minute.";
+}
+
 async function loginStep1() {
   const err = document.getElementById('auth-err');
   const email = document.getElementById('login-email').value.trim();
@@ -1103,12 +1126,7 @@ async function loginStep1() {
   err.textContent = 'Envoi du code...';
   // shouldCreateUser: false — on ne crée pas de compte depuis l'écran de connexion
   const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-  if (error) {
-    err.textContent = /not found|user|signup/i.test(error.message || '')
-      ? "Aucun compte avec cet email. Passez par « S'inscrire »."
-      : "Envoi impossible pour le moment. Réessayez.";
-    return;
-  }
+  if (error) { err.textContent = messageErreurEnvoi(error, 'login'); return; }
   err.textContent = '';
   otpContext = 'login'; otpIdentifier = email;
   document.getElementById('otp-sent-msg').textContent = 'Code envoyé à ' + email + ' ✅';
@@ -1128,7 +1146,7 @@ async function sendRegisterOTP() {
     email,
     options: { shouldCreateUser: true, data: { prenom, nom, telephone: tel || null } }
   });
-  if (error) { err.textContent = "Envoi impossible pour le moment. Réessayez."; return; }
+  if (error) { err.textContent = messageErreurEnvoi(error, 'register'); return; }
   err.textContent = '';
   otpContext = 'register'; otpIdentifier = email; otpRegData = { prenom, nom, email, tel };
   document.getElementById('otp-sent-msg').textContent = 'Code envoyé à ' + email + ' ✅';
@@ -1141,7 +1159,17 @@ async function verifyOTP() {
   if (code.length < 6) { err.textContent = 'Entrez le code reçu par email'; return; }
   err.textContent = 'Vérification...';
   const { data, error } = await sb.auth.verifyOtp({ email: otpIdentifier, token: code, type: 'email' });
-  if (error || !data || !data.user) { err.textContent = 'Code incorrect ou expiré'; return; }
+  if (error || !data || !data.user) {
+    const m = (error && error.message) || '';
+    if ((error && error.status === 429) || /rate limit|too many/i.test(m)) {
+      err.textContent = "Trop de tentatives. Patientez une minute avant de réessayer.";
+    } else if (/expired/i.test(m)) {
+      err.textContent = "Ce code a expiré. Cliquez sur « Renvoyer le code » pour en recevoir un nouveau.";
+    } else {
+      err.textContent = "Code incorrect. Vérifiez le code reçu par email, ou demandez-en un nouveau.";
+    }
+    return;
+  }
   // Inscription : on complète la fiche client maintenant que le compte existe vraiment
   if (otpContext === 'register') {
     const { error: pErr } = await sb.from('profiles').upsert({
@@ -1166,7 +1194,7 @@ async function resendOTP() {
     ? { shouldCreateUser: true, data: { prenom: otpRegData.prenom, nom: otpRegData.nom, telephone: otpRegData.tel || null } }
     : { shouldCreateUser: false };
   const { error } = await sb.auth.signInWithOtp({ email: otpIdentifier, options });
-  err.textContent = error ? "Envoi impossible pour le moment." : 'Code renvoyé ✅';
+  err.textContent = error ? messageErreurEnvoi(error, otpContext) : 'Code renvoyé ✅';
 }
 
 function showStep(n) {
