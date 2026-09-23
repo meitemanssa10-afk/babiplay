@@ -296,10 +296,11 @@ setInterval(async () => {
 }, 4 * 60 * 1000);
 
 const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toString('hex');
-console.log(`🔐 Code secret import/fix : ${IMPORT_SECRET}`);
-console.log(`👉 Import par catégories : https://babiplay-agent.onrender.com/import-categories?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
-console.log(`👉 Fix produits existants : https://babiplay-agent.onrender.com/fix-kinguin-products?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
-console.log(`👉 Réactiver faux positifs : https://babiplay-agent.onrender.com/reactivate-false-positives?secret=${IMPORT_SECRET}  (ajoute &confirm=oui à la fin pour vraiment lancer)`);
+// Le secret ne doit jamais apparaître dans les logs Render : ils sont consultables et
+// conservés. Avant, chaque redémarrage réaffichait le secret en clair, ainsi que les
+// adresses complètes permettant de déclencher import, audit et réactivation.
+console.log(`🔐 Code secret import/fix : ${process.env.IMPORT_SECRET ? 'configuré ✅' : 'MANQUANT ⚠️ (secret temporaire généré, il changera à chaque redémarrage)'}`);
+console.log('👉 Actions disponibles depuis le back-office : audit, import, réactivation, slider.');
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
