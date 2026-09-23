@@ -1079,7 +1079,7 @@ async function verifierProduit(produitId, kinguinId) {
   btn.disabled = true;
   resultSpan.innerHTML = '<span style="color:var(--muted2);font-size:12px">⏳ Vérification...</span>';
   try {
-    const res = await fetch(`${AGENT_URL}/check-product?id=${encodeURIComponent(kinguinId)}&secret=${AGENT_SECRET}`);
+    const res = await fetch(`${AGENT_API}?action=check-product&id=${encodeURIComponent(kinguinId)}`);
     const data = await res.json();
     if (data.ok) {
       resultSpan.innerHTML = `<span style="color:#52b043;font-size:12px">✅ OK — ${data.prix}€</span>`;
@@ -1423,16 +1423,16 @@ async function toggleBanner(id,current){
 // ============================================================
 // AUDIT CATALOGUE
 // ============================================================
-// Même secret que la variable d'environnement IMPORT_SECRET définie sur Render pour l'agent —
-// remplace la valeur ci-dessous par celle que tu as choisie côté Render, les deux doivent être identiques.
-const AGENT_SECRET='babiplay2026audit';
-const AGENT_URL='https://babiplay-agent.onrender.com';
+// Le secret du bot ne doit JAMAIS apparaître ici : cette page est lisible par n'importe qui
+// via "Afficher le code source". Les appels passent donc par une fonction Netlify (agent.js)
+// qui ajoute le secret côté serveur, à partir de la variable d'environnement AGENT_SECRET.
+const AGENT_API='/.netlify/functions/agent';
 
 async function lancerAudit(){
   const btn=document.getElementById('audit-btn');
   btn.disabled=true;btn.textContent='⏳ Démarrage...';
   try{
-    const res=await fetch(`${AGENT_URL}/fix-kinguin-products?secret=${AGENT_SECRET}`);
+    const res=await fetch(`${AGENT_API}?action=audit`);
     const texte=await res.text();
     showToast(res.ok?'✅ Vérification démarrée en arrière-plan !':'Erreur : '+texte,res.ok?'ok':'err');
   }catch(e){
