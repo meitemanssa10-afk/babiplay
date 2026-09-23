@@ -287,10 +287,57 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
           <p>
             Votre compte n'a pas de mot de passe : à chaque connexion, vous recevez un code à usage
             unique sur <strong id="info-email">votre adresse email</strong>. Personne ne peut accéder
-            à votre compte sans ce code.<br><br>
-            Pour changer l'adresse email associée à votre compte, contactez le support sur
-            <a href="https://wa.me/2250797659178" target="_blank" style="color:#25D366;font-weight:600">WhatsApp</a>.
+            à votre compte sans ce code.
           </p>
+        </div>
+
+        <!-- CHANGEMENT D'ADRESSE EMAIL
+             L'adresse email étant devenue la clé du compte, Supabase exige une double
+             confirmation ("Secure email change") : un code part sur l'ANCIENNE adresse et un
+             autre sur la NOUVELLE. Sans les deux, rien ne change — donc quelqu'un qui trouverait
+             une session ouverte ne peut pas détourner le compte. -->
+        <div class="info-connexion" style="margin-top:14px">
+          <h4>📧 Changer mon adresse email</h4>
+
+          <div id="mail-etape-1">
+            <p style="margin-bottom:12px">
+              Par sécurité, vous recevrez un code sur votre adresse actuelle <strong>et</strong> un
+              autre sur la nouvelle. Les deux sont nécessaires.
+            </p>
+            <div class="form-group" style="margin-bottom:10px">
+              <label>Nouvelle adresse email</label>
+              <input type="email" id="nouvel-email" placeholder="nouvelle@email.com" autocomplete="email">
+            </div>
+            <button class="btn-save" onclick="demanderChangementEmail()">Envoyer les codes →</button>
+          </div>
+
+          <div id="mail-etape-2" style="display:none">
+            <p style="margin-bottom:12px">
+              Ouvrez la boîte de votre <strong>ancienne</strong> adresse
+              (<span id="mail-ancienne">—</span>) et recopiez le code reçu.
+            </p>
+            <div class="form-group" style="margin-bottom:10px">
+              <label>Code reçu sur l'ancienne adresse</label>
+              <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" id="code-ancien" placeholder="00000000" style="text-align:center;letter-spacing:6px;font-size:20px">
+            </div>
+            <button class="btn-save" onclick="validerCodeAncien()">Valider →</button>
+            <button class="btn-save" onclick="annulerChangementEmail()" style="background:var(--bg4);border:1px solid var(--border2);color:var(--muted2);margin-left:8px">Annuler</button>
+          </div>
+
+          <div id="mail-etape-3" style="display:none">
+            <p style="margin-bottom:12px">
+              Dernière étape : ouvrez la boîte de votre <strong>nouvelle</strong> adresse
+              (<span id="mail-nouvelle">—</span>) et recopiez le code reçu.
+            </p>
+            <div class="form-group" style="margin-bottom:10px">
+              <label>Code reçu sur la nouvelle adresse</label>
+              <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" id="code-nouveau" placeholder="00000000" style="text-align:center;letter-spacing:6px;font-size:20px">
+            </div>
+            <button class="btn-save" onclick="validerCodeNouveau()">Terminer →</button>
+            <button class="btn-save" onclick="annulerChangementEmail()" style="background:var(--bg4);border:1px solid var(--border2);color:var(--muted2);margin-left:8px">Annuler</button>
+          </div>
+
+          <div id="mail-erreur" style="font-size:13px;color:#ff6b6b;margin-top:10px;min-height:18px"></div>
         </div>
       </div>
     </div>
@@ -429,6 +476,86 @@ async function saveProfile(){
   const{error}=await sb.from('profiles').update({prenom,nom,telephone}).eq('id',currentUser.id);
   if(error){showToast('Erreur lors de la mise à jour','err');return;}
   showToast('✅ Profil mis à jour !','ok');await loadProfile();
+}
+
+// ============================================================
+// CHANGEMENT D'ADRESSE EMAIL (double confirmation Supabase)
+// ============================================================
+let emailDemande='';
+
+function afficherEtapeMail(n){
+  document.getElementById('mail-etape-1').style.display=n===1?'block':'none';
+  document.getElementById('mail-etape-2').style.display=n===2?'block':'none';
+  document.getElementById('mail-etape-3').style.display=n===3?'block':'none';
+  document.getElementById('mail-erreur').textContent='';
+}
+
+function annulerChangementEmail(){
+  emailDemande='';
+  document.getElementById('nouvel-email').value='';
+  document.getElementById('code-ancien').value='';
+  document.getElementById('code-nouveau').value='';
+  afficherEtapeMail(1);
+}
+
+function messageErreurMail(error){
+  const m=(error&&error.message)||'';
+  if((error&&error.status===429)||/rate limit|only request this after|too many/i.test(m))
+    return "Trop de demandes d'affilée. Patientez une minute, puis réessayez.";
+  if(/already registered|already been registered|already exists/i.test(m))
+    return "Cette adresse est déjà utilisée par un autre compte.";
+  if(/invalid.*email|email.*invalid/i.test(m))
+    return "Cette adresse email ne semble pas valide.";
+  if(/expired/i.test(m))
+    return "Ce code a expiré. Recommencez la procédure.";
+  if(/token|otp|invalid/i.test(m))
+    return "Code incorrect. Vérifiez le code reçu par email.";
+  return "L'opération a échoué. Réessayez dans une minute.";
+}
+
+async function demanderChangementEmail(){
+  const err=document.getElementById('mail-erreur');
+  const nouveau=document.getElementById('nouvel-email').value.trim();
+  if(!nouveau){err.textContent='Entrez la nouvelle adresse';return;}
+  if(nouveau.toLowerCase()===currentUser.email.toLowerCase()){
+    err.textContent="C'est déjà votre adresse actuelle.";return;
+  }
+  err.textContent='Envoi des codes...';
+  const{error}=await sb.auth.updateUser({email:nouveau});
+  if(error){err.textContent=messageErreurMail(error);return;}
+  emailDemande=nouveau;
+  document.getElementById('mail-ancienne').textContent=currentUser.email;
+  document.getElementById('mail-nouvelle').textContent=nouveau;
+  afficherEtapeMail(2);
+  showToast('📧 Deux codes envoyés — un par boîte','ok');
+}
+
+async function validerCodeAncien(){
+  const err=document.getElementById('mail-erreur');
+  const code=document.getElementById('code-ancien').value.trim();
+  if(code.length<6){err.textContent='Entrez le code reçu sur votre ancienne adresse';return;}
+  err.textContent='Vérification...';
+  // Le code de l'ancienne boîte se vérifie avec l'ANCIENNE adresse
+  const{error}=await sb.auth.verifyOtp({email:currentUser.email,token:code,type:'email_change'});
+  if(error){err.textContent=messageErreurMail(error);return;}
+  afficherEtapeMail(3);
+}
+
+async function validerCodeNouveau(){
+  const err=document.getElementById('mail-erreur');
+  const code=document.getElementById('code-nouveau').value.trim();
+  if(code.length<6){err.textContent='Entrez le code reçu sur votre nouvelle adresse';return;}
+  err.textContent='Vérification...';
+  // Le code de la nouvelle boîte se vérifie avec la NOUVELLE adresse
+  const{error}=await sb.auth.verifyOtp({email:emailDemande,token:code,type:'email_change'});
+  if(error){err.textContent=messageErreurMail(error);return;}
+  // On met aussi à jour la fiche client, qui garde sa propre colonne email
+  await sb.from('profiles').update({email:emailDemande}).eq('id',currentUser.id);
+  const{data:{session}}=await sb.auth.getSession();
+  if(session)currentUser=session.user;
+  annulerChangementEmail();
+  await loadProfile();
+  showToast('✅ Adresse email modifiée !','ok');
 }
 
 async function loadOrders(){
