@@ -505,9 +505,26 @@ async function fetchKinguinPage(page) {
 }
 
 async function getExistingKinguinIds() {
-  const { data, error } = await supabase.from('products').select('kinguin_product_id').not('kinguin_product_id', 'is', null);
-  if (error) throw new Error('Impossible de lire les produits existants: ' + error.message);
-  return new Set((data || []).map(r => r.kinguin_product_id).filter(Boolean));
+  // CAUSE HISTORIQUE DES DOUBLONS : sans pagination, Supabase ne renvoyait que les 1000
+  // premières lignes. L'import croyait donc que tous les autres produits n'existaient pas
+  // et les réinsérait à chaque passage — d'où 14 000 fiches pour 2 556 produits réels.
+  const pageSize = 1000;
+  const ids = new Set();
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase.from('products')
+      .select('kinguin_product_id')
+      .not('kinguin_product_id', 'is', null)
+      .neq('kinguin_product_id', '')
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error('Impossible de lire les produits existants: ' + error.message);
+    if (!data || !data.length) break;
+    for (const r of data) if (r.kinguin_product_id) ids.add(r.kinguin_product_id);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return ids;
 }
 
 function catKey(cat) { return cat.plateforme + '|' + cat.sousCategorie; }
@@ -1064,10 +1081,13 @@ http.createServer((req, res) => {
   res.end('BabiPlay Agent (Kinguin) OK');
 }).listen(process.env.PORT || 3000);
 
+// L'audit peut tourner seul : il corrige prix et images, il n'insère aucun produit.
 runFixKinguinProducts();
 setInterval(runFixKinguinProducts, 60 * 60 * 1000);
 
-setTimeout(() => {
-  runImportParCategories();
-  setInterval(runImportParCategories, 7 * 24 * 60 * 60 * 1000);
-}, 5 * 60 * 1000);
+// L'IMPORT, LUI, NE SE LANCE PLUS TOUT SEUL.
+// Avant : il partait 5 minutes après chaque redémarrage du bot, puis toutes les semaines —
+// sans que personne ne le sache, et en ajoutant des milliers de fiches à chaque fois.
+// Maintenant il se déclenche uniquement depuis le back-office (bouton dédié), donc au
+// moment choisi, et on peut en suivre le résultat.
+console.log('ℹ️ Import automatique désactivé — à lancer depuis le back-office quand tu le décides.');
