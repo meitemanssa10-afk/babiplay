@@ -295,7 +295,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="section" id="section-audit">
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
         <div><h1>🔍 Audit catalogue</h1><p>Vérifie tous les produits face au vrai catalogue Kinguin actuel</p></div>
-        <button class="btn btn-primary" id="audit-btn" onclick="lancerAudit()">▶️ Lancer une vérification</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-secondary" id="import-cat-btn" onclick="lancerImport()">📥 Importer de nouveaux produits</button>
+          <button class="btn btn-primary" id="audit-btn" onclick="lancerAudit()">▶️ Lancer une vérification</button>
+        </div>
       </div>
       <div class="table-wrap" style="margin-bottom:20px">
         <div style="padding:20px;font-size:13px;color:var(--muted2);line-height:1.8">
@@ -1427,6 +1430,23 @@ async function toggleBanner(id,current){
 // via "Afficher le code source". Les appels passent donc par une fonction Netlify (agent.js)
 // qui ajoute le secret côté serveur, à partir de la variable d'environnement AGENT_SECRET.
 const AGENT_API='/.netlify/functions/agent';
+
+// L'import n'est plus automatique (avant : à chaque redémarrage du bot, puis chaque semaine,
+// ce qui empilait des milliers de doublons). Il se déclenche désormais uniquement ici.
+async function lancerImport(){
+  if(!confirm("Lancer un import de nouveaux produits depuis Kinguin ?\n\nL'opération tourne en arrière-plan et peut prendre plusieurs minutes. Seuls les produits absents de ton catalogue seront ajoutés."))return;
+  const btn=document.getElementById('import-cat-btn');
+  btn.disabled=true;btn.textContent='⏳ Démarrage...';
+  try{
+    const res=await fetch(`${AGENT_API}?action=import`);
+    const data=await res.json().catch(()=>({}));
+    showToast(data.ok!==false?'✅ Import démarré en arrière-plan — reviens dans quelques minutes.':'Erreur : '+(data.erreur||data.message||'inconnue'),data.ok!==false?'ok':'err');
+  }catch(e){
+    showToast('Erreur de connexion à l\'agent : '+e.message,'err');
+  }finally{
+    btn.disabled=false;btn.textContent='📥 Importer de nouveaux produits';
+  }
+}
 
 async function lancerAudit(){
   const btn=document.getElementById('audit-btn');
