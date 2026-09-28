@@ -92,6 +92,10 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.95);backdrop-fil
 .code-box{background:var(--bg3);border:1px solid var(--gold);border-radius:8px;padding:8px 16px;font-family:monospace;font-size:15px;color:var(--gold);letter-spacing:2px;display:flex;align-items:center;gap:10px}
 .copy-btn{background:none;border:1px solid rgba(245,166,35,.3);color:var(--gold);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
 .copy-btn:hover{background:rgba(245,166,35,.1)}
+.btn-payer{background:linear-gradient(100deg,#f5a623,#ff8c00);border:none;color:#000;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:.5px;cursor:pointer}
+.btn-annuler{background:none;border:1px solid var(--border2);color:var(--muted2);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-annuler:hover{border-color:#ff6b6b;color:#ff6b6b}
+.btn-payer:disabled,.btn-annuler:disabled{opacity:.5;cursor:wait}
 .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.5px}
 .badge-green{background:rgba(82,176,67,.15);color:#7dd670;border:1px solid rgba(82,176,67,.3)}
 .badge-gold{background:rgba(245,166,35,.15);color:var(--gold);border:1px solid rgba(245,166,35,.3)}
@@ -574,7 +578,7 @@ const fmt=n=>(n||0).toLocaleString('fr-FR');
 
 function statusBadge(s){
   return{
-    en_attente:'<span class="badge badge-gold">⏳ En attente</span>',
+    en_attente:'<span class="badge badge-gold">⏳ En attente de paiement</span>',
     paye:'<span class="badge badge-blue">💳 Payé</span>',
     en_cours:'<span class="badge badge-blue">⚙️ Traitement en cours</span>',
     code_envoye:'<span class="badge badge-green">✅ Code envoyé</span>',
@@ -666,7 +670,7 @@ function renderOrders(){
           <div class="order-name">${o.nom_produit||'Produit'}</div>
           <div class="order-meta">
             <span>${pLabel(o.plateforme)}</span>
-            <span>+${o.points_gagnes||0} pts gagnés</span>
+            ${o.statut==='annule'?'':o.statut==='en_attente'?`<span>+${o.points_gagnes||0} pts à gagner</span>`:`<span>+${o.points_gagnes||0} pts gagnés</span>`}
             ${o.promo_code?`<span>Code promo : ${o.promo_code}</span>`:''}
           </div>
         </div>
@@ -685,7 +689,12 @@ function renderOrders(){
               ${instructionsActivation(o.nom_produit).etapes.map(e=>`<li style="margin-bottom:4px">${e}</li>`).join('')}
             </ol>
           </div>`
-        :o.statut==='en_attente'||o.statut==='paye'||o.statut==='en_cours'?
+        :o.statut==='en_attente'?
+          `<div style="display:flex;gap:8px;align-items:center">
+            <button class="btn-annuler" onclick="annulerCommande('${o.id}',this)">Annuler</button>
+            <button class="btn-payer" onclick="payerCommande('${o.id}',this)">💳 Payer</button>
+          </div>`:
+          o.statut==='paye'||o.statut==='en_cours'?
           '<span style="font-size:12px;color:var(--muted2)">⏳ Code en cours de traitement...</span>':
           o.statut==='a_approvisionner'?
           '<span style="font-size:12px;color:var(--muted2)">📦 Nous préparons votre commande</span>':
@@ -699,6 +708,33 @@ function renderOrders(){
       </div>
     </div>`;
   }).join('');
+}
+
+// Reprendre le paiement d'une commande en attente : le serveur recalcule le prix
+async function payerCommande(orderId,btn){
+  btn.disabled=true;btn.textContent='⏳ Redirection...';
+  try{
+    const{data:{session}}=await sb.auth.getSession();
+    const res=await fetch('/.netlify/functions/paydunya',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+(session?.access_token||'')},
+      body:JSON.stringify({order_ids:[orderId]})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(res.ok&&data.url){window.location.href=data.url;return;}
+    showToast('⚠️ '+(data.error||'Paiement indisponible'),'err');
+  }catch(e){showToast('⚠️ Erreur de connexion','err');}
+  btn.disabled=false;btn.textContent='💳 Payer';
+}
+
+// Annuler (supprimer) une commande en attente — la base refuse si elle est déjà payée
+async function annulerCommande(orderId,btn){
+  if(!confirm('Annuler cette commande ? Elle sera supprimée de votre liste.'))return;
+  btn.disabled=true;
+  const{error}=await sb.rpc('annuler_commande',{p_order_id:orderId});
+  if(error){showToast('⚠️ '+error.message,'err');btn.disabled=false;return;}
+  showToast('Commande annulée','ok');
+  loadOrders();
 }
 
 function copyCode(orderId,code){
