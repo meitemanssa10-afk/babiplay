@@ -1665,16 +1665,22 @@ async function avancerLivraison(orderId,nouveauStatut){
   await loadOrders();await loadDashboard();
 }
 
+// Les envois d'email passent par send-email.js, qui n'accepte QUE l'admin connecté (MFA).
+async function enteteAdmin(){
+  const{data:{session}}=await sb.auth.getSession();
+  return{'Content-Type':'application/json',Authorization:'Bearer '+(session?.access_token||'')};
+}
+
 async function envoyerEmailLivraison(email,prenom,produit,statut){
   const estLivre=statut==='livree';
   try{
     const res=await fetch('/.netlify/functions/send-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:await enteteAdmin(),
       body:JSON.stringify({
-        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+        sender:{name:'BabiPlay',email:'news@babiplay.store'},replyTo:{email:'meitemanssasouleymane@gmail.com'},
         to:[{email,name:prenom}],
-        subject:estLivre?`✅ Votre commande BabiPlay a été livrée !`:`🚚 Votre commande BabiPlay est en route !`,
+        subject:estLivre?`Votre commande BabiPlay a été livrée`:`Votre commande BabiPlay est en route`,
         htmlContent:`
           <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
             <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
@@ -1936,9 +1942,9 @@ async function _envoyerPromoEtReset(userId, email, prenom, pct){
   try{
     await fetch('/.netlify/functions/send-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:await enteteAdmin(),
       body:JSON.stringify({
-        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+        sender:{name:'BabiPlay',email:'news@babiplay.store'},replyTo:{email:'meitemanssasouleymane@gmail.com'},
         to:[{email,name:prenom}],
         subject:`🎁 Votre récompense fidélité BabiPlay — ${pct}% de réduction !`,
         htmlContent:`
@@ -2150,9 +2156,9 @@ async function relancerInactifs(){
     try{
       const res=await fetch('/.netlify/functions/send-email',{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:await enteteAdmin(),
         body:JSON.stringify({
-          sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+          sender:{name:'BabiPlay',email:'news@babiplay.store'},replyTo:{email:'meitemanssasouleymane@gmail.com'},
           to:[{email:dest.email,name:dest.prenom||'Client'}],
           subject:'👋 On vous manque ! Revenez jouer avec BabiPlay CI',
           htmlContent:`
@@ -2357,9 +2363,9 @@ async function envoyerEmailMarketing(){
     try{
       const res=await fetch('/.netlify/functions/send-email',{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:await enteteAdmin(),
         body:JSON.stringify({
-          sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+          sender:{name:'BabiPlay',email:'news@babiplay.store'},replyTo:{email:'meitemanssasouleymane@gmail.com'},
           to:[{email:dest.email,name:dest.prenom||'Client'}],
           subject:objet,
           htmlContent:`
@@ -2469,11 +2475,11 @@ async function envoyerEmailCode(email,prenom,produit,code,prix,points,commandeId
   try{
     const res=await fetch('/.netlify/functions/send-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:await enteteAdmin(),
       body:JSON.stringify({
-        sender:{name:'BabiPlay CI',email:'meitemanssasouleymane@gmail.com'},
+        sender:{name:'BabiPlay',email:'news@babiplay.store'},replyTo:{email:'meitemanssasouleymane@gmail.com'},
         to:[{email,name:prenom||'Client'}],
-        subject:`✅ Votre code ${produit} - BabiPlay`,
+        subject:`Votre code pour ${produit} – BabiPlay`,
         htmlContent:`
           <div style="background:#0b0b0e;padding:20px;font-family:Arial,sans-serif">
             <div style="max-width:500px;margin:0 auto;background:#111116;border:1px solid #2b2b3a;border-radius:16px;overflow:hidden">
