@@ -71,7 +71,7 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
   throw new Error('Délai dépassé : clé non livrée par Kinguin');
 }
 
-async function acheterViaKinguin(produitNom, kinguinProductId) {
+async function acheterViaKinguin(produitNom, kinguinProductId, onAchete) {
   let produit;
   if (kinguinProductId) {
     console.log(`🔗 Utilisation de l'ID Kinguin configuré : ${kinguinProductId}`);
@@ -84,6 +84,8 @@ async function acheterViaKinguin(produitNom, kinguinProductId) {
   console.log(`📦 Produit trouvé : ${produit.name} — ${produit.price}€`);
   const commandeKinguin = await passerCommandeKinguin(produit.productId || produit.kinguinId, produit.price);
   console.log(`✅ Commande Kinguin créée : ${commandeKinguin.orderId}`);
+  // Enregistré AVANT d'attendre le code : si le bot plante ensuite, on sait qu'on a déjà payé
+  if (onAchete) await onAchete(commandeKinguin.orderId);
   const code = await recupererCleCommande(commandeKinguin.orderId);
   console.log('✅ Clé récupérée !');
   return { code, kinguinOrderId: commandeKinguin.orderId };
@@ -220,8 +222,32 @@ async function envoyerEmailEchec(clientEmail, clientNom, produitNom) {
 
 async function traiterCommande(commande) {
   console.log(`🔄 Traitement commande ${commande.id}...`);
+
+  // Garde-fou 1 : on "réserve" la commande. Si un autre passage du bot l'a déjà prise
+  // (statut n'est plus 'payee'), la mise à jour ne touche aucune ligne et on s'arrête.
+  const { data: reservee } = await supabase.from('commandes')
+    .update({ statut: 'en_cours' }).eq('id', commande.id).eq('statut', 'payee').select('id');
+  if (!reservee || !reservee.length) {
+    console.log(`↪️ Commande ${commande.id} déjà prise en charge, ignorée`);
+    return;
+  }
+
+  // Garde-fou 2 : déjà achetée chez Kinguin, ou déjà livrée à la main côté client ? On n'achète pas.
+  let dejaLivree = !!commande.kinguin_order_id;
+  if (!dejaLivree && commande.order_id) {
+    const { data: o } = await supabase.from('orders').select('statut').eq('id', commande.order_id).single();
+    dejaLivree = ['code_envoye', 'livree'].includes(o?.statut);
+  }
+  if (dejaLivree) {
+    await supabase.from('commandes').update({
+      statut: 'livree', erreur_message: 'Déjà livrée (à la main ou achat Kinguin existant) — aucun nouvel achat'
+    }).eq('id', commande.id);
+    console.log(`🛑 Commande ${commande.id} déjà livrée : AUCUN achat Kinguin`);
+    return;
+  }
+
+  let kinguinAchete = null;
   try {
-    await supabase.from('commandes').update({ statut: 'en_cours' }).eq('id', commande.id);
     if (commande.order_id) await supabase.from('orders').update({ statut: 'en_cours' }).eq('id', commande.order_id);
     let kinguinProductId = null;
     const produitId = commande.product_id || commande.produit_id;
@@ -230,7 +256,13 @@ async function traiterCommande(commande) {
         .from('products').select('kinguin_product_id').eq('id', produitId).single();
       kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
     }
-    const { code, kinguinOrderId } = await acheterViaKinguin(commande.produit_nom || commande.nom_produit, kinguinProductId);
+    const { code, kinguinOrderId } = await acheterViaKinguin(
+      commande.produit_nom || commande.nom_produit, kinguinProductId,
+      async (id) => {
+        kinguinAchete = id;
+        await supabase.from('commandes').update({ kinguin_order_id: id }).eq('id', commande.id);
+      }
+    );
     if (!code) throw new Error(`Code Kinguin vide/invalide pour la commande Kinguin ${kinguinOrderId}`);
     if (commande.client_email) {
       await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
@@ -255,7 +287,10 @@ async function traiterCommande(commande) {
     console.log(`✅ Commande ${commande.id} livrée avec succès !`);
   } catch (err) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
-    await supabase.from('commandes').update({ statut: 'erreur', erreur_message: err.message }).eq('id', commande.id);
+    const message = kinguinAchete
+      ? `PAYÉ chez Kinguin (${kinguinAchete}) mais code non récupéré — le code est dans l'inventaire Kinguin, à livrer à la main. Détail : ${err.message}`
+      : err.message;
+    await supabase.from('commandes').update({ statut: 'erreur', erreur_message: message }).eq('id', commande.id);
     if (commande.order_id) await supabase.from('orders').update({ statut: 'erreur' }).eq('id', commande.order_id);
     if (commande.client_email) {
       try {
@@ -267,7 +302,10 @@ async function traiterCommande(commande) {
   }
 }
 
+let verificationEnCours = false;
 async function checkCommandes() {
+  if (verificationEnCours) return; // le passage précédent n'est pas fini : on ne lance pas un 2e achat en parallèle
+  verificationEnCours = true;
   try {
     const { data: commandes, error } = await supabase
       .from('commandes').select('*').eq('statut', 'payee').eq('livraison_auto', false);
@@ -280,6 +318,8 @@ async function checkCommandes() {
     }
   } catch (err) {
     console.error('Erreur checkCommandes:', err.message);
+  } finally {
+    verificationEnCours = false;
   }
 }
 
