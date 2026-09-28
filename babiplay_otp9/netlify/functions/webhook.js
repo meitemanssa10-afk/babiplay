@@ -95,7 +95,8 @@ exports.handler = async (event) => {
 
     // custom_data revient tel qu'on l'a envoyé au moment de créer la facture (voir checkout() côté
     // site) — c'est notre source fiable pour savoir QUELS produits exacts ont été achetés.
-    const customData = body.custom_data || body.data?.custom_data || {};
+    // Lu dans la réponse de PayDunya elle-même, jamais dans la notification reçue (falsifiable).
+    const customData = confirmData.custom_data || {};
     const clientEmail = customData.client_email || body.customer?.email || null;
     const clientNom = customData.client_nom || body.customer?.name || 'Client';
     const adresseLivraison = customData.adresse_livraison || null;
