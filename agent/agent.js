@@ -415,6 +415,13 @@ const CODES_PAYS_NON_FRANCE = [
 ];
 const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','ron','sek','nok','dkk','zar','inr','jpy','cny','hkd','cad','aud','nzd','brl','mxn','sar','qar','kwd','bhd','omr','egp','dirham','chf'];
 
+// Régions dont les codes ne s'activent pas sur les comptes de nos clients (EU/FR).
+// US et UK sont volontairement gardés (avec avertissement sur la fiche produit).
+const REGIONS_REFUSEES = /\b(KR|JP|TR|BR|AR|IN|CN|RU|ASIA|LATAM)\b/;
+function regionRefusee(nom) {
+  return REGIONS_REFUSEES.test(nom || '');
+}
+
 function estCarteFrance(nomOriginal) {
   const n = (nomOriginal || '').trim();
   const nLower = n.toLowerCase();
@@ -617,6 +624,7 @@ async function runImportParCategories() {
         const sousCategorie = guessSousCategorie(product, plateforme);
 
         if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(product.name)) continue;
+        if (regionRefusee(product.name)) continue;
 
         if (sousCategorie === 'Cartes cadeaux') {
           const montant = extraireMontantFacial(product.name);
@@ -855,6 +863,11 @@ async function runFixKinguinProducts() {
           totalCorriges++;
           continue;
         }
+        if (regionRefusee(product.name) || regionRefusee(row.nom)) {
+          await supabase.from('products').update({ est_actif: false }).eq('id', row.id);
+          totalCorriges++;
+          continue;
+        }
 
         if (sousCategorie === 'Cartes cadeaux') {
           const montant = extraireMontantFacial(product.name);
@@ -993,6 +1006,7 @@ async function runReactivateFalsePositives() {
       if (data.length < 1000) break;
       from += 1000;
     }
+    inactifs = inactifs.filter(p => !regionRefusee(p.nom)); // régions refusées : jamais réactivées
     console.log(`🔎 ${inactifs.length} produit(s) inactif(s) avec ID Kinguin à re-tester.`);
 
     const parId = new Map();
