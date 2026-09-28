@@ -965,7 +965,8 @@ async function applyPromo() {
   const code = document.getElementById('promo-in').value.trim().toUpperCase();
   const msg = document.getElementById('promo-msg');
   if (!code) return;
-  const { data, error } = await sb.from('promo_codes').select('*').eq('code', code).eq('est_actif', true).single();
+  // La liste des codes n'est plus lisible : la base vérifie seulement CE code-là.
+  const { data, error } = await sb.rpc('verifier_code_promo', { p_code: code });
   if (error || !data) { msg.textContent = '❌ Code invalide'; msg.className = 'promo-msg err'; return; }
   promoApplied = data;
   msg.textContent = '✅ Code appliqué : ' + (data.reduction_pct > 0 ? `-${data.reduction_pct}%` : `-${fmt(data.reduction_fcfa)} FCFA`);
