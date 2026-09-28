@@ -196,11 +196,13 @@ function typeProduit(p) {
   if (sc.includes('carte') || /gift card|giftcard|carte cadeau|wallet|top.?up|prepaid/.test(nom)) return 'carte';
   if (sc.includes('abonnement') || sc.includes('game pass') || /subscription|membership|game pass|playstation plus|ps plus|nintendo switch online|\b\d+\s*(month|months|mois)\b/.test(nom)) return 'abonnement';
   if (sc.includes('point') || /\bpoints\b|\bcoins\b|v-?bucks|robux|\buc\b|credits?\b|tokens?\b|fifa points|fc points/.test(nom)) return 'points';
+  if (/\bdlc\b|pre-?order bonus|season pass|expansion pass|\badd-?on\b|\bupgrade\b/.test(nom)) return 'dlc';
   return 'jeu';
 }
 
 const LIBELLE_TYPE = {
   jeu: '🎮 Jeu — clé d\'activation',
+  dlc: '🧩 Contenu additionnel (DLC) — pas le jeu',
   carte: '🎁 Carte cadeau — crédit',
   abonnement: '⭐ Abonnement',
   points: '🪙 Monnaie de jeu',
@@ -219,6 +221,18 @@ function pointsAchat(p, type) {
       'Ce n\'est ni une carte cadeau, ni de la monnaie de jeu : vous recevez ce jeu précis, et rien d\'autre.',
       'La clé ne s\'active qu\'une seule fois, sur un seul compte.',
     ];
+    case 'dlc': {
+      const nomMin = (p.nom || '').toLowerCase();
+      const pts = [
+        'Vous achetez un <strong>contenu additionnel</strong> (DLC) : un bonus qui s\'ajoute à un jeu. <strong>Ce n\'est pas le jeu lui-même.</strong>',
+        `⚠️ Le jeu de base doit déjà être sur votre compte ${boutique} (acheté séparément). Sans lui, ce contenu ne sert à rien.`,
+      ];
+      if (/pre-?order bonus/.test(nomMin)) pts.push('Il s\'agit du bonus normalement offert à ceux qui ont précommandé le jeu (tenue, arme, objets...). Vous pouvez l\'obtenir ici sans avoir précommandé.');
+      if (/season pass/.test(nomMin)) pts.push('Le Season Pass donne accès aux contenus additionnels prévus pour ce jeu, au fur et à mesure de leur sortie.');
+      if (/\bupgrade\b/.test(nomMin)) pts.push('Une « Upgrade » fait passer votre version du jeu à une édition supérieure : vous devez déjà posséder la version de base.');
+      pts.push('La clé ne s\'active qu\'une seule fois, sur un seul compte.');
+      return pts;
+    }
     case 'carte': return [
       `Vous achetez un <strong>code de crédit</strong> qui alimente le porte-monnaie de votre compte ${boutique}, du montant indiqué dans le nom du produit.`,
       'Ce crédit vous sert ensuite à acheter ce que vous voulez sur la boutique officielle : jeux, extensions, abonnements.',
@@ -274,6 +288,8 @@ function regionDepuisNom(nom) {
   if (/\bBR\b|BRAZIL/.test(n)) return 'Brésil — un compte brésilien est nécessaire';
   if (/\bAR\b|ARGENTINA/.test(n)) return 'Argentine — un compte argentin est nécessaire';
   if (/\bIN\b|\bINDIA\b/.test(n)) return 'Inde — un compte indien est nécessaire';
+  if (/\bKR\b|KOREA/.test(n)) return 'Corée du Sud — un compte coréen est nécessaire';
+  if (/\bJP\b|JAPAN/.test(n)) return 'Japon — un compte japonais est nécessaire';
   return 'Indiquée dans le nom du produit — vérifiez avant d\'acheter';
 }
 
@@ -392,8 +408,42 @@ function etapesPour(p, type) {
     case 'points': return ETAPES_POINTS;
     case 'abonnement': return ETAPES_ABONNEMENT[plat] || ETAPES_ABONNEMENT.pc;
     case 'carte': return ETAPES_CARTE[plat] || ETAPES_CARTE.pc;
+    case 'dlc': {
+      const base = (ETAPES_JEU[plat] || ETAPES_JEU.pc).slice(0, -1);
+      return [...base, { t: 'Lancez le jeu', d: 'Le contenu apparaît dans le jeu de base déjà installé (parfois après un petit téléchargement)' }];
+    }
     default: return ETAPES_JEU[plat] || ETAPES_JEU.pc;
   }
+}
+
+// ---------------------------------------------------------------------------
+// LE NOM DU PRODUIT EXPLIQUÉ — les noms Kinguin sont en anglais et pleins de
+// jargon (DLC, CD Key, Pre-order Bonus, EU...). On traduit chaque terme présent.
+// ---------------------------------------------------------------------------
+function lexiqueNom(p) {
+  const n = ' ' + (p.nom || '').toLowerCase() + ' ';
+  const L = [];
+  const a = (test, terme, sens) => { if (test.test(n)) L.push([terme, sens]); };
+  a(/pre-?order bonus/, 'Pre-order Bonus', 'Bonus offert à ceux qui précommandent le jeu (tenue, arme, objets...)');
+  a(/pre-?order(?! bonus)/, 'Pre-order', 'Précommande : le jeu n\'est pas encore sorti, le code fonctionnera à la date de sortie');
+  a(/\bdlc\b/, 'DLC', 'Contenu additionnel pour un jeu. Le jeu de base est obligatoire et vendu à part');
+  a(/season pass/, 'Season Pass', 'Accès aux futurs contenus additionnels du jeu');
+  a(/\bupgrade\b/, 'Upgrade', 'Passage à une édition supérieure du jeu, qu\'il faut déjà posséder');
+  a(/deluxe|gold edition|ultimate|complete edition|premium edition|vault edition/, 'Deluxe / Gold / Ultimate…', 'Édition plus complète du jeu, avec des bonus inclus');
+  a(/\bbundle\b/, 'Bundle', 'Lot de plusieurs produits vendus ensemble');
+  a(/gift card|giftcard|prepaid/, 'Gift Card / Prepaid', 'Carte de crédit à ajouter au porte-monnaie de votre compte');
+  a(/steam gift/, 'Steam Gift', 'Le produit vous est offert via Steam (lien ou invitation) au lieu d\'un code');
+  a(/cd key|\bkey\b/, 'CD Key / Key', 'Code d\'activation, envoyé par email, à saisir sur la boutique officielle');
+  a(/\bps5\b/, 'PS5', 'Pour PlayStation 5');
+  a(/\bps4\b/, 'PS4', 'Pour PlayStation 4');
+  a(/\bpsn\b|playstation network/, 'PSN', 'Compte PlayStation (PlayStation Network)');
+  a(/xbox series/, 'Xbox Series X|S', 'Pour Xbox Series X et Series S');
+  a(/xbox one/, 'Xbox One', 'Pour Xbox One');
+  a(/\bswitch\b/, 'Switch', 'Pour Nintendo Switch');
+  a(/\bpc\b|\bsteam\b(?! gift)/, 'PC / Steam', 'Pour ordinateur, via l\'application Steam');
+  const region = regionDepuisNom(p.nom);
+  if (!/^Indiquée/.test(region)) L.push(['Région', region + ' : le code doit être activé sur un compte de cette région']);
+  return L;
 }
 
 (async () => {
@@ -437,8 +487,17 @@ function renderPage() {
          ${galerie.length > 1 ? `<div class="gallery-thumbs">${galerie.map((src, i) => `<img src="${src}" class="gallery-thumb${i === 0 ? ' active' : ''}" onclick="document.getElementById('gallery-main-img').src=this.src;document.querySelectorAll('.gallery-thumb').forEach(t=>t.classList.remove('active'));this.classList.add('active')">`).join('')}</div>` : ''}`
       : `<div class="gallery-fb ${pFbClass(p.plateforme)}">${pEmoji(p.plateforme)}</div>`;
 
+  const lexique = lexiqueNom(p);
+  const lexiqueHtml = lexique.length ? `
+    <div class="info-box">
+      <h3>📖 Le nom du produit expliqué</h3>
+      <table class="specs-table">
+        ${lexique.map(([t, d]) => `<tr><td>${t}</td><td>${d}</td></tr>`).join('')}
+      </table>
+    </div>` : '';
+
   // Encadré "Ce que vous achetez" — en français, quel que soit le nom du produit
-  const achatHtml = `
+  const achatHtml = lexiqueHtml + `
     <div class="info-box">
       <h3>🛍️ Ce que vous achetez</h3>
       <span class="achat-type">${LIBELLE_TYPE[type]}</span>
