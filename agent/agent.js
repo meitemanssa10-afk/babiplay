@@ -167,9 +167,48 @@ function instructionsActivation(produitNom) {
   };
 }
 
+// Activer le code depuis son téléphone : le client copie-colle au lieu de taper
+// un long code à la manette. Liens officiels de chaque boutique.
+function activationDepuisTelephone(produitNom) {
+  const n = (produitNom || '').toLowerCase();
+  if (/psn|playstation|\bps4\b|\bps5\b/.test(n)) return {
+    boutique: 'PlayStation Store', lien: 'https://store.playstation.com',
+    etapes: 'connectez-vous avec <strong>le même compte que votre console</strong>, touchez votre photo de profil en haut, puis « Utiliser un code », et collez le code',
+    fin: 'Le contenu apparaîtra automatiquement sur votre console.'
+  };
+  if (/xbox|game pass/.test(n)) return {
+    boutique: 'le site Microsoft', lien: 'https://redeem.microsoft.com',
+    etapes: 'connectez-vous avec <strong>le même compte Microsoft que votre Xbox</strong>, puis collez le code',
+    fin: 'Le contenu apparaîtra automatiquement sur votre Xbox.'
+  };
+  if (/nintendo|switch/.test(n)) return {
+    boutique: 'le site Nintendo', lien: 'https://ec.nintendo.com/redeem',
+    etapes: 'connectez-vous avec <strong>le même compte Nintendo que votre Switch</strong>, puis collez le code',
+    fin: 'Le contenu se téléchargera sur votre Switch.'
+  };
+  if (/steam/.test(n) && !/steam gift/.test(n)) return {
+    boutique: 'Steam', lien: 'https://store.steampowered.com/account/registerkey',
+    etapes: 'connectez-vous à votre compte Steam, puis collez la clé',
+    fin: 'Le jeu apparaîtra dans votre bibliothèque Steam.'
+  };
+  return null;
+}
+
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const instructions = instructionsActivation(produitNom);
+  const tel = activationDepuisTelephone(produitNom);
+  const astuceHtml = tel ? `
+        <div style="background:#fff8ec;border:1px solid #f5c26b;border-radius:10px;padding:16px;margin-top:20px;">
+          <p style="margin:0 0 8px;font-weight:bold;color:#1a1a2e;">💡 Bon à savoir : activez le code depuis votre téléphone</p>
+          <p style="margin:0 0 12px;color:#333;line-height:1.5;">
+            Vous pouvez l'activer <strong>depuis votre téléphone</strong> : faites un appui long sur le code pour le copier,
+            ouvrez ${tel.boutique}, ${tel.etapes}. ${tel.fin}
+          </p>
+          <p style="margin:0;text-align:center;">
+            <a href="${tel.lien}" style="background:#1a1a2e;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">Ouvrir ${tel.boutique}</a>
+          </p>
+        </div>` : '';
   await resend.emails.send({
     from: 'BabiPlay <noreply@babiplay.store>',
     to: clientEmail,
@@ -179,16 +218,17 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
         <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
         <h2>Bonjour ${clientNom} !</h2>
         <p>Voici votre code d'activation :</p>
-        <div style="background:#1a1a2e;color:#fff;padding:20px;border-radius:10px;text-align:center;font-size:24px;letter-spacing:3px;font-weight:bold;">
+        <div style="background:#1a1a2e;color:#fff;padding:20px;border-radius:10px;text-align:center;font-size:22px;letter-spacing:2px;font-weight:bold;font-family:'Courier New',monospace;word-break:break-all;">
           ${code}
         </div>
+        <p style="margin:6px 0 0;font-size:12px;color:#888;text-align:center;">Appui long sur le code pour le copier · Retrouvez-le aussi, avec un bouton « Copier », dans <a href="https://babiplay.store/compte.html" style="color:#f5a623;">Mon compte → Mes commandes</a></p>
         <p>Produit : <strong>${produitNom}</strong></p>
         <div style="background:#f7f7f9;border:1px solid #e5e5ea;border-radius:10px;padding:18px;margin-top:20px;">
           <p style="margin:0 0 10px;font-weight:bold;color:#1a1a2e;">${instructions.titre}</p>
           <ol style="margin:0;padding-left:18px;color:#333;">
             ${instructions.etapes.map(e => `<li style="margin-bottom:6px;">${e}</li>`).join('')}
           </ol>
-        </div>
+        </div>${astuceHtml}
         <p>Merci pour votre achat sur BabiPlay ! 🚀</p>
       </div>
     `
