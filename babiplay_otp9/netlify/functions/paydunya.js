@@ -27,10 +27,16 @@ exports.handler = async (event) => {
 
     // 2. Uniquement les commandes de CE client, encore en attente.
     const { data: orders } = await supabase.from('orders')
-      .select('id, product_id, prix_paye, promo_code')
+      .select('id, product_id, prix_paye, promo_code, created_at')
       .in('id', order_ids).eq('user_id', user.id).eq('statut', 'en_attente');
     if (!orders || orders.length !== order_ids.length) {
       return reponse(400, { error: 'Commande introuvable ou déjà payée' });
+    }
+    // Une facture = un seul panier d'origine (même date de création, même code promo).
+    const panierRef = orders[0].created_at;
+    const code = orders[0].promo_code || null;
+    if (orders.some(o => o.created_at !== panierRef || (o.promo_code || null) !== code)) {
+      return reponse(400, { error: 'Payez une commande à la fois' });
     }
 
     // 3. Prix réels lus dans products (jamais ceux envoyés par le navigateur).
@@ -49,16 +55,37 @@ exports.handler = async (event) => {
       articles.push({ order_id: o.id, product_id: p.id, produit_nom: p.nom, plateforme: p.plateforme, prix: Number(p.prix) });
     }
 
-    // 4. Code promo revérifié ici (s'il n'est plus actif, pas de réduction).
+    // 4. Code promo revérifié ici : actif, pas expiré, pas épuisé.
     let total = articles.reduce((s, a) => s + a.prix, 0);
-    const code = orders[0].promo_code;
     if (code) {
       const { data: promo } = await supabase.from('promo_codes')
-        .select('reduction_pct, reduction_fcfa').eq('code', code).eq('est_actif', true).maybeSingle();
-      if (promo) {
-        total = promo.reduction_pct > 0
-          ? Math.round(total * (1 - promo.reduction_pct / 100))
-          : Math.max(0, total - (promo.reduction_fcfa || 0));
+        .select('reduction_pct, reduction_fcfa, utilisations_max, expire_le')
+        .eq('code', code).eq('est_actif', true).maybeSingle();
+      const expire = promo?.expire_le && new Date(promo.expire_le) < new Date();
+
+      // Une utilisation = un panier déjà payé avec ce code (hors panier en cours).
+      let epuise = false;
+      if (promo && promo.utilisations_max) {
+        const { data: payes } = await supabase.from('orders').select('user_id, created_at')
+          .eq('promo_code', code).not('statut', 'in', '("en_attente","annule")');
+        const paniers = new Set((payes || [])
+          .filter(p => !(p.user_id === user.id && p.created_at === panierRef))
+          .map(p => p.user_id + '|' + p.created_at));
+        epuise = paniers.size >= promo.utilisations_max;
+      }
+      if (!promo || expire || epuise) {
+        return reponse(409, { error: "Le code promo n'est plus valable. Annulez cette commande et recommandez sans le code." });
+      }
+
+      if (promo.reduction_pct > 0) {
+        total = Math.round(total * (1 - promo.reduction_pct / 100));
+      } else if (promo.reduction_fcfa > 0) {
+        // Réduction fixe répartie sur tout le panier d'origine : payée en plusieurs fois,
+        // elle ne compte quand même qu'une seule fois.
+        const { data: panier } = await supabase.from('orders').select('prix_paye')
+          .eq('user_id', user.id).eq('created_at', panierRef).eq('promo_code', code).neq('statut', 'annule');
+        const totalPanier = (panier || []).reduce((s, x) => s + Number(x.prix_paye), 0) || total;
+        total = Math.max(0, total - Math.round(promo.reduction_fcfa * total / totalPanier));
       }
     }
     if (total < 100) return reponse(400, { error: 'Montant trop faible pour un paiement' });
