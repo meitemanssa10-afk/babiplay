@@ -194,6 +194,11 @@ function activationDepuisTelephone(produitNom) {
   return null;
 }
 
+// Expéditeur : une vraie adresse plutôt que "noreply", et une adresse de réponse,
+// deux signaux qui aident à sortir des spams.
+const EXPEDITEUR = 'BabiPlay <commandes@babiplay.store>';
+const REPONDRE_A = 'meitemanssasouleymane@gmail.com';
+
 async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const instructions = instructionsActivation(produitNom);
@@ -210,9 +215,25 @@ async function envoyerCodeParEmail(clientEmail, clientNom, produitNom, code) {
           </p>
         </div>` : '';
   await resend.emails.send({
-    from: 'BabiPlay <noreply@babiplay.store>',
+    from: EXPEDITEUR,
+    reply_to: REPONDRE_A,
     to: clientEmail,
-    subject: `✅ Votre code ${produitNom} - BabiPlay`,
+    subject: `Votre code pour ${produitNom} – BabiPlay`,
+    // Version texte en plus du HTML : les messageries font davantage confiance aux emails qui ont les deux
+    text: [
+      `Bonjour ${clientNom},`,
+      '',
+      `Voici votre code pour ${produitNom} :`,
+      code,
+      '',
+      instructions.titre,
+      ...instructions.etapes.map((e, i) => `${i + 1}. ${e}`),
+      '',
+      tel ? `Astuce : activez le code depuis votre téléphone sur ${tel.lien} (même compte que votre console).` : '',
+      'Retrouvez aussi votre code dans Mon compte : https://babiplay.store/compte.html',
+      '',
+      'Merci pour votre achat sur BabiPlay !'
+    ].join('\n'),
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
         <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
@@ -241,9 +262,11 @@ const WHATSAPP_SUPPORT = '2250797659178';
 async function envoyerEmailEchec(clientEmail, clientNom, produitNom) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
-    from: 'BabiPlay <noreply@babiplay.store>',
+    from: EXPEDITEUR,
+    reply_to: REPONDRE_A,
     to: clientEmail,
-    subject: `⚠️ Un souci avec votre commande ${produitNom} - BabiPlay`,
+    subject: `Votre commande ${produitNom} – BabiPlay`,
+    text: `Bonjour ${clientNom || 'Client'},\n\nVotre paiement pour ${produitNom} a bien été reçu, mais un souci technique passager retarde la livraison de votre code.\nContactez-nous sur WhatsApp pour un traitement immédiat : https://wa.me/${WHATSAPP_SUPPORT}\n\nToutes nos excuses pour la gêne.`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
         <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
