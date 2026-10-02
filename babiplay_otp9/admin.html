@@ -1475,7 +1475,11 @@ async function importerMotCle(){
     zone.innerHTML=`
       <div style="font-size:14px;margin-bottom:10px">✅ <strong>${data.ajoutes.length}</strong> produit(s) ajouté(s) sur ${data.trouves} trouvé(s) chez Kinguin pour « ${esc(data.recherche)} »</div>
       ${aj?`<table style="margin-bottom:12px"><thead><tr><th>Produit ajouté</th><th>Plateforme</th><th>Prix</th></tr></thead><tbody>${aj}</tbody></table>`:''}
-      ${ign?`<div style="font-size:13px;color:var(--muted2)">Ignorés :<ul style="margin:6px 0 0 18px">${ign}</ul></div>`:''}`;
+      ${ign?`<div style="font-size:13px;color:var(--muted2)">Ignorés :<ul style="margin:6px 0 0 18px">${ign}</ul></div>`:''}
+      ${(data.details||[]).length?`<details style="margin-top:10px;font-size:12px;color:var(--muted2)"><summary style="cursor:pointer">Voir le détail des produits ignorés</summary>
+        <table style="margin-top:8px"><thead><tr><th>Produit</th><th>Raison</th><th>Région Kinguin</th></tr></thead><tbody>
+        ${data.details.map(d=>`<tr><td>${esc(d.nom)}</td><td>${esc(d.raison)}</td><td>${esc(d.region)}${d.pays?' ('+esc(d.pays)+')':''}</td></tr>`).join('')}
+        </tbody></table></details>`:''}`;
     if(data.ajoutes.length)showToast(`✅ ${data.ajoutes.length} produit(s) ajouté(s)`,'ok');
   }catch(e){
     zone.innerHTML=`<span style="color:#ff6b6b;font-size:13px">⚠️ Erreur de connexion à l'agent : ${esc(e.message)}</span>`;
