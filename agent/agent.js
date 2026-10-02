@@ -634,7 +634,9 @@ function mapPlatform(kinguinPlatform, productName) {
 
 function estCompteExclu(product) {
   const n = (product.name || '').toLowerCase();
-  return n.includes('account') || n.includes('compte partagé') || n.includes('login details');
+  // « Access » = accès à un compte partagé (pas une clé à soi). « Early Access » reste autorisé.
+  const access = /\baccess\b/.test(n.replace(/early access/g, ''));
+  return n.includes('account') || access || n.includes('compte partagé') || n.includes('login details');
 }
 
 function guessSousCategorie(product, plateforme) {
@@ -873,8 +875,11 @@ let motCleEnCours = false;
 
 async function importParMotCle(q) {
   const recherche = (q || '').trim();
-  if (recherche.length < 3) throw new Error('Tape au moins 3 caractères.');
-  const mots = recherche.toLowerCase().split(/\s+/).filter(Boolean);
+  // Mot réservé : « __precommandes » = importer toutes les précommandes Kinguin, sans mot-clé
+  const modePreco = recherche === '__precommandes';
+  if (!modePreco && recherche.length < 3) throw new Error('Tape au moins 3 caractères.');
+  const mots = modePreco ? [] : recherche.toLowerCase().split(/\s+/).filter(Boolean);
+  const aujourdhui = new Date(); aujourdhui.setHours(0, 0, 0, 0);
   const ignores = {};
   const details = []; // pour comprendre pourquoi un produit précis n'a pas été ajouté
   let courant = null;
@@ -887,8 +892,10 @@ async function importParMotCle(q) {
 
   // 1. Recherche chez Kinguin (2 pages max = 200 résultats, pour rester rapide)
   let resultats = [];
-  for (let page = 1; page <= 2; page++) {
-    const url = `${KINGUIN_PRODUCTS_BASE}/products?name=${encodeURIComponent(recherche)}&page=${page}&limit=${PAGE_LIMIT}`;
+  for (let page = 1; page <= (modePreco ? 3 : 2); page++) {
+    const url = modePreco
+      ? `${KINGUIN_PRODUCTS_BASE}/products?isPreorder=yes&activePreorder=yes&page=${page}&limit=${PAGE_LIMIT}`
+      : `${KINGUIN_PRODUCTS_BASE}/products?name=${encodeURIComponent(recherche)}&page=${page}&limit=${PAGE_LIMIT}`;
     const res = await fetch(url, { headers: { 'X-Api-Key': KINGUIN_KEY } });
     if (!res.ok) throw new Error(`Kinguin a répondu ${res.status}`);
     const data = await res.json();
@@ -903,7 +910,13 @@ async function importParMotCle(q) {
     courant = product;
     const nom = product.name || '';
     if (!mots.every(m => nom.toLowerCase().includes(m))) { ignorer('Ne correspond pas à la recherche'); continue; }
-    if (estCompteExclu(product)) { ignorer('Compte (Account)'); continue; }
+    if (modePreco) {
+      // Double sécurité : même si Kinguin ignorait le filtre, on ne garde que les vraies précommandes à venir
+      const sortie = product.releaseDate ? new Date(product.releaseDate) : null;
+      if (!product.isPreorder || (sortie && !isNaN(sortie) && sortie < aujourdhui)) { ignorer('Pas une précommande à venir'); continue; }
+      if (/\s-\s*pre-?order bonus/i.test(nom)) { ignorer('Bonus de précommande seul (pas le jeu)'); continue; }
+    }
+    if (estCompteExclu(product)) { ignorer('Compte (Account / Access)'); continue; }
     if (SERVICES_EXCLUS.test(nom)) { ignorer('Altergift / boost (pas un code)'); continue; }
     // Kinguin classe parfois des clés « EU » en « Other » ou « Rest of the world » : quand le nom
     // annonce explicitement EU/Europe, on se fie au nom.
@@ -956,9 +969,9 @@ async function importParMotCle(q) {
     const { error } = await supabase.from('products').insert(rows);
     if (error) throw new Error('Ajout impossible : ' + error.message);
   }
-  console.log(`🔎 Import « ${recherche} » : ${rows.length} ajouté(s) sur ${resultats.length} trouvé(s) chez Kinguin`);
+  console.log(`🔎 Import « ${modePreco ? 'précommandes' : recherche} » : ${rows.length} ajouté(s) sur ${resultats.length} trouvé(s) chez Kinguin`);
   return {
-    ok: true, recherche, trouves: resultats.length,
+    ok: true, recherche: modePreco ? 'toutes les précommandes' : recherche, trouves: resultats.length,
     ajoutes: rows.map(r => ({ nom: r.nom, prix: r.prix, plateforme: r.plateforme })),
     ignores,
     details
@@ -1008,7 +1021,7 @@ async function runFixKinguinProducts() {
   console.log('🛠️ Correction des produits Kinguin (images + prix + descriptions FR)...');
   try {
     const { data: comptesResiduels, error: errResiduels } = await supabase.from('products')
-      .update({ est_actif: false }).ilike('nom', '%account%').eq('est_actif', true).select('id');
+      .update({ est_actif: false }).or('nom.ilike.%account%,nom.ilike.% access%').not('nom', 'ilike', '%early access%').eq('est_actif', true).select('id');
     if (errResiduels) console.error('⚠️ Erreur nettoyage comptes résiduels:', errResiduels.message);
     else if (comptesResiduels?.length) console.log(`🧹 ${comptesResiduels.length} produit(s) "compte partagé" résiduel(s) désactivé(s).`);
 
