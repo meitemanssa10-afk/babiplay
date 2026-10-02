@@ -309,6 +309,17 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <strong style="color:var(--gold)">Le résultat n'apparaît pas tout de suite</strong> — la vérification tourne en arrière-plan sur le serveur. Reviens sur cette page dans quelques minutes et clique "🔄 Actualiser" pour voir le rapport.
         </div>
       </div>
+      <div class="table-wrap" style="margin-bottom:20px">
+        <div style="padding:20px">
+          <div style="font-weight:700;margin-bottom:4px">🔎 Importer par mot-clé</div>
+          <div style="font-size:13px;color:var(--muted2);margin-bottom:12px">Tape un nom de jeu (ex. <em>FC 27</em>, <em>eFootball</em>). Le bot cherche chez Kinguin et ajoute uniquement les codes EU/Global livrables automatiquement (pas de comptes, pas d'Altergift, pas de régions incompatibles), avec ta marge.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="text" id="motcle-input" placeholder="FC 27" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')importerMotCle()">
+            <button class="btn btn-primary" id="motcle-btn" onclick="importerMotCle()">🔎 Chercher et ajouter</button>
+          </div>
+          <div id="motcle-resultat" style="margin-top:14px"></div>
+        </div>
+      </div>
       <div id="audit-resultat"></div>
     </div>
 
@@ -1445,6 +1456,31 @@ async function lancerImport(){
     showToast('Erreur de connexion à l\'agent : '+e.message,'err');
   }finally{
     btn.disabled=false;btn.textContent='📥 Importer de nouveaux produits';
+  }
+}
+
+async function importerMotCle(){
+  const q=document.getElementById('motcle-input').value.trim();
+  const zone=document.getElementById('motcle-resultat');
+  if(q.length<3){showToast('Tape au moins 3 caractères','err');return;}
+  const btn=document.getElementById('motcle-btn');
+  btn.disabled=true;btn.textContent='⏳ Recherche...';
+  zone.innerHTML='<span style="font-size:13px;color:var(--muted2)">⏳ Recherche chez Kinguin, quelques secondes...</span>';
+  try{
+    const res=await fetch(`${AGENT_API}?action=import-mot-cle&q=${encodeURIComponent(q)}`);
+    const data=await res.json().catch(()=>({ok:false,erreur:'Réponse illisible'}));
+    if(!data.ok){zone.innerHTML=`<span style="color:#ff6b6b;font-size:13px">❌ ${esc(data.erreur||data.message||'Erreur inconnue')}</span>`;return;}
+    const ign=Object.entries(data.ignores||{}).map(([r,n])=>`<li>${esc(r)} : <strong>${n}</strong></li>`).join('');
+    const aj=(data.ajoutes||[]).map(p=>`<tr><td>${esc(p.nom)}</td><td>${esc(p.plateforme)}</td><td style="white-space:nowrap">${Number(p.prix).toLocaleString('fr-FR')} FCFA</td></tr>`).join('');
+    zone.innerHTML=`
+      <div style="font-size:14px;margin-bottom:10px">✅ <strong>${data.ajoutes.length}</strong> produit(s) ajouté(s) sur ${data.trouves} trouvé(s) chez Kinguin pour « ${esc(data.recherche)} »</div>
+      ${aj?`<table style="margin-bottom:12px"><thead><tr><th>Produit ajouté</th><th>Plateforme</th><th>Prix</th></tr></thead><tbody>${aj}</tbody></table>`:''}
+      ${ign?`<div style="font-size:13px;color:var(--muted2)">Ignorés :<ul style="margin:6px 0 0 18px">${ign}</ul></div>`:''}`;
+    if(data.ajoutes.length)showToast(`✅ ${data.ajoutes.length} produit(s) ajouté(s)`,'ok');
+  }catch(e){
+    zone.innerHTML=`<span style="color:#ff6b6b;font-size:13px">⚠️ Erreur de connexion à l'agent : ${esc(e.message)}</span>`;
+  }finally{
+    btn.disabled=false;btn.textContent='🔎 Chercher et ajouter';
   }
 }
 
