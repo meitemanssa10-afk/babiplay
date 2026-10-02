@@ -496,7 +496,7 @@ const IMPORT_SECRET = process.env.IMPORT_SECRET || crypto.randomBytes(8).toStrin
 // conservés. Avant, chaque redémarrage réaffichait le secret en clair, ainsi que les
 // adresses complètes permettant de déclencher import, audit et réactivation.
 console.log(`🔐 Code secret import/fix : ${process.env.IMPORT_SECRET ? 'configuré ✅' : 'MANQUANT ⚠️ (secret temporaire généré, il changera à chaque redémarrage)'}`);
-console.log('👉 Actions disponibles depuis le back-office : audit, import, réactivation, slider.');
+console.log('👉 Actions disponibles depuis le back-office : audit, import, import par mot-clé, réactivation, slider.');
 
 const KINGUIN_PRODUCTS_BASE = 'https://gateway.kinguin.net/esa/api/v1';
 const PAGE_LIMIT = 100;
@@ -861,6 +861,93 @@ async function runImportParCategories() {
   } finally {
     importEnCours = false;
   }
+}
+
+// IMPORT PAR MOT-CLÉ (bouton du back-office) : cherche chez Kinguin, garde uniquement les
+// produits livrables automatiquement et compatibles, puis les ajoute. Répond avec le détail.
+const PRIX_MAX_FCFA = 500000; // au-delà, c'est presque toujours un vendeur au prix délirant
+const SERVICES_EXCLUS = /altergift|boost|weekend league|champions finals|wins? guaranteed|coaching|piloted|carry/i;
+let motCleEnCours = false;
+
+async function importParMotCle(q) {
+  const recherche = (q || '').trim();
+  if (recherche.length < 3) throw new Error('Tape au moins 3 caractères.');
+  const mots = recherche.toLowerCase().split(/\s+/).filter(Boolean);
+  const ignores = {};
+  const ignorer = raison => { ignores[raison] = (ignores[raison] || 0) + 1; };
+
+  // 1. Recherche chez Kinguin (2 pages max = 200 résultats, pour rester rapide)
+  let resultats = [];
+  for (let page = 1; page <= 2; page++) {
+    const url = `${KINGUIN_PRODUCTS_BASE}/products?name=${encodeURIComponent(recherche)}&page=${page}&limit=${PAGE_LIMIT}`;
+    const res = await fetch(url, { headers: { 'X-Api-Key': KINGUIN_KEY } });
+    if (!res.ok) throw new Error(`Kinguin a répondu ${res.status}`);
+    const data = await res.json();
+    const lot = data.results || [];
+    resultats = resultats.concat(lot);
+    if (lot.length < PAGE_LIMIT) break;
+  }
+
+  // 2. Tri : on ne garde que ce que le bot sait livrer et qui marche pour nos clients
+  const candidats = new Map(); // nom affiché -> fiche (on garde la moins chère)
+  for (const product of resultats) {
+    const nom = product.name || '';
+    if (!mots.every(m => nom.toLowerCase().includes(m))) { ignorer('Ne correspond pas à la recherche'); continue; }
+    if (estCompteExclu(product)) { ignorer('Compte (Account)'); continue; }
+    if (SERVICES_EXCLUS.test(nom)) { ignorer('Altergift / boost (pas un code)'); continue; }
+    if (contientDeviseNonEuro(nom) || !estCompatibleEurope(product) || regionRefusee(nom)) { ignorer('Région incompatible'); continue; }
+    if (!product.productId) { ignorer('Sans identifiant Kinguin'); continue; }
+    const eurPrice = product.price || 0;
+    if (eurPrice < PRIX_MIN_EUR) { ignorer('Prix trop bas / indisponible'); continue; }
+    const prix = priceToFCFA(eurPrice, nom);
+    if (prix > PRIX_MAX_FCFA) { ignorer('Prix anormal (> 500 000 FCFA)'); continue; }
+    const imageUrl = getImageUrl(product);
+    if (!imageUrl) { ignorer('Sans image'); continue; }
+    const { plateforme, categorie } = mapPlatform(product.platform, nom);
+    const sousCategorie = guessSousCategorie(product, plateforme);
+    if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(nom)) { ignorer('Région incompatible'); continue; }
+    const nomFinal = nomAffiche(product, plateforme, categorie, sousCategorie);
+    const deja = candidats.get(nomFinal.toLowerCase());
+    if (deja && deja.product.price <= eurPrice) { ignorer('Doublon (offre plus chère)'); continue; }
+    if (deja) ignorer('Doublon (offre plus chère)');
+    candidats.set(nomFinal.toLowerCase(), { product, plateforme, categorie, sousCategorie, imageUrl, nomFinal, prix });
+  }
+
+  // 3. On retire ce qui est déjà au catalogue (même ID Kinguin ou même nom)
+  let liste = [...candidats.values()];
+  if (liste.length) {
+    const { data: parId } = await supabase.from('products').select('kinguin_product_id')
+      .in('kinguin_product_id', liste.map(c => c.product.productId));
+    const { data: parNom } = await supabase.from('products').select('nom')
+      .in('nom', liste.map(c => c.nomFinal));
+    const idsExistants = new Set((parId || []).map(r => r.kinguin_product_id));
+    const nomsExistants = new Set((parNom || []).map(r => (r.nom || '').toLowerCase()));
+    liste = liste.filter(c => {
+      if (idsExistants.has(c.product.productId) || nomsExistants.has(c.nomFinal.toLowerCase())) { ignorer('Déjà au catalogue'); return false; }
+      return true;
+    });
+  }
+
+  // 4. Ajout
+  const rows = liste.map(({ product, plateforme, categorie, sousCategorie, imageUrl, nomFinal, prix }) => ({
+    nom: nomFinal, plateforme, categorie, sous_categorie: sousCategorie,
+    description: genererDescriptionFR(plateforme, categorie, sousCategorie),
+    prix, image_url: imageUrl, video_url: '',
+    developpeur: joinField(product.developers), editeur: joinField(product.publishers), genres: joinField(product.genres),
+    date_sortie: product.releaseDate || '', note_metacritic: product.metacriticScore || null,
+    est_slider: false, slider_ordre: 1, est_populaire: estPopulaire(product.name),
+    est_precommande: !!product.isPreorder, est_actif: true, kinguin_product_id: product.productId, stock: 999
+  }));
+  if (rows.length) {
+    const { error } = await supabase.from('products').insert(rows);
+    if (error) throw new Error('Ajout impossible : ' + error.message);
+  }
+  console.log(`🔎 Import « ${recherche} » : ${rows.length} ajouté(s) sur ${resultats.length} trouvé(s) chez Kinguin`);
+  return {
+    ok: true, recherche, trouves: resultats.length,
+    ajoutes: rows.map(r => ({ nom: r.nom, prix: r.prix, plateforme: r.plateforme })),
+    ignores
+  };
 }
 
 async function marquerSliderPourHomepage() {
@@ -1270,6 +1357,18 @@ http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, erreur: err.message }));
       });
+    return;
+  }
+
+  if (url.pathname === '/import-mot-cle') {
+    if (secret !== IMPORT_SECRET) { res.writeHead(403); res.end('Code secret invalide.'); return; }
+    const envoyer = obj => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (motCleEnCours) { envoyer({ ok: false, erreur: 'Un import par mot-clé est déjà en cours, réessaie dans quelques secondes.' }); return; }
+    motCleEnCours = true;
+    importParMotCle(url.searchParams.get('q'))
+      .then(envoyer)
+      .catch(err => envoyer({ ok: false, erreur: err.message }))
+      .finally(() => { motCleEnCours = false; });
     return;
   }
 
