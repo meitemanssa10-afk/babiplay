@@ -256,19 +256,63 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 @media(max-width:700px){
   .search-results{position:fixed;top:62px;left:10px;right:10px;max-height:65vh}
 }
+
+.lbl-court{display:none}
+/* Boutons visibles uniquement sur mobile */
+.nav-search-btn,.nav-account-mobile{display:none}
+.carte-ligne{margin-top:6px;font-size:12px;font-weight:600}
+.carte-preco{display:flex;align-items:center;gap:6px;color:#7ab8ff}
+.carte-preco b{border:1px solid #4a8fff;border-radius:5px;padding:1px 6px;font-size:10.5px}
+.carte-chrono{color:#ff7a50}
+
+/* ============ MOBILE (maquette validée le 03/10) ============
+   En-tête sur une ligne (logo · 🔍 · 🛒 · 👤), barre consoles à plat sous l'en-tête,
+   slider dégagé, puis sections en carrousels qui défilent au doigt. */
+@media(max-width:700px){
+  nav{padding:8px 12px;flex-wrap:wrap;height:auto;row-gap:8px}
+  .nav-center{display:none;order:3;flex-basis:100%;max-width:none;margin:0}
+  body.recherche-ouverte .nav-center{display:block}
+  .search-results{top:112px}
+  #nav-auth-btns{display:none !important}
+  .nav-search-btn{display:flex;align-items:center;justify-content:center;height:38px;width:54px;border:none;border-radius:19px;background:linear-gradient(135deg,#f5a623,#ff7f28);font-size:17px;cursor:pointer}
+  .nav-account-mobile{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:var(--bg2);border:1px solid var(--border2);font-size:17px;cursor:pointer}
+  body.connecte .nav-account-mobile{display:none}
+  .nav-right{gap:8px}
+  .nav-right .nav-icon-btn{width:38px;height:38px;background:var(--bg2);border:1px solid var(--border2)}
+
+  /* Barre consoles à plat, pleine largeur, au-dessus du slider */
+  .filter-bar-overlay{position:static;padding:0;gap:0;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .rubriques{display:none}
+  .filter-bar{display:flex;justify-content:space-around;width:100%;max-width:100%;padding:4px 2px;border:none;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .fchip{font-size:13px;font-weight:600;padding:8px 8px;opacity:.9}
+  .fchip[data-filter="all"],.fchip[data-filter="streaming"],.fchip[data-filter="materiel"]{display:none}
+  .fchip.active{background:none;color:var(--fc,var(--gold));border-bottom:2px solid var(--fc,var(--gold));border-radius:0}
+  .fchip.active img{filter:none}
+  .lbl-long{display:none}
+  .lbl-court{display:inline}
+
+  /* Sections de l'accueil en carrousels */
+  .prod-grid.carrousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;gap:12px;margin:0 -16px;padding:0 16px 6px;scrollbar-width:none}
+  .prod-grid.carrousel::-webkit-scrollbar{display:none}
+  .prod-grid.carrousel .card{flex:0 0 62%;scroll-snap-align:start}
+  .section-head h2{font-size:21px}
+  .see-all.fleche{font-size:24px;line-height:1;padding:0 4px;color:var(--muted2);background:none;border:none}
+}
+}
 </style>
 </head>
 <body>
 
 <!-- NAV -->
 <nav>
-  <a class="logo" href="#">BabiPlay<small>GAMING CI</small></a>
+  <a class="logo" href="#" onclick="event.preventDefault();retourAccueil()">BabiPlay<small>GAMING CI</small></a>
   <div class="nav-center">
     <span class="search-icon">🔍</span>
     <input class="search-input" id="search-input" placeholder="Rechercher un jeu, une carte..." oninput="onSearch(this.value)" onfocus="showSearchResults()" autocomplete="off">
     <div class="search-results" id="search-results"></div>
   </div>
   <div class="nav-right">
+    <button class="nav-search-btn" onclick="ouvrirRechercheMobile()" aria-label="Rechercher">🔍</button>
     <div id="nav-auth-btns" style="display:flex;gap:6px">
       <button class="nav-auth-btn" style="background:none;border:1px solid var(--border2);color:var(--text)" onclick="openAuth('login')">Connexion</button>
       <button class="nav-auth-btn" onclick="openAuth('register')">S'inscrire</button>
@@ -284,6 +328,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
     <button class="nav-icon-btn" onclick="toggleDrawer()">
       🛒<span class="nav-cart-badge" id="cart-badge">0</span>
     </button>
+    <button class="nav-account-mobile" id="nav-account-mobile" onclick="openAuth('login')" aria-label="Mon compte">👤</button>
   </div>
 </nav>
 
@@ -294,7 +339,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
       <button class="rubrique" data-rubrique="promos" onclick="setRubrique('promos')">⚡ Promos</button>
       <button class="rubrique" data-rubrique="tendances" onclick="setRubrique('tendances')">🔥 Tendances</button>
       <button class="rubrique" data-rubrique="precommandes" onclick="setRubrique('precommandes')">🚀 Précommandes</button>
-      <button class="rubrique" data-rubrique="sorties" onclick="setRubrique('sorties')">📅 Prochaines sorties</button>
+      <button class="rubrique" data-rubrique="sorties" onclick="setRubrique('sorties')">📅 <span class="lbl-long">Prochaines sorties</span><span class="lbl-court">Sorties</span></button>
     </div>
     <div class="filter-bar" id="filter-bar">
       <button class="fchip active" onclick="setFilter('all',this)" data-filter="all">🎮 Tout</button>
@@ -620,6 +665,7 @@ function renderSlider() {
         <div class="slide-overlay"></div>
         <div class="slide-content">
           <span class="slide-plat" style="background:rgba(0,0,0,.4);border:1px solid ${color};color:${color}">${pEmoji(p.plateforme)} ${pLabel(p.plateforme)}</span>
+          ${p.est_precommande && estAVenir(p) ? `<span class="slide-plat" style="background:#f5a623;color:#000;border:1px solid #f5a623;margin-left:6px">🚀 ${joursAvant(p)}</span>` : ''}
           <div class="slide-title">${p.nom}</div>
           <div class="slide-row">
             <div class="slide-price">${fmt(p.prix)} <span style="font-size:14px;color:rgba(255,255,255,.6)">FCFA</span></div>
@@ -796,7 +842,9 @@ function renderCatalogue(filter = currentFilter) {
 
   // Vue "Tout" — sections par thème
   const sections = [
-    { id: 'populaires', title: '🔥 Les plus populaires', items: products.filter(p => p.est_populaire).slice(0, 8) },
+    { id: 'promos', rubrique: true, title: '⚡ Promos du jour', items: produitsRubrique('promos').slice(0, 10) },
+    { id: 'tendances', rubrique: true, title: '🔥 Tendances', items: produitsRubrique('tendances').slice(0, 10) },
+    { id: 'precommandes', rubrique: true, title: '🚀 Précommandes', items: produitsRubrique('precommandes').slice(0, 10) },
     { id: 'psn', title: '🎮 PlayStation', items: products.filter(p => p.plateforme === 'psn').slice(0, 6) },
     { id: 'xbox', title: '🕹️ Xbox & Game Pass', items: products.filter(p => p.plateforme === 'xbox').slice(0, 6) },
     { id: 'pc', title: '🖥️ PC & Steam', items: products.filter(p => p.plateforme === 'pc').slice(0, 6) },
@@ -809,11 +857,11 @@ function renderCatalogue(filter = currentFilter) {
     <div class="section-block">
       <div class="section-head">
         <h2>${s.title}</h2>
-        ${s.id !== 'populaires'
-          ? `<button class="see-all" onclick="setFilter('${s.id}', document.querySelector('[data-filter=${s.id}]'))">Tout voir →</button>`
-          : ''}
+        ${s.rubrique
+          ? `<button class="see-all" onclick="setRubrique('${s.id}')">Tout voir →</button>`
+          : `<button class="see-all" onclick="setFilter('${s.id}', document.querySelector('[data-filter=${s.id}]'))">Tout voir →</button>`}
       </div>
-      <div class="prod-grid">${s.items.map(cardHtml).join('')}</div>
+      <div class="prod-grid carrousel">${s.items.map(cardHtml).join('')}</div>
     </div>`).join('');
 }
 
@@ -828,7 +876,7 @@ function cardHtml(p) {
       <span class="card-badge ${pBadgeClass(p.plateforme)}">${badgeLabel}</span>
       ${p.est_populaire ? '<span class="card-pop">⭐</span>' : ''}
       ${p.prix_normal ? `<span class="card-promo">-${p.promo_pct} %</span>` : ''}
-      ${p.prix_normal && currentRubrique === 'promos' ? `<span class="card-tag">⏳ ${tempsRestant(p.promo_fin)}</span>` : estAVenir(p) ? `<span class="card-tag">${p.est_precommande ? '🚀 ' : '📅 '}${dateCourte(p.date_sortie)}</span>` : ''}
+      ${estAVenir(p) && !p.est_precommande ? `<span class="card-tag">📅 ${dateCourte(p.date_sortie)}</span>` : ''}
     </div>
     <div class="card-body">
       <div class="card-name">${p.nom}</div>
@@ -836,6 +884,8 @@ function cardHtml(p) {
       <div class="card-foot">
         <div class="card-price">${p.prix_normal ? `<span class="card-old">${fmt(p.prix_normal)}</span>` : ''}${fmt(p.prix)}<small>FCFA</small></div>
       </div>
+      ${p.prix_normal ? `<div class="carte-ligne carte-chrono">⏳ Fin dans ${tempsRestant(p.promo_fin)}</div>` : ''}
+      ${p.est_precommande && estAVenir(p) ? `<div class="carte-ligne carte-preco"><b>PRÉCO</b>${joursAvant(p)}</div>` : ''}
     </div>
   </a>`;
 }
@@ -859,7 +909,7 @@ function setFilter(filter, btn) {
     root.style.setProperty('--fcbg', c + '22');
   }
   renderCatalogue(filter);
-  window.scrollTo({ top: document.getElementById('slider-wrap').offsetHeight + 56 + 48, behavior: 'smooth' });
+  defilerVersCatalogue();
 }
 
 // ---------------------------------------------------------------------------
@@ -962,7 +1012,27 @@ function setRubrique(r) {
   document.documentElement.style.removeProperty('--fcbg');
   history.replaceState(null, '', '#' + r);
   renderCatalogue();
-  window.scrollTo({ top: document.getElementById('slider-wrap').offsetHeight + 56 + 48, behavior: 'smooth' });
+  defilerVersCatalogue();
+}
+
+function ouvrirRechercheMobile() {
+  const ouvert = document.body.classList.toggle('recherche-ouverte');
+  if (ouvert) setTimeout(() => document.getElementById('search-input').focus(), 50);
+}
+function retourAccueil() {
+  setFilter('all', document.querySelector('[data-filter=all]'));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function joursAvant(p) {
+  const d = dateJeu(p); if (!d) return '';
+  const n = Math.round((d - aujourdhui()) / 864e5);
+  return n <= 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `Dans ${n} jours`;
+}
+
+function defilerVersCatalogue() {
+  const cat = document.getElementById('catalogue');
+  const hauteurNav = document.querySelector('nav').offsetHeight;
+  if (cat) window.scrollTo({ top: cat.getBoundingClientRect().top + window.scrollY - hauteurNav - 8, behavior: 'smooth' });
 }
 
 function setRubriquePlateforme(pl) {
@@ -1382,6 +1452,7 @@ async function loadProfile() {
 }
 function updateNavAuth() {
   document.getElementById('nav-auth-btns').style.display = currentUser ? 'none' : 'flex';
+  document.body.classList.toggle('connecte', !!currentUser);
   document.getElementById('nav-user-menu').style.display = currentUser ? 'block' : 'none';
 }
 function toggleUserMenu() { document.getElementById('user-dropdown').classList.toggle('open'); }
