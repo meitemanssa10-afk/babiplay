@@ -64,6 +64,8 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .rubrique{background:none;border:none;color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;padding:7px 14px;border-radius:999px;transition:all .2s}
 .rubrique:hover{background:rgba(245,166,35,.15)}
 .rubrique.active{background:var(--gold);color:#0b0b0e;font-weight:700}
+.card-promo{position:absolute;bottom:6px;right:6px;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;background:#ff3b30;color:#fff}
+.card-old{font-size:11px;color:var(--muted2);text-decoration:line-through;margin-right:4px}
 .card-tag{position:absolute;bottom:6px;left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(245,166,35,.92);color:#0b0b0e}
 .mois-titre{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin:22px 0 12px;text-transform:capitalize}
 .filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:rgba(17,17,22,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);max-width:100%;overflow-x:auto;scrollbar-width:none;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
@@ -289,6 +291,7 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 <div class="hero-wrap">
   <div class="filter-bar-overlay">
     <div class="rubriques" id="rubriques">
+      <button class="rubrique" data-rubrique="promos" onclick="setRubrique('promos')">⚡ Promos</button>
       <button class="rubrique" data-rubrique="tendances" onclick="setRubrique('tendances')">🔥 Tendances</button>
       <button class="rubrique" data-rubrique="precommandes" onclick="setRubrique('precommandes')">🚀 Précommandes</button>
       <button class="rubrique" data-rubrique="sorties" onclick="setRubrique('sorties')">📅 Prochaines sorties</button>
@@ -490,7 +493,7 @@ async function loadProducts() {
   // On envoie toutes les pages EN MÊME TEMPS (au lieu d'une par une) : on demande d'abord juste
   // le nombre total de produits, puis on lance tous les .range() en parallèle avec Promise.all.
   const pageSize = 1000;
-  const selectCols = 'id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, date_sortie, est_slider, slider_ordre, est_physique, delai_livraison_jours';
+  const selectCols = 'id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, date_sortie, prix_promo, promo_fin, est_slider, slider_ordre, est_physique, delai_livraison_jours';
 
   const countPromise = sb.from('products').select('id', { count: 'exact', head: true }).eq('est_actif', true);
   const banPromise = sb.from('banners').select('*').eq('est_actif', true).order('ordre', { ascending: true });
@@ -514,7 +517,10 @@ async function loadProducts() {
     if (error) { console.error('Erreur chargement produits:', error.message); continue; }
     if (data) all = all.concat(data);
   }
-  products = all;
+  products = all.map(appliquerPromo);
+  // Panier gardé dans le navigateur : on remet les prix à jour (promo commencée ou finie)
+  cart = cart.map(c => { const p = products.find(x => x.id === c.id); return p ? { ...c, prix: p.prix, prix_normal: p.prix_normal } : c; });
+  sauvegarderPanier();
   activeBanners = banData || [];
   renderSlider();
   const ancre = (location.hash || '').replace('#', '');
@@ -769,13 +775,14 @@ function cardHtml(p) {
       ${imgHtml}
       <span class="card-badge ${pBadgeClass(p.plateforme)}">${badgeLabel}</span>
       ${p.est_populaire ? '<span class="card-pop">⭐</span>' : ''}
-      ${estAVenir(p) ? `<span class="card-tag">${p.est_precommande ? '🚀 ' : '📅 '}${dateCourte(p.date_sortie)}</span>` : ''}
+      ${p.prix_normal ? `<span class="card-promo">-${p.promo_pct} %</span>` : ''}
+      ${p.prix_normal && currentRubrique === 'promos' ? `<span class="card-tag">⏳ ${tempsRestant(p.promo_fin)}</span>` : estAVenir(p) ? `<span class="card-tag">${p.est_precommande ? '🚀 ' : '📅 '}${dateCourte(p.date_sortie)}</span>` : ''}
     </div>
     <div class="card-body">
       <div class="card-name">${p.nom}</div>
       ${p.est_physique ? `<div style="font-size:11px;color:var(--gold,#ffb020);margin-top:2px">🚚 Livraison ~${p.delai_livraison_jours || 7} jours (Abidjan)</div>` : ''}
       <div class="card-foot">
-        <div class="card-price">${fmt(p.prix)}<small>FCFA</small></div>
+        <div class="card-price">${p.prix_normal ? `<span class="card-old">${fmt(p.prix_normal)}</span>` : ''}${fmt(p.prix)}<small>FCFA</small></div>
       </div>
     </div>
   </a>`;
@@ -809,6 +816,7 @@ function setFilter(filter, btn) {
 // Lien partageable : babiplay.store/#precommandes, #tendances, #sorties
 // ---------------------------------------------------------------------------
 const RUBRIQUES = {
+  promos:       { titre: '⚡ Promos du jour', texte: 'Des réductions pour une durée limitée. Quand le compteur arrive à zéro, le prix normal revient.' },
   tendances:    { titre: '🔥 Tendances', texte: 'Les jeux et produits les plus demandés du moment, toutes consoles confondues.' },
   precommandes: { titre: '🚀 Précommandes', texte: 'Réserve les prochains gros jeux. Tu reçois un email de confirmation dès le paiement, et ton code le jour de la sortie.' },
   sorties:      { titre: '📅 Prochaines sorties', texte: 'Le calendrier des jeux qui arrivent, mois par mois.' },
@@ -820,7 +828,27 @@ function aujourdhui() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; 
 function estAVenir(p) { const d = dateJeu(p); return !!d && d >= aujourdhui(); }
 function dateCourte(v) { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; }
 
+// ---------------------------------------------------------------------------
+// PROMOS : même règle que la base de données (prix promo < prix normal, date de fin à venir).
+// Le prix affiché n'est qu'indicatif : le vrai prix est recalculé par la base au paiement.
+// ---------------------------------------------------------------------------
+function appliquerPromo(p) {
+  const active = p.prix_promo && p.promo_fin && new Date(p.promo_fin) > new Date() && p.prix_promo > 0 && p.prix_promo < p.prix;
+  if (!active) return p;
+  return { ...p, prix_normal: p.prix, prix: p.prix_promo, promo_pct: Math.round((1 - p.prix_promo / p.prix) * 100) };
+}
+function tempsRestant(fin) {
+  const ms = new Date(fin) - new Date();
+  if (ms <= 0) return 'terminée';
+  const h = Math.floor(ms / 3600e3), m = Math.floor((ms % 3600e3) / 60e3);
+  if (h >= 48) return Math.floor(h / 24) + ' j';
+  return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
+}
+
 function produitsRubrique(r) {
+  if (r === 'promos') {
+    return products.filter(p => p.prix_normal).sort((a, b) => new Date(a.promo_fin) - new Date(b.promo_fin));
+  }
   const base = products.filter(p => PLATEFORMES_JEUX.includes(p.plateforme));
   if (r === 'tendances') {
     // Populaires, les plus récents d'abord (un FIFA 10 n'est pas une tendance)
@@ -840,7 +868,7 @@ function renderRubrique(cat) {
   const r = RUBRIQUES[currentRubrique];
   const tous = produitsRubrique(currentRubrique);
   const liste = rubriquePlateforme === 'all' ? tous : tous.filter(p => p.plateforme === rubriquePlateforme);
-  const consoles = PLATEFORMES_JEUX.filter(pl => tous.some(p => p.plateforme === pl));
+  const consoles = (currentRubrique === 'promos' ? [...PLATEFORMES_JEUX, 'streaming', 'materiel'] : PLATEFORMES_JEUX).filter(pl => tous.some(p => p.plateforme === pl));
   const chips = `
     <div class="subcon-row">
       <button class="subcon-chip ${rubriquePlateforme === 'all' ? 'active' : ''}" onclick="setRubriquePlateforme('all')">Toutes (${tous.length})</button>
@@ -849,7 +877,7 @@ function renderRubrique(cat) {
 
   let corps;
   if (!liste.length) {
-    corps = '<div class="empty-state">Rien pour le moment dans cette rubrique.</div>';
+    corps = `<div class="empty-state">${currentRubrique === 'promos' ? 'Pas de promo en cours. Reviens bientôt, il y en a régulièrement ! ⚡' : 'Rien pour le moment dans cette rubrique.'}</div>`;
   } else if (currentRubrique === 'sorties') {
     // Regroupement par mois : « novembre 2026 », « décembre 2026 »...
     const parMois = {};
@@ -1054,7 +1082,7 @@ function updateCartUI() {
       ${c.image_url ? `<img class="ci-thumb" src="${c.image_url}" alt="${c.nom}">` : `<div class="ci-thumb-fb">${pEmoji(c.plateforme)}</div>`}
       <div class="ci-info">
         <div class="ci-name">${c.nom}</div>
-        <div class="ci-price">${fmt(c.prix)} FCFA</div>
+        <div class="ci-price">${c.prix_normal ? `<s style="opacity:.6;font-size:.85em">${fmt(c.prix_normal)}</s> ` : ''}${fmt(c.prix)} FCFA</div>
       </div>
       <button class="ci-rm" onclick="removeFromCart('${c.id}')">✕</button>
     </div>`).join('');
