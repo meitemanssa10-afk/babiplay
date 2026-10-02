@@ -58,7 +58,13 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 
 /* FILTRES PLATEFORMES — capsule flottante par-dessus le slider */
 .hero-wrap{position:relative}
-.filter-bar-overlay{position:absolute;top:14px;left:0;right:0;z-index:20;display:flex;justify-content:center;padding:0 16px;pointer-events:none}
+.filter-bar-overlay{position:absolute;top:14px;left:0;right:0;z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 16px;pointer-events:none}
+.rubriques{display:flex;gap:18px;pointer-events:auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.rubriques::-webkit-scrollbar{display:none}
+.rubrique{background:none;border:none;color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;opacity:.9;text-shadow:0 1px 6px rgba(0,0,0,.8);padding:2px 0;border-bottom:2px solid transparent}
+.rubrique.active{opacity:1;font-weight:700;border-bottom-color:var(--gold)}
+.card-tag{position:absolute;bottom:6px;left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(245,166,35,.92);color:#0b0b0e}
+.mois-titre{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin:22px 0 12px;text-transform:capitalize}
 .filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:rgba(17,17,22,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);max-width:100%;overflow-x:auto;scrollbar-width:none;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .filter-bar::-webkit-scrollbar{display:none}
 .fchip{display:flex;align-items:center;gap:6px;background:none;border:none;color:#fff;opacity:.8;padding:8px 16px;border-radius:999px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
@@ -281,6 +287,11 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 <!-- HERO : slider + capsule de plateformes flottante par-dessus -->
 <div class="hero-wrap">
   <div class="filter-bar-overlay">
+    <div class="rubriques" id="rubriques">
+      <button class="rubrique" data-rubrique="tendances" onclick="setRubrique('tendances')">🔥 Tendances</button>
+      <button class="rubrique" data-rubrique="precommandes" onclick="setRubrique('precommandes')">🚀 Précommandes</button>
+      <button class="rubrique" data-rubrique="sorties" onclick="setRubrique('sorties')">📅 Prochaines sorties</button>
+    </div>
     <div class="filter-bar" id="filter-bar">
       <button class="fchip active" onclick="setFilter('all',this)" data-filter="all">🎮 Tout</button>
       <button class="fchip" onclick="setFilter('psn',this)" data-filter="psn">
@@ -415,6 +426,8 @@ let sb, products = [], cart = JSON.parse(localStorage.getItem('babiplay_cart') |
 function sauvegarderPanier(){ localStorage.setItem('babiplay_cart', JSON.stringify(cart)); }
 let promoApplied = null;
 let currentFilter = 'all';
+let currentRubrique = null;      // 'tendances' | 'precommandes' | 'sorties' (toutes consoles)
+let rubriquePlateforme = 'all';  // filtre console à l'intérieur d'une rubrique
 let currentSousConsole = 'all';
 let currentType = 'tous';
 let currentSort = 'defaut';
@@ -476,7 +489,7 @@ async function loadProducts() {
   // On envoie toutes les pages EN MÊME TEMPS (au lieu d'une par une) : on demande d'abord juste
   // le nombre total de produits, puis on lance tous les .range() en parallèle avec Promise.all.
   const pageSize = 1000;
-  const selectCols = 'id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, est_slider, slider_ordre, est_physique, delai_livraison_jours';
+  const selectCols = 'id, nom, prix, image_url, video_url, description, plateforme, categorie, sous_categorie, est_populaire, est_precommande, date_sortie, est_slider, slider_ordre, est_physique, delai_livraison_jours';
 
   const countPromise = sb.from('products').select('id', { count: 'exact', head: true }).eq('est_actif', true);
   const banPromise = sb.from('banners').select('*').eq('est_actif', true).order('ordre', { ascending: true });
@@ -503,7 +516,8 @@ async function loadProducts() {
   products = all;
   activeBanners = banData || [];
   renderSlider();
-  renderCatalogue();
+  const ancre = (location.hash || '').replace('#', '');
+  if (RUBRIQUES[ancre]) setRubrique(ancre); else renderCatalogue();
 }
 
 // SLIDER — mélange les produits marqués "slider" ET les bannières promo libres (pubs,
@@ -600,6 +614,7 @@ function startSlider() { clearInterval(sliderTimer); if (slidesCount > 1) slider
 function renderCatalogue(filter = currentFilter) {
   const cat = document.getElementById('catalogue');
   if (!products.length) { cat.innerHTML = '<div class="empty-state">Aucun produit disponible pour le moment.</div>'; return; }
+  if (currentRubrique) { renderRubrique(cat); return; }
 
   let list = filter === 'all' ? products : products.filter(p => p.plateforme === filter);
 
@@ -753,6 +768,7 @@ function cardHtml(p) {
       ${imgHtml}
       <span class="card-badge ${pBadgeClass(p.plateforme)}">${badgeLabel}</span>
       ${p.est_populaire ? '<span class="card-pop">⭐</span>' : ''}
+      ${estAVenir(p) ? `<span class="card-tag">${p.est_precommande ? '🚀 ' : '📅 '}${dateCourte(p.date_sortie)}</span>` : ''}
     </div>
     <div class="card-body">
       <div class="card-name">${p.nom}</div>
@@ -765,6 +781,9 @@ function cardHtml(p) {
 }
 
 function setFilter(filter, btn) {
+  currentRubrique = null;
+  document.querySelectorAll('.rubrique').forEach(b => b.classList.remove('active'));
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   currentFilter = filter;
   currentSousConsole = 'all';
   currentType = 'tous';
@@ -781,6 +800,93 @@ function setFilter(filter, btn) {
   }
   renderCatalogue(filter);
   window.scrollTo({ top: document.getElementById('slider-wrap').offsetHeight + 56 + 48, behavior: 'smooth' });
+}
+
+// ---------------------------------------------------------------------------
+// RUBRIQUES (comme Instant Gaming) : Tendances, Précommandes, Prochaines sorties.
+// Toutes consoles mélangées, avec un filtre console à l'intérieur.
+// Lien partageable : babiplay.store/#precommandes, #tendances, #sorties
+// ---------------------------------------------------------------------------
+const RUBRIQUES = {
+  tendances:    { titre: '🔥 Tendances', texte: 'Les jeux et produits les plus demandés du moment, toutes consoles confondues.' },
+  precommandes: { titre: '🚀 Précommandes', texte: 'Réserve les prochains gros jeux. Tu reçois un email de confirmation dès le paiement, et ton code le jour de la sortie.' },
+  sorties:      { titre: '📅 Prochaines sorties', texte: 'Le calendrier des jeux qui arrivent, mois par mois.' },
+};
+const PLATEFORMES_JEUX = ['psn', 'xbox', 'pc', 'nintendo'];
+
+function dateJeu(p) { const d = p.date_sortie ? new Date(p.date_sortie) : null; return d && !isNaN(d) ? d : null; }
+function aujourdhui() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function estAVenir(p) { const d = dateJeu(p); return !!d && d >= aujourdhui(); }
+function dateCourte(v) { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; }
+
+function produitsRubrique(r) {
+  const base = products.filter(p => PLATEFORMES_JEUX.includes(p.plateforme));
+  if (r === 'tendances') {
+    // Populaires, les plus récents d'abord (un FIFA 10 n'est pas une tendance)
+    return base.filter(p => p.est_populaire)
+      .sort((a, b) => (dateJeu(b)?.getTime() || 0) - (dateJeu(a)?.getTime() || 0)).slice(0, 60);
+  }
+  if (r === 'precommandes') {
+    // Marqués précommande ET pas encore sortis (évite les vieux bonus de précommande)
+    return base.filter(p => p.est_precommande && (!dateJeu(p) || estAVenir(p)))
+      .sort((a, b) => (dateJeu(a)?.getTime() || Infinity) - (dateJeu(b)?.getTime() || Infinity));
+  }
+  // sorties : tout ce qui a une date future
+  return base.filter(estAVenir).sort((a, b) => dateJeu(a) - dateJeu(b));
+}
+
+function renderRubrique(cat) {
+  const r = RUBRIQUES[currentRubrique];
+  const tous = produitsRubrique(currentRubrique);
+  const liste = rubriquePlateforme === 'all' ? tous : tous.filter(p => p.plateforme === rubriquePlateforme);
+  const consoles = PLATEFORMES_JEUX.filter(pl => tous.some(p => p.plateforme === pl));
+  const chips = `
+    <div class="subcon-row">
+      <button class="subcon-chip ${rubriquePlateforme === 'all' ? 'active' : ''}" onclick="setRubriquePlateforme('all')">Toutes (${tous.length})</button>
+      ${consoles.map(pl => `<button class="subcon-chip ${rubriquePlateforme === pl ? 'active' : ''}" onclick="setRubriquePlateforme('${pl}')">${pLabel(pl)} (${tous.filter(p => p.plateforme === pl).length})</button>`).join('')}
+    </div>`;
+
+  let corps;
+  if (!liste.length) {
+    corps = '<div class="empty-state">Rien pour le moment dans cette rubrique.</div>';
+  } else if (currentRubrique === 'sorties') {
+    // Regroupement par mois : « novembre 2026 », « décembre 2026 »...
+    const parMois = {};
+    for (const p of liste) {
+      const cle = dateJeu(p).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      (parMois[cle] = parMois[cle] || []).push(p);
+    }
+    corps = Object.entries(parMois).map(([mois, items]) =>
+      `<div class="mois-titre">${mois}</div><div class="prod-grid">${items.map(cardHtml).join('')}</div>`).join('');
+  } else {
+    corps = `<div class="prod-grid">${liste.map(cardHtml).join('')}</div>`;
+  }
+
+  cat.innerHTML = `
+    <div class="cat-hero"><h1>${r.titre}</h1><p>${r.texte}</p>
+      <div style="width:40px;height:3px;background:var(--gold);margin:12px auto 0;border-radius:2px"></div></div>
+    ${chips}
+    <div class="section-block">
+      <div class="section-head"><span style="font-size:12px;color:var(--muted2)">${liste.length} article${liste.length > 1 ? 's' : ''}</span></div>
+      ${corps}
+    </div>`;
+}
+
+function setRubrique(r) {
+  currentRubrique = r;
+  rubriquePlateforme = 'all';
+  document.querySelectorAll('.rubrique').forEach(b => b.classList.toggle('active', b.dataset.rubrique === r));
+  document.querySelectorAll('.fchip').forEach(b => b.classList.remove('active'));
+  document.documentElement.style.removeProperty('--fc');
+  document.documentElement.style.removeProperty('--fcbg');
+  history.replaceState(null, '', '#' + r);
+  renderCatalogue();
+  window.scrollTo({ top: document.getElementById('slider-wrap').offsetHeight + 56 + 48, behavior: 'smooth' });
+}
+
+function setRubriquePlateforme(pl) {
+  rubriquePlateforme = pl;
+  renderCatalogue();
 }
 
 function setSousConsole(c) {
