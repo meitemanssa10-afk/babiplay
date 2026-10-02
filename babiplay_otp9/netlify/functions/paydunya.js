@@ -42,17 +42,21 @@ exports.handler = async (event) => {
     // 3. Prix réels lus dans products (jamais ceux envoyés par le navigateur).
     const ids = [...new Set(orders.map(o => o.product_id))];
     const { data: produits } = await supabase.from('products')
-      .select('id, nom, plateforme, prix, est_actif').in('id', ids);
+      .select('id, nom, plateforme, prix, prix_promo, promo_fin, est_actif').in('id', ids);
+    // Prix du moment : le prix promo s'il est en cours, sinon le prix normal (même règle que la base)
+    const prixDuMoment = p => (p.prix_promo != null && p.promo_fin && new Date(p.promo_fin) > new Date()
+      && Number(p.prix_promo) > 0 && Number(p.prix_promo) < Number(p.prix)) ? Number(p.prix_promo) : Number(p.prix);
     const parId = Object.fromEntries((produits || []).map(p => [p.id, p]));
 
     const articles = [];
     for (const o of orders) {
       const p = parId[o.product_id];
       if (!p || !p.est_actif) return reponse(400, { error: "Un produit de cette commande n'est plus disponible" });
-      if (Number(o.prix_paye) !== Number(p.prix)) {
-        return reponse(409, { error: `Le prix de « ${p.nom} » a changé. Annulez cette commande et recommandez.` });
+      const prix = prixDuMoment(p);
+      if (Number(o.prix_paye) !== prix) {
+        return reponse(409, { error: `Le prix de « ${p.nom} » a changé (fin de promo ou mise à jour). Annulez cette commande et recommandez.` });
       }
-      articles.push({ order_id: o.id, product_id: p.id, produit_nom: p.nom, plateforme: p.plateforme, prix: Number(p.prix) });
+      articles.push({ order_id: o.id, product_id: p.id, produit_nom: p.nom, plateforme: p.plateforme, prix });
     }
 
     // 4. Code promo revérifié ici : actif, pas expiré, pas épuisé.
