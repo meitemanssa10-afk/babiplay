@@ -1102,7 +1102,7 @@ async function runFixKinguinProducts() {
       let from = 0;
       while (true) {
         const { data: pageRows, error: pageErr } = await supabase.from('products')
-          .select('id, nom, kinguin_product_id, image_url, prix')
+          .select('id, nom, kinguin_product_id, image_url, prix, prix_promo, promo_fin')
           .not('kinguin_product_id', 'is', null)
           .neq('kinguin_product_id', '')
           .order('id', { ascending: true }).range(from, from + pageSize - 1);
@@ -1210,6 +1210,14 @@ async function runFixKinguinProducts() {
             fields.est_actif = false; // seul un vendeur hors de prix reste : on retire la fiche
           }
           if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
+          // Garde-fou promo : si le coût Kinguin a monté au point que la promo ferait vendre à perte
+          // (coût + ~2,5 % de frais PayDunya), on arrête la promo tout de suite.
+          const coutFCFA = eurPrice * EUR_TO_XOF * 1.025;
+          if (row.prix_promo && row.promo_fin && new Date(row.promo_fin) > new Date() && row.prix_promo < coutFCFA) {
+            fields.prix_promo = null;
+            fields.promo_fin = null;
+            console.log(`⚡ Promo arrêtée (vente à perte évitée) : ${row.nom} — promo ${row.prix_promo} < coût ${Math.round(coutFCFA)} FCFA`);
+          }
         }
         const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
         if (!updateErr) totalCorriges++;
