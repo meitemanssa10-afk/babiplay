@@ -109,6 +109,10 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 .buy-name{font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;line-height:1.3}
 .buy-type{font-size:12px;color:var(--gold);font-weight:600}
 .buy-price{font-family:'Rajdhani',sans-serif;font-size:34px;font-weight:700;color:var(--gold);line-height:1}
+.buy-promo{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.buy-promo s{color:var(--muted2);font-size:15px}
+.buy-promo span{background:#ff3b30;color:#fff;font-weight:800;font-size:12px;padding:2px 8px;border-radius:5px}
+.buy-chrono{margin-top:8px;font-size:13px;color:#ff7a50;font-weight:600}
 .buy-price small{display:block;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--muted2);font-weight:400}
 .buy-stock{font-size:12px;color:var(--muted2);display:flex;align-items:center;gap:5px}
 .buy-stock-dot{width:7px;height:7px;border-radius:50%;background:#52b043;flex-shrink:0}
@@ -477,8 +481,9 @@ function lexiqueNom(p) {
 
   if (!prodId) { render404(); return; }
 
-  const { data: p } = await sb.from('products').select('*').eq('id', prodId).single();
-  if (!p) { render404(); return; }
+  const { data: brut } = await sb.from('products').select('*').eq('id', prodId).single();
+  if (!brut) { render404(); return; }
+  const p = appliquerPromo(brut);
   produit = p;
   document.title = p.nom + ' — BabiPlay CI';
 
@@ -621,7 +626,9 @@ function renderPage() {
           <div class="buy-name">${p.nom}</div>
           <div class="buy-type">${LIBELLE_TYPE[type]}</div>
           <div>
+            ${p.prix_normal ? `<div class="buy-promo"><s>${fmt(p.prix_normal)} FCFA</s><span>-${p.promo_pct} %</span></div>` : ''}
             <div class="buy-price">${fmt(p.prix)} <small>FCFA</small></div>
+            ${p.prix_normal ? `<div class="buy-chrono" id="buy-chrono" data-fin="${p.promo_fin}">⚡ Promo : fin dans …</div>` : ''}
           </div>
           <div class="buy-stock"><div class="buy-stock-dot"></div> ${type === 'physique' ? `En stock — livraison sous ${delai} jours` : p.est_precommande ? `Précommande — code livré le jour de la sortie${dateSortieFR(p) ? ' (' + dateSortieFR(p) + ')' : ''}` : 'En stock — livraison immédiate'}</div>
           <button class="btn-add" onclick="addToCart()">🛒 Ajouter au panier</button>
@@ -665,6 +672,23 @@ function renderPage() {
     ${similairesHtml}
   `;
 }
+
+// PROMO : même règle que la base (le vrai prix est recalculé au paiement)
+function appliquerPromo(p) {
+  const active = p.prix_promo && p.promo_fin && new Date(p.promo_fin) > new Date() && p.prix_promo > 0 && p.prix_promo < p.prix;
+  if (!active) return p;
+  return { ...p, prix_normal: p.prix, prix: p.prix_promo, promo_pct: Math.round((1 - p.prix_promo / p.prix) * 100) };
+}
+// Compte à rebours en direct ; à zéro, on recharge pour afficher le prix normal
+setInterval(() => {
+  const el = document.getElementById('buy-chrono');
+  if (!el) return;
+  const ms = new Date(el.dataset.fin) - new Date();
+  if (ms <= 0) { location.reload(); return; }
+  const j = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4), sec = Math.floor(ms % 6e4 / 1e3);
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = `⚡ Promo : fin dans ${j ? j + ' j ' : ''}${pad(h)}:${pad(m)}:${pad(sec)}`;
+}, 1000);
 
 function addToCart() {
   showToast('✅ Ajouté au panier !', 'ok');
