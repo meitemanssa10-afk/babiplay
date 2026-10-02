@@ -71,7 +71,7 @@ async function recupererCleCommande(orderId, tentativesMax = 10) {
   throw new Error('Délai dépassé : clé non livrée par Kinguin');
 }
 
-async function acheterViaKinguin(produitNom, kinguinProductId, onAchete) {
+async function acheterViaKinguin(produitNom, kinguinProductId, onAchete, precommandeConnue = false) {
   let produit;
   if (kinguinProductId) {
     console.log(`🔗 Utilisation de l'ID Kinguin configuré : ${kinguinProductId}`);
@@ -86,6 +86,14 @@ async function acheterViaKinguin(produitNom, kinguinProductId, onAchete) {
   console.log(`✅ Commande Kinguin créée : ${commandeKinguin.orderId}`);
   // Enregistré AVANT d'attendre le code : si le bot plante ensuite, on sait qu'on a déjà payé
   if (onAchete) await onAchete(commandeKinguin.orderId);
+  // PRÉCOMMANDE : Kinguin ne livre la clé qu'à la sortie du jeu. On tente vite fait
+  // (au cas où le jeu serait déjà sorti), sinon on rend la main sans erreur.
+  if (precommandeConnue || produit.isPreorder) {
+    let codePreco = null;
+    try { codePreco = await recupererCleCommande(commandeKinguin.orderId, 2); } catch (_) {}
+    if (!codePreco) console.log('🕒 Précommande : clé attendue à la sortie du jeu');
+    return { code: codePreco, kinguinOrderId: commandeKinguin.orderId, precommande: !codePreco, dateSortie: produit.releaseDate || null };
+  }
   const code = await recupererCleCommande(commandeKinguin.orderId);
   console.log('✅ Clé récupérée !');
   return { code, kinguinOrderId: commandeKinguin.orderId };
@@ -283,6 +291,63 @@ async function envoyerEmailEchec(clientEmail, clientNom, produitNom) {
   console.log(`📧 Email d'échec envoyé à ${clientEmail}`);
 }
 
+const MARQUEUR_PRECO = 'PRÉCOMMANDE';
+
+function dateSortieFR(d) {
+  const date = d ? new Date(d) : null;
+  return date && !isNaN(date) ? date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+}
+
+async function envoyerEmailPrecommande(clientEmail, clientNom, produitNom, dateSortie) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const quand = dateSortieFR(dateSortie) ? `le ${dateSortieFR(dateSortie)}` : 'à la sortie du jeu';
+  await resend.emails.send({
+    from: EXPEDITEUR,
+    reply_to: REPONDRE_A,
+    to: clientEmail,
+    subject: `Précommande confirmée : ${produitNom} – BabiPlay`,
+    text: `Bonjour ${clientNom || 'Client'},\n\nVotre précommande de ${produitNom} est confirmée et payée.\nC'est une précommande : votre code vous sera envoyé automatiquement par email ${quand}, dès sa sortie. Vous n'avez rien à faire.\n\nVous pouvez suivre votre commande dans Mon compte : https://babiplay.store/compte.html\n\nMerci pour votre confiance !`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
+        <h2>Bonjour ${clientNom || 'Client'} !</h2>
+        <p>✅ Votre précommande de <strong>${produitNom}</strong> est <strong>confirmée et payée</strong>.</p>
+        <div style="background:#fff8ec;border:1px solid #f5c26b;border-radius:10px;padding:16px;margin:20px 0;">
+          <p style="margin:0;color:#333;line-height:1.5;">🕒 C'est une précommande : votre code vous sera envoyé <strong>automatiquement par email ${quand}</strong>, dès la sortie du jeu. Vous n'avez rien à faire.</p>
+        </div>
+        <p>Suivez votre commande dans <a href="https://babiplay.store/compte.html" style="color:#f5a623;">Mon compte → Mes commandes</a>.</p>
+        <p>Merci pour votre confiance ! 🚀</p>
+      </div>`
+  });
+  console.log(`📧 Confirmation de précommande envoyée à ${clientEmail}`);
+}
+
+// Livraison finale (commune aux commandes normales et aux précommandes qui viennent de sortir)
+async function finaliserLivraison(commande, code, kinguinOrderId) {
+  if (!code) throw new Error(`Code Kinguin vide/invalide pour la commande Kinguin ${kinguinOrderId}`);
+  if (commande.client_email) {
+    await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
+  }
+  await supabase.from('commandes').update({
+    statut: 'livree', livraison_auto: true, erreur_message: null,
+    livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code, kinguin_order_id: kinguinOrderId
+  }).eq('id', commande.id);
+  if (commande.order_id) {
+    await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code, kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
+    const { data: orderRow } = await supabase.from('orders').select('user_id, points_gagnes').eq('id', commande.order_id).single();
+    if (orderRow?.user_id) {
+      const { data: profil } = await supabase.from('profiles').select('points, total_commandes').eq('id', orderRow.user_id).single();
+      if (profil) {
+        const nouveauxPoints = (profil.points || 0) + (orderRow.points_gagnes || 10);
+        const nouveauTotal = (profil.total_commandes || 0) + 1;
+        await supabase.from('profiles').update({ points: nouveauxPoints, total_commandes: nouveauTotal }).eq('id', orderRow.user_id);
+        console.log(`⭐ Points crédités : +${orderRow.points_gagnes || 10} (total ${nouveauxPoints}) pour ${orderRow.user_id}`);
+      }
+    }
+  }
+  console.log(`✅ Commande ${commande.id} livrée avec succès !`);
+}
+
 async function traiterCommande(commande) {
   console.log(`🔄 Traitement commande ${commande.id}...`);
 
@@ -312,42 +377,39 @@ async function traiterCommande(commande) {
   let kinguinAchete = null;
   try {
     if (commande.order_id) await supabase.from('orders').update({ statut: 'en_cours' }).eq('id', commande.order_id);
-    let kinguinProductId = null;
+    let kinguinProductId = null, estPrecommande = false, dateSortieBabiPlay = null;
     const produitId = commande.product_id || commande.produit_id;
     if (produitId) {
       const { data: produitBabiPlay } = await supabase
-        .from('products').select('kinguin_product_id').eq('id', produitId).single();
+        .from('products').select('kinguin_product_id, est_precommande, date_sortie').eq('id', produitId).single();
       kinguinProductId = produitBabiPlay?.kinguin_product_id || null;
+      estPrecommande = !!produitBabiPlay?.est_precommande;
+      dateSortieBabiPlay = produitBabiPlay?.date_sortie || null;
     }
-    const { code, kinguinOrderId } = await acheterViaKinguin(
+    const { code, kinguinOrderId, precommande, dateSortie } = await acheterViaKinguin(
       commande.produit_nom || commande.nom_produit, kinguinProductId,
       async (id) => {
         kinguinAchete = id;
         await supabase.from('commandes').update({ kinguin_order_id: id }).eq('id', commande.id);
-      }
+      },
+      estPrecommande
     );
-    if (!code) throw new Error(`Code Kinguin vide/invalide pour la commande Kinguin ${kinguinOrderId}`);
-    if (commande.client_email) {
-      await envoyerCodeParEmail(commande.client_email, commande.client_nom || 'Client', commande.produit_nom || commande.nom_produit, code);
-    }
-    await supabase.from('commandes').update({
-      statut: 'livree', livraison_auto: true,
-      livre_le: new Date().toISOString(), codes_livres: [code], code_jeu: code, kinguin_order_id: kinguinOrderId
-    }).eq('id', commande.id);
-    if (commande.order_id) {
-      await supabase.from('orders').update({ statut: 'code_envoye', code_jeu: code, kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
-      const { data: orderRow } = await supabase.from('orders').select('user_id, points_gagnes').eq('id', commande.order_id).single();
-      if (orderRow?.user_id) {
-        const { data: profil } = await supabase.from('profiles').select('points, total_commandes').eq('id', orderRow.user_id).single();
-        if (profil) {
-          const nouveauxPoints = (profil.points || 0) + (orderRow.points_gagnes || 10);
-          const nouveauTotal = (profil.total_commandes || 0) + 1;
-          await supabase.from('profiles').update({ points: nouveauxPoints, total_commandes: nouveauTotal }).eq('id', orderRow.user_id);
-          console.log(`⭐ Points crédités : +${orderRow.points_gagnes || 10} (total ${nouveauxPoints}) pour ${orderRow.user_id}`);
-        }
+    if (precommande) {
+      // Payé chez Kinguin, clé à la sortie : on met en attente (PAS en erreur) et on rassure le client
+      await supabase.from('commandes').update({
+        statut: 'en_cours', kinguin_order_id: kinguinOrderId,
+        erreur_message: `${MARQUEUR_PRECO} — payée chez Kinguin (${kinguinOrderId}), clé attendue à la sortie, envoi automatique`
+      }).eq('id', commande.id);
+      if (commande.order_id) await supabase.from('orders').update({ statut: 'a_approvisionner', kinguin_order_id: kinguinOrderId }).eq('id', commande.order_id);
+      if (commande.client_email) {
+        try {
+          await envoyerEmailPrecommande(commande.client_email, commande.client_nom, commande.produit_nom || commande.nom_produit, dateSortie || dateSortieBabiPlay);
+        } catch (e) { console.error('⚠️ Email de précommande non envoyé :', e.message); }
       }
+      console.log(`🕒 Commande ${commande.id} : précommande enregistrée, clé attendue à la sortie`);
+      return;
     }
-    console.log(`✅ Commande ${commande.id} livrée avec succès !`);
+    await finaliserLivraison(commande, code, kinguinOrderId);
   } catch (err) {
     console.error(`❌ Erreur commande ${commande.id}:`, err.message);
     const message = kinguinAchete
@@ -388,6 +450,37 @@ async function checkCommandes() {
 
 checkCommandes();
 setInterval(checkCommandes, 30000);
+
+// PRÉCOMMANDES : toutes les 3 heures, on regarde si Kinguin a livré la clé, et on l'envoie au client
+let precoEnCours = false;
+async function verifierPrecommandes() {
+  if (precoEnCours) return;
+  precoEnCours = true;
+  try {
+    const { data: precos, error } = await supabase.from('commandes').select('*')
+      .eq('statut', 'en_cours').like('erreur_message', `${MARQUEUR_PRECO}%`).not('kinguin_order_id', 'is', null);
+    if (error) throw error;
+    if (!precos?.length) return;
+    console.log(`🕒 ${precos.length} précommande(s) en attente de clé...`);
+    for (const c of precos) {
+      let code = null;
+      try { code = await recupererCleCommande(c.kinguin_order_id, 1); } catch (_) { continue; } // pas encore livrée
+      try {
+        await finaliserLivraison(c, code, c.kinguin_order_id);
+        console.log(`🎉 Précommande ${c.id} livrée (jeu sorti)`);
+      } catch (e) {
+        console.error(`❌ Précommande ${c.id} : clé reçue mais envoi échoué —`, e.message);
+        await supabase.from('commandes').update({ statut: 'erreur', erreur_message: `Clé Kinguin reçue (${c.kinguin_order_id}) mais envoi échoué : ${e.message}` }).eq('id', c.id);
+      }
+    }
+  } catch (err) {
+    console.error('Erreur verifierPrecommandes:', err.message);
+  } finally {
+    precoEnCours = false;
+  }
+}
+setTimeout(verifierPrecommandes, 60 * 1000);
+setInterval(verifierPrecommandes, 3 * 60 * 60 * 1000);
 
 setInterval(async () => {
   try {
