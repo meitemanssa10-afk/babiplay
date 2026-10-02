@@ -482,6 +482,111 @@ async function verifierPrecommandes() {
 setTimeout(verifierPrecommandes, 60 * 1000);
 setInterval(verifierPrecommandes, 3 * 60 * 60 * 1000);
 
+// ---------------------------------------------------------------------------
+// PANIERS ABANDONNÉS : un client connecté ajoute un produit au panier mais ne clique jamais
+// sur « Payer ». 2 h après, on lui envoie UN email de rappel avec ses articles.
+// Règles anti-spam : un seul rappel par panier ; un nouveau rappel n'est possible que si le panier
+// a changé depuis ET que le dernier rappel date d'au moins 3 jours ; rien au-delà de 7 jours.
+// ---------------------------------------------------------------------------
+const DELAI_RELANCE_H = 2;
+let relanceEnCours = false;
+
+function prixDuMomentProduit(p) {
+  const promo = p.prix_promo && p.promo_fin && new Date(p.promo_fin) > new Date() && p.prix_promo > 0 && p.prix_promo < p.prix;
+  return promo ? { prix: p.prix_promo, ancien: p.prix } : { prix: p.prix, ancien: null };
+}
+
+async function envoyerEmailRelancePanier(email, prenom, articles) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const fmt = n => Number(n).toLocaleString('fr-FR');
+  const lien = 'https://babiplay.store/?panier=1';
+  const premier = articles[0].nom;
+  const lignesHtml = articles.map(a => `
+    <tr>
+      <td style="padding:10px 0;width:80px">${a.image_url ? `<img src="${a.image_url}" alt="" width="72" style="border-radius:8px;display:block">` : ''}</td>
+      <td style="padding:10px 12px;color:#1a1a2e;font-size:14px">${a.nom}</td>
+      <td style="padding:10px 0;text-align:right;white-space:nowrap;font-weight:bold;color:#1a1a2e">
+        ${a.ancien ? `<span style="text-decoration:line-through;color:#999;font-weight:normal;font-size:12px">${fmt(a.ancien)}</span><br>` : ''}${fmt(a.prix)} FCFA
+      </td>
+    </tr>`).join('');
+  const enPromo = articles.some(a => a.ancien);
+  await resend.emails.send({
+    from: EXPEDITEUR,
+    reply_to: REPONDRE_A,
+    to: email,
+    subject: articles.length > 1 ? `Votre panier vous attend 🎮 (${articles.length} articles)` : `${premier} vous attend 🎮`,
+    text: [
+      `Bonjour ${prenom || ''},`.replace(' ,', ','),
+      '',
+      'Vous avez laissé ceci dans votre panier sur BabiPlay :',
+      ...articles.map(a => `- ${a.nom} : ${fmt(a.prix)} FCFA`),
+      '',
+      enPromo ? 'Bonne nouvelle : au moins un article est en promo en ce moment, mais pour une durée limitée.' : '',
+      'Paiement en FCFA par Orange Money, MTN, Moov ou Wave, et votre code arrive par email en quelques secondes.',
+      '',
+      `Finaliser ma commande : ${lien}`,
+      '',
+      'Une question ? Répondez simplement à cet email.',
+    ].filter(l => l !== null).join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <h1 style="color:#f5a623;">🎮 BabiPlay</h1>
+        <h2>Bonjour${prenom ? ' ' + prenom : ''} !</h2>
+        <p>Vous avez laissé ${articles.length > 1 ? 'ces articles' : 'cet article'} dans votre panier :</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #eee;border-bottom:1px solid #eee">${lignesHtml}</table>
+        ${enPromo ? '<p style="background:#fff1ec;border:1px solid #ffb59a;border-radius:8px;padding:10px;color:#c2410c">⚡ Au moins un article est <strong>en promo</strong> en ce moment, pour une durée limitée.</p>' : ''}
+        <p>Paiement en FCFA par <strong>Orange Money, MTN, Moov ou Wave</strong>. Votre code arrive par email en quelques secondes.</p>
+        <p style="text-align:center;margin:28px 0">
+          <a href="${lien}" style="background:#f5a623;color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block">Finaliser ma commande</a>
+        </p>
+        <p style="font-size:12px;color:#888">Une question ? Répondez simplement à cet email. Vous recevez ce rappel une seule fois, car vous avez ajouté un article à votre panier.</p>
+      </div>`
+  });
+}
+
+async function relancerPaniersAbandonnes() {
+  if (relanceEnCours) return;
+  relanceEnCours = true;
+  try {
+    const limite = new Date(Date.now() - DELAI_RELANCE_H * 3600e3).toISOString();
+    const septJours = new Date(Date.now() - 7 * 864e5).toISOString();
+    const { data: paniers, error } = await supabase.from('paniers').select('*')
+      .lt('maj_le', limite).gt('maj_le', septJours);
+    if (error) throw error;
+    for (const pan of paniers || []) {
+      if (!Array.isArray(pan.articles) || !pan.articles.length) continue;
+      if (pan.relance_le) {
+        const changeDepuis = new Date(pan.maj_le) > new Date(pan.relance_le);
+        const ilYa3Jours = new Date(pan.relance_le) < new Date(Date.now() - 3 * 864e5);
+        if (!changeDepuis || !ilYa3Jours) continue;
+      }
+      // Prix et disponibilité relus maintenant (jamais ceux enregistrés dans le panier)
+      const ids = pan.articles.map(a => a.id);
+      const { data: produits } = await supabase.from('products')
+        .select('id, nom, prix, prix_promo, promo_fin, image_url, est_actif').in('id', ids);
+      const articles = (produits || []).filter(p => p.est_actif)
+        .map(p => ({ nom: p.nom, image_url: p.image_url, ...prixDuMomentProduit(p) }));
+      // On marque le panier comme traité dans tous les cas, pour ne pas le reprendre en boucle
+      await supabase.from('paniers').update({ relance_le: new Date().toISOString() }).eq('user_id', pan.user_id);
+      if (!articles.length) continue;
+      const { data: profil } = await supabase.from('profiles').select('email, prenom').eq('id', pan.user_id).single();
+      if (!profil?.email) continue;
+      try {
+        await envoyerEmailRelancePanier(profil.email, profil.prenom, articles);
+        console.log(`🛒 Rappel panier envoyé à ${profil.email} (${articles.length} article(s))`);
+      } catch (e) {
+        console.error(`⚠️ Rappel panier non envoyé à ${profil.email} :`, e.message);
+      }
+    }
+  } catch (err) {
+    console.error('Erreur relancerPaniersAbandonnes:', err.message);
+  } finally {
+    relanceEnCours = false;
+  }
+}
+setTimeout(relancerPaniersAbandonnes, 2 * 60 * 1000);
+setInterval(relancerPaniersAbandonnes, 30 * 60 * 1000);
+
 setInterval(async () => {
   try {
     await fetch('https://babiplay-agent.onrender.com');
