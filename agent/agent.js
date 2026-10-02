@@ -611,24 +611,34 @@ function mapPlatform(kinguinPlatform, productName) {
   if (n.includes('disney')) return { plateforme: 'streaming', categorie: 'Disney+' };
   if (n.includes('crunchyroll')) return { plateforme: 'streaming', categorie: 'Crunchyroll' };
 
-  if (p.includes('playstation') || p.includes('psn')) {
+  // Le NOM du produit est plus fiable que le champ plateforme de Kinguin (ex. « BATS ... PC Steam CD Key »
+  // était classé PlayStation). On regarde donc d'abord le nom.
+  if (/\b(ps4|ps5|playstation|psn)\b/.test(n)) {
+    return { plateforme: 'psn', categorie: n.includes('ps5') ? 'PS5' : n.includes('ps4') ? 'PS4' : '' };
+  }
+  if (/\bxbox\b/.test(n)) return { plateforme: 'xbox', categorie: n.includes('series') ? 'Xbox Series X|S' : 'Xbox One' };
+  if (/\b(nintendo|switch)\b/.test(n)) return { plateforme: 'nintendo', categorie: 'Switch' };
+  const nomPC = /\b(pc|steam|ea app|origin|epic games|ubisoft connect|uplay|gog|battle\.net|rockstar|microsoft store|windows)\b/.test(n);
+
+  if (!nomPC && (p.includes('playstation') || p.includes('psn'))) {
     let categorie = '';
     if (n.includes('ps5')) categorie = 'PS5';
     else if (n.includes('ps4')) categorie = 'PS4';
     return { plateforme: 'psn', categorie };
   }
-  if (p.includes('xbox'))
+  if (!nomPC && p.includes('xbox'))
     return { plateforme: 'xbox', categorie: p.includes('series') || n.includes('series') ? 'Xbox Series X|S' : 'Xbox One' };
-  if (p.includes('nintendo') || p.includes('switch') || p === '2ds' || p === '3ds')
+  if (!nomPC && (p.includes('nintendo') || p.includes('switch') || p === '2ds' || p === '3ds'))
     return { plateforme: 'nintendo', categorie: 'Switch' };
   let categorie = 'Steam';
-  if (p.includes('epic')) categorie = 'Epic Games';
-  else if (p.includes('battle.net') || p.includes('battlenet')) categorie = 'Battle.net';
-  else if (p.includes('ubisoft')) categorie = 'Ubisoft Connect';
-  else if (p.includes('ea app') || p.includes('origin')) categorie = 'EA App';
-  else if (p.includes('rockstar')) categorie = 'Rockstar Games';
-  else if (p.includes('gog')) categorie = 'GOG';
-  else if (p.includes('microsoft store')) categorie = 'Microsoft Store';
+  const pn = p + ' ' + n;
+  if (pn.includes('epic')) categorie = 'Epic Games';
+  else if (pn.includes('battle.net') || pn.includes('battlenet')) categorie = 'Battle.net';
+  else if (pn.includes('ubisoft')) categorie = 'Ubisoft Connect';
+  else if (pn.includes('ea app') || pn.includes('origin')) categorie = 'EA App';
+  else if (pn.includes('rockstar')) categorie = 'Rockstar Games';
+  else if (/\bgog\b/.test(pn)) categorie = 'GOG';
+  else if (pn.includes('microsoft store') || /\bwindows\b/.test(pn)) categorie = 'Microsoft Store';
   return { plateforme: 'pc', categorie };
 }
 
@@ -636,7 +646,8 @@ function estCompteExclu(product) {
   const n = (product.name || '').toLowerCase();
   // « Access » = accès à un compte partagé (pas une clé à soi). « Early Access » reste autorisé.
   const access = /\baccess\b/.test(n.replace(/early access/g, ''));
-  return n.includes('account') || access || n.includes('compte partagé') || n.includes('login details');
+  const giftSteam = /steam gift|altergift/.test(n); // cadeau Steam à envoyer à la main, pas un code
+  return n.includes('account') || access || giftSteam || n.includes('compte partagé') || n.includes('login details');
 }
 
 function guessSousCategorie(product, plateforme) {
@@ -674,6 +685,24 @@ function genererDescriptionFR(plateforme, categorie, sousCategorie) {
   if (sousCategorie === 'Points')
     return `Monnaie virtuelle à usage interne au jeu (utilisable uniquement dans ce jeu, pas sur l'ensemble de la boutique ${storeLabel}). Code envoyé par email après achat.`;
   return `Clé d'activation officielle pour ${storeLabel}. Téléchargement et activation immédiats après réception du code par email.`;
+}
+
+// PRIX DÉLIRANTS : quand il ne reste qu'un vendeur chez Kinguin, le prix peut être 5 à 50 fois
+// trop cher (GTA Vice City à 196 779 FCFA). Règles :
+//  - plus de 500 000 FCFA : toujours refusé
+//  - jeu sorti il y a plus de 2 ans et vendu plus de 40 000 FCFA : refusé
+// Exceptions : cartes / abonnements / points / monnaies (le prix dépend du montant),
+// et jeux Nintendo officiels EU jusqu'à 60 000 FCFA (Nintendo ne baisse jamais ses prix).
+const NINTENDO_OFFICIEL = /(mario|zelda|pok[eé]mon|yoshi|luigi|splatoon|animal crossing|smash|bayonetta|fire emblem|kirby|metroid)/i;
+function estPrixAberrant(nom, prixFCFA, sousCategorie, plateforme, dateSortie) {
+  if (prixFCFA > 500000) return true;
+  if (['Cartes cadeaux', 'Abonnements', 'Points', 'Game Pass'].includes(sousCategorie || '')) return false;
+  if (/gift card|prepaid|voucher|\brp\b|coins|points|v-?bucks|platinum|gold bars|shark card|\beur\b|€/i.test(nom || '')) return false;
+  if (plateforme === 'nintendo' && /\bEU\b/.test(nom || '') && NINTENDO_OFFICIEL.test(nom || '') && prixFCFA <= 60000) return false;
+  const d = dateSortie ? new Date(dateSortie) : null;
+  if (!d || isNaN(d)) return false;
+  const ilYa2Ans = new Date(); ilYa2Ans.setFullYear(ilYa2Ans.getFullYear() - 2);
+  return d < ilYa2Ans && prixFCFA > 40000;
 }
 
 function priceToFCFA(eurPrice, nom) {
@@ -792,6 +821,8 @@ async function runImportParCategories() {
             const prixCalcule = priceToFCFA(eurPrice, product.name);
           }
         }
+
+        if (estPrixAberrant(product.name, priceToFCFA(eurPrice, product.name), sousCategorie, plateforme, product.releaseDate)) continue;
 
         const key = plateforme + '|' + sousCategorie;
         const bucket = buckets[key];
@@ -916,7 +947,7 @@ async function importParMotCle(q) {
       if (!product.isPreorder || (sortie && !isNaN(sortie) && sortie < aujourdhui)) { ignorer('Pas une précommande à venir'); continue; }
       if (/\s-\s*pre-?order bonus/i.test(nom)) { ignorer('Bonus de précommande seul (pas le jeu)'); continue; }
     }
-    if (estCompteExclu(product)) { ignorer('Compte (Account / Access)'); continue; }
+    if (estCompteExclu(product)) { ignorer('Compte, Access ou Steam Gift (pas un code)'); continue; }
     if (SERVICES_EXCLUS.test(nom)) { ignorer('Altergift / boost (pas un code)'); continue; }
     // Kinguin classe parfois des clés « EU » en « Other » ou « Rest of the world » : quand le nom
     // annonce explicitement EU/Europe, on se fie au nom.
@@ -926,11 +957,11 @@ async function importParMotCle(q) {
     const eurPrice = product.price || 0;
     if (eurPrice < PRIX_MIN_EUR) { ignorer('Prix trop bas / indisponible'); continue; }
     const prix = priceToFCFA(eurPrice, nom);
-    if (prix > PRIX_MAX_FCFA) { ignorer('Prix anormal (> 500 000 FCFA)'); continue; }
     const imageUrl = getImageUrl(product);
     if (!imageUrl) { ignorer('Sans image'); continue; }
     const { plateforme, categorie } = mapPlatform(product.platform, nom);
     const sousCategorie = guessSousCategorie(product, plateforme);
+    if (estPrixAberrant(nom, prix, sousCategorie, plateforme, product.releaseDate)) { ignorer('Prix délirant (vendeur unique)'); continue; }
     if ((sousCategorie === 'Cartes cadeaux' || sousCategorie === 'Abonnements' || sousCategorie === 'Points') && !estCarteFrance(nom)) { ignorer('Région incompatible'); continue; }
     const nomFinal = nomAffiche(product, plateforme, categorie, sousCategorie);
     const deja = candidats.get(nomFinal.toLowerCase());
@@ -1159,6 +1190,7 @@ async function runFixKinguinProducts() {
         }
 
         const fields = {
+          plateforme, categorie,
           nom: nomAffiche(product, plateforme, categorie, sousCategorie),
           sous_categorie: sousCategorie,
           description: genererDescriptionFR(plateforme, categorie, sousCategorie),
@@ -1174,6 +1206,9 @@ async function runFixKinguinProducts() {
         const eurPrice = product.price || 0;
         if (eurPrice >= PRIX_MIN_EUR) {
           const nouveauPrix = priceToFCFA(eurPrice, product.name);
+          if (estPrixAberrant(product.name, nouveauPrix, sousCategorie, plateforme, product.releaseDate)) {
+            fields.est_actif = false; // seul un vendeur hors de prix reste : on retire la fiche
+          }
           if (nouveauPrix !== row.prix) fields.prix = nouveauPrix;
         }
         const { error: updateErr } = await supabase.from('products').update(fields).eq('id', row.id);
