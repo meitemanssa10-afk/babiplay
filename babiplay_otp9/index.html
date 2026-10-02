@@ -59,10 +59,11 @@ nav{position:sticky;top:0;z-index:100;background:rgba(11,11,14,.97);backdrop-fil
 /* FILTRES PLATEFORMES — capsule flottante par-dessus le slider */
 .hero-wrap{position:relative}
 .filter-bar-overlay{position:absolute;top:14px;left:0;right:0;z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 16px;pointer-events:none}
-.rubriques{display:flex;gap:18px;pointer-events:auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.rubriques{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(11,11,14,.92);border:1px solid rgba(245,166,35,.55);box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
 .rubriques::-webkit-scrollbar{display:none}
-.rubrique{background:none;border:none;color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;opacity:.9;text-shadow:0 1px 6px rgba(0,0,0,.8);padding:2px 0;border-bottom:2px solid transparent}
-.rubrique.active{opacity:1;font-weight:700;border-bottom-color:var(--gold)}
+.rubrique{background:none;border:none;color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;padding:7px 14px;border-radius:999px;transition:all .2s}
+.rubrique:hover{background:rgba(245,166,35,.15)}
+.rubrique.active{background:var(--gold);color:#0b0b0e;font-weight:700}
 .card-tag{position:absolute;bottom:6px;left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(245,166,35,.92);color:#0b0b0e}
 .mois-titre{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin:22px 0 12px;text-transform:capitalize}
 .filter-bar{display:inline-flex;gap:2px;padding:5px;border-radius:999px;background:rgba(17,17,22,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);max-width:100%;overflow-x:auto;scrollbar-width:none;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
