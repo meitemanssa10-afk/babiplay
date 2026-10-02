@@ -619,6 +619,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="prod-prix" placeholder="14500"></div>
         <div class="form-group"><label>Stock (illimité, géré par fournisseur)</label><input type="number" id="prod-stock" placeholder="999" value="999" readonly style="opacity:.6"></div>
       </div>
+      <div class="form-group" style="background:rgba(255,90,60,.07);border:1px solid rgba(255,90,60,.3);border-radius:10px;padding:14px">
+        <label style="color:#ff7a50">⚡ Promo (optionnel)</label>
+        <div class="form-row" style="margin-top:6px">
+          <div class="form-group"><label>Prix promo (FCFA)</label><input type="number" id="prod-promo" placeholder="ex. 49000" oninput="majInfoPromo()"></div>
+          <div class="form-group"><label>Fin de la promo</label><input type="datetime-local" id="prod-promo-fin" oninput="majInfoPromo()"></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="promoRapide(5)">-5 %</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="promoRapide(10)">-10 %</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="promoDuree(24)">Fin dans 24 h</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="promoDuree(72)">Fin dans 3 jours</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="retirerPromo()">Retirer la promo</button>
+        </div>
+        <small id="prod-promo-info" style="display:block;margin-top:8px;font-size:12px;color:var(--muted2)">Laisse vide pour aucune promo. La promo s'arrête toute seule à la date de fin.</small>
+      </div>
       <div class="form-group" id="prod-kinguin-group" style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:14px">
         <label style="color:var(--gold)">🔗 ID Produit Kinguin (fournisseur)</label>
         <input type="text" id="prod-kinguin-id" placeholder="Ex: 5c9b68662539a4e8f17ae2fe">
@@ -1077,7 +1092,7 @@ function renderProducts(list){
       <td>${p.image_url?`<img src="${p.image_url}" loading="lazy" style="width:48px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`:platEmoji(p.plateforme)}</td>
       <td><strong>${p.nom}</strong>${p.est_populaire?' ⭐':''}</td>
       <td><span class="platform-dot dot-${platDot(p.plateforme)}"></span>${platLabel(p.plateforme)}</td>
-      <td><strong style="color:var(--gold)">${fmt(p.prix)}</strong> <small>FCFA</small></td>
+      <td>${promoActive(p)?`<s style="color:var(--muted2);font-size:12px">${fmt(p.prix)}</s><br><strong style="color:#ff7a50">${fmt(p.prix_promo)}</strong> <small>FCFA</small> <span class="badge badge-red">⚡ Promo</span>`:`<strong style="color:var(--gold)">${fmt(p.prix)}</strong> <small>FCFA</small>`}</td>
       <td><span class="badge ${p.stock>0?'badge-green':'badge-red'}">${p.stock} codes</span></td>
       <td>${p.est_slider?'<span class="badge badge-gold">✓ Slider</span>':'<span class="badge badge-gray">Non</span>'}</td>
       <td>${p.est_actif?'<span class="badge badge-green">Actif</span>':'<span class="badge badge-red">Inactif</span>'}</td>
@@ -1130,6 +1145,9 @@ function openProductModal(p=null){
   document.getElementById('prod-sous-categorie').value=p?p.sous_categorie||'':'';
   document.getElementById('prod-desc').value=p?p.description||'':'';
   document.getElementById('prod-prix').value=p?p.prix:'';
+  document.getElementById('prod-promo').value=p&&p.prix_promo?p.prix_promo:'';
+  document.getElementById('prod-promo-fin').value=p&&p.promo_fin?dateVersChamp(p.promo_fin):'';
+  majInfoPromo();
   document.getElementById('prod-image').value=p?p.image_url||'':'';
   document.getElementById('prod-video').value=p?p.video_url||'':'';
   document.getElementById('prod-slider').checked=p?p.est_slider:false;
@@ -1147,6 +1165,33 @@ function openProductModal(p=null){
 }
 
 function editProduct(p){openProductModal(p);}
+
+// ---- PROMOS ----
+// Coût estimé = prix ÷ 1,12 (marge standard) + ~2,5 % de frais PayDunya. Prudent : sur un titre
+// populaire (marge 20 %), le vrai coût est plus bas, l'alerte arrive donc un peu tôt plutôt que trop tard.
+function coutEstime(prix){return Math.round(prix/1.12*1.025);}
+function dateVersChamp(iso){const d=new Date(iso);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
+function promoActive(p){return p.prix_promo&&p.promo_fin&&new Date(p.promo_fin)>new Date()&&p.prix_promo<p.prix;}
+function promoRapide(pct){
+  const prix=parseInt(document.getElementById('prod-prix').value)||0;
+  if(!prix){showToast("Indique d'abord le prix normal",'err');return;}
+  document.getElementById('prod-promo').value=Math.round(prix*(1-pct/100)/50)*50;
+  if(!document.getElementById('prod-promo-fin').value)promoDuree(24);else majInfoPromo();
+}
+function promoDuree(h){const d=new Date(Date.now()+h*3600e3);document.getElementById('prod-promo-fin').value=dateVersChamp(d.toISOString());majInfoPromo();}
+function retirerPromo(){document.getElementById('prod-promo').value='';document.getElementById('prod-promo-fin').value='';majInfoPromo();}
+function majInfoPromo(){
+  const el=document.getElementById('prod-promo-info');if(!el)return;
+  const prix=parseInt(document.getElementById('prod-prix').value)||0;
+  const promo=parseInt(document.getElementById('prod-promo').value)||0;
+  const fin=document.getElementById('prod-promo-fin').value;
+  if(!promo){el.style.color='var(--muted2)';el.textContent="Laisse vide pour aucune promo. La promo s'arrête toute seule à la date de fin.";return;}
+  const pct=prix?Math.round((1-promo/prix)*100):0;
+  const perte=prix&&promo<coutEstime(prix);
+  el.style.color=perte?'#ff6b6b':'#52b043';
+  el.innerHTML=`Réduction affichée : <strong>-${pct} %</strong> (${fmt(prix)} → ${fmt(promo)} FCFA)${fin?` · jusqu'au ${new Date(fin).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}`:''}`
+    +(perte?`<br>⚠️ Probablement sous ton coût (≈ ${fmt(coutEstime(prix))} FCFA) : vente à perte`:'');
+}
 function editProductById(id){
   const p=allProducts.find(x=>String(x.id)===String(id));
   if(!p){showToast('Produit introuvable — recharge la page','err');return;}
@@ -1259,6 +1304,16 @@ async function saveProduct(){
     options:texteVersOptions(document.getElementById('prod-options').value),
   };
   if(!data.nom||!data.prix){showToast('Nom et prix obligatoires','err');return;}
+  // Promo : les deux champs ensemble, ou aucun
+  const promo=parseInt(document.getElementById('prod-promo').value)||null;
+  const finTxt=document.getElementById('prod-promo-fin').value;
+  if(promo||finTxt){
+    if(!promo||!finTxt){showToast('Promo : indique le prix promo ET la date de fin','err');return;}
+    if(promo>=data.prix){showToast('Le prix promo doit être plus bas que le prix normal','err');return;}
+    if(new Date(finTxt)<=new Date()){showToast('La date de fin de promo est déjà passée','err');return;}
+    if(promo<coutEstime(data.prix)&&!confirm("⚠️ Ce prix promo est probablement SOUS ton prix d'achat Kinguin + frais PayDunya : tu vendrais à perte.\n\nEnregistrer quand même ?"))return;
+    data.prix_promo=promo;data.promo_fin=new Date(finTxt).toISOString();
+  }else{data.prix_promo=null;data.promo_fin=null;}
   let error;
   if(id){({error}=await sb.from('products').update(data).eq('id',id));}
   else{({error}=await sb.from('products').insert({...data,stock:999}));}
