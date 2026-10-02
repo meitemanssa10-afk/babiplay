@@ -905,7 +905,10 @@ async function importParMotCle(q) {
     if (!mots.every(m => nom.toLowerCase().includes(m))) { ignorer('Ne correspond pas à la recherche'); continue; }
     if (estCompteExclu(product)) { ignorer('Compte (Account)'); continue; }
     if (SERVICES_EXCLUS.test(nom)) { ignorer('Altergift / boost (pas un code)'); continue; }
-    if (contientDeviseNonEuro(nom) || !estCompatibleEurope(product) || regionRefusee(nom)) { ignorer('Région incompatible'); continue; }
+    // Kinguin classe parfois des clés « EU » en « Other » ou « Rest of the world » : quand le nom
+    // annonce explicitement EU/Europe, on se fie au nom.
+    const nomEU = /\b(EU|EUROPE)\b/i.test(nom);
+    if (contientDeviseNonEuro(nom) || (!nomEU && !estCompatibleEurope(product)) || regionRefusee(nom)) { ignorer('Région incompatible'); continue; }
     if (!product.productId) { ignorer('Sans identifiant Kinguin'); continue; }
     const eurPrice = product.price || 0;
     if (eurPrice < PRIX_MIN_EUR) { ignorer('Prix trop bas / indisponible'); continue; }
@@ -934,7 +937,7 @@ async function importParMotCle(q) {
     const idsExistants = new Set((parId || []).map(r => r.kinguin_product_id));
     const nomsExistants = new Set((parNom || []).map(r => (r.nom || '').toLowerCase()));
     liste = liste.filter(c => {
-      if (idsExistants.has(c.product.productId) || nomsExistants.has(c.nomFinal.toLowerCase())) { ignorer('Déjà au catalogue'); return false; }
+      if (idsExistants.has(c.product.productId) || nomsExistants.has(c.nomFinal.toLowerCase())) { courant = c.product; ignorer('Déjà au catalogue'); courant = null; return false; }
       return true;
     });
   }
