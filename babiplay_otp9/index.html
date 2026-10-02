@@ -427,7 +427,26 @@ footer p{font-size:11px;color:var(--muted);margin-top:4px}
 
 <script>
 let sb, products = [], cart = JSON.parse(localStorage.getItem('babiplay_cart') || '[]'), currentUser = null, userProfile = null;
-function sauvegarderPanier(){ localStorage.setItem('babiplay_cart', JSON.stringify(cart)); }
+function sauvegarderPanier(){ localStorage.setItem('babiplay_cart', JSON.stringify(cart)); synchroniserPanier(); }
+
+// PANIERS ABANDONNÉS : pour un client connecté, le panier est aussi copié dans la base (table paniers),
+// afin que le bot puisse le relancer par email s'il ne commande pas. On n'écrit que si le CONTENU
+// change (pas à chaque visite), sinon le délai avant relance repartirait à zéro à chaque page vue.
+let synchroTimer = null;
+function synchroniserPanier() {
+  if (!currentUser || !sb) return;
+  const signature = currentUser.id + '|' + cart.map(c => c.id).sort().join(',');
+  if (localStorage.getItem('babiplay_cart_sync') === signature) return;
+  clearTimeout(synchroTimer);
+  synchroTimer = setTimeout(async () => {
+    try {
+      const articles = cart.map(c => ({ id: c.id, nom: c.nom, prix: c.prix, image_url: c.image_url || '' }));
+      const { error } = await sb.from('paniers').upsert(
+        { user_id: currentUser.id, articles, maj_le: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (!error) localStorage.setItem('babiplay_cart_sync', signature);
+    } catch (e) { /* sans importance : la relance est un bonus */ }
+  }, 1500);
+}
 let promoApplied = null;
 let currentFilter = 'all';
 let currentRubrique = null;      // 'tendances' | 'precommandes' | 'sorties' (toutes consoles)
@@ -454,6 +473,7 @@ let searchTimeout = null;
     currentUser = s ? s.user : null;
     if (currentUser) await loadProfile(); else userProfile = null;
     updateNavAuth(); updateCartUI();
+    synchroniserPanier();
   });
 })();
 
@@ -1161,6 +1181,9 @@ async function proceedToPayment() {
     }));
     const { data: ordersCrees, error } = await sb.from('orders').insert(lignesACreer).select();
     if (error) { showToast('Erreur: ' + error.message, 'err'); btn.disabled = false; btn.textContent = '💳 PAYER MAINTENANT'; return; }
+    // Les articles sont maintenant des commandes (payables plus tard depuis « Mon compte ») :
+    // on vide le panier, sinon le client revoit les mêmes jeux et pourrait les racheter par erreur.
+    cart = []; sauvegarderPanier(); updateCartUI();
 
     // Le serveur (paydunya.js) recalcule lui-même le prix : on ne lui envoie que les numéros de commande.
     const { data: { session } } = await sb.auth.getSession();
