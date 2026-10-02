@@ -18,6 +18,7 @@ const ACTIONS = {
   'import': { chemin: '/import-categories', confirm: true },
   'reactiver': { chemin: '/reactivate-false-positives', confirm: true },
   'slider': { chemin: '/update-slider', confirm: true },
+  'import-mot-cle': { chemin: '/import-mot-cle', confirm: false },
 };
 
 exports.handler = async (event) => {
@@ -56,6 +57,7 @@ exports.handler = async (event) => {
   url.searchParams.set('secret', secret);
   if (action.confirm) url.searchParams.set('confirm', 'oui');
   if (params.id) url.searchParams.set('id', params.id);
+  if (params.q) url.searchParams.set('q', params.q);
 
   try {
     const res = await fetch(url.toString());
