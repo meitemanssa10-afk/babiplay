@@ -433,6 +433,34 @@ function sauvegarderPanier(){ localStorage.setItem('babiplay_cart', JSON.stringi
 // afin que le bot puisse le relancer par email s'il ne commande pas. On n'écrit que si le CONTENU
 // change (pas à chaque visite), sinon le délai avant relance repartirait à zéro à chaque page vue.
 let synchroTimer = null;
+
+// Panier retrouvé sur un autre appareil : si le panier local est vide, on reprend celui de la base
+// (ex. le client a ajouté un jeu sur son téléphone et clique sur l'email de rappel depuis son PC).
+async function restaurerPanier() {
+  if (!currentUser || !sb || cart.length || !products.length) return;
+  try {
+    const { data } = await sb.from('paniers').select('articles').eq('user_id', currentUser.id).maybeSingle();
+    const restaures = (data?.articles || []).map(a => products.find(p => p.id === a.id)).filter(Boolean);
+    if (!restaures.length) return;
+    cart = restaures.map(p => ({ ...p }));
+    localStorage.setItem('babiplay_cart', JSON.stringify(cart));
+    localStorage.setItem('babiplay_cart_sync', currentUser.id + '|' + cart.map(c => c.id).sort().join(','));
+    updateCartUI();
+  } catch (e) { /* sans importance */ }
+}
+
+// Lien de l'email de rappel : babiplay.store/?panier=1 → ouvre le panier (connexion d'abord si besoin)
+function ouvrirPanierDepuisEmail() {
+  if (new URLSearchParams(location.search).get('panier') !== '1') return;
+  window.history.replaceState({}, '', 'index.html');
+  if (!currentUser && !cart.length) {
+    sessionStorage.setItem('ouvrir_panier', '1');
+    openAuth('login');
+    showToast('Connectez-vous pour retrouver votre panier');
+  } else {
+    toggleDrawer();
+  }
+}
 function synchroniserPanier() {
   if (!currentUser || !sb) return;
   const signature = currentUser.id + '|' + cart.map(c => c.id).sort().join(',');
@@ -469,11 +497,15 @@ let searchTimeout = null;
   updateNavAuth();
   await loadProducts();
   reprendreAjoutPanier();
+  await restaurerPanier();
+  ouvrirPanierDepuisEmail();
   sb.auth.onAuthStateChange(async (e, s) => {
     currentUser = s ? s.user : null;
     if (currentUser) await loadProfile(); else userProfile = null;
     updateNavAuth(); updateCartUI();
+    await restaurerPanier();
     synchroniserPanier();
+    if (currentUser && sessionStorage.getItem('ouvrir_panier')) { sessionStorage.removeItem('ouvrir_panier'); toggleDrawer(); }
   });
 })();
 
