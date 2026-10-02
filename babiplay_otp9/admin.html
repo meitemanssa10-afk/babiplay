@@ -317,6 +317,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
             <input type="text" id="motcle-input" placeholder="FC 27" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')importerMotCle()">
             <button class="btn btn-primary" id="motcle-btn" onclick="importerMotCle()">🔎 Chercher et ajouter</button>
           </div>
+          <div style="margin-top:10px">
+            <button class="btn btn-secondary" onclick="importerPrecommandes()">🚀 Importer toutes les précommandes</button>
+            <small style="color:var(--muted2);font-size:12px;margin-left:8px">Ajoute les jeux en précommande chez Kinguin (EU/Global, sans comptes ni bonus seuls)</small>
+          </div>
           <div id="motcle-resultat" style="margin-top:14px"></div>
         </div>
       </div>
@@ -1459,8 +1463,10 @@ async function lancerImport(){
   }
 }
 
-async function importerMotCle(){
-  const q=document.getElementById('motcle-input').value.trim();
+function importerPrecommandes(){importerMotCle('__precommandes');}
+
+async function importerMotCle(forcer){
+  const q=forcer||document.getElementById('motcle-input').value.trim();
   const zone=document.getElementById('motcle-resultat');
   if(q.length<3){showToast('Tape au moins 3 caractères','err');return;}
   const btn=document.getElementById('motcle-btn');
