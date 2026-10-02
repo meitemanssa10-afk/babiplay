@@ -876,7 +876,14 @@ async function importParMotCle(q) {
   if (recherche.length < 3) throw new Error('Tape au moins 3 caractères.');
   const mots = recherche.toLowerCase().split(/\s+/).filter(Boolean);
   const ignores = {};
-  const ignorer = raison => { ignores[raison] = (ignores[raison] || 0) + 1; };
+  const details = []; // pour comprendre pourquoi un produit précis n'a pas été ajouté
+  let courant = null;
+  const ignorer = raison => {
+    ignores[raison] = (ignores[raison] || 0) + 1;
+    if (courant && raison !== 'Ne correspond pas à la recherche') {
+      details.push({ nom: courant.name, raison, region: courant.regionalLimitations || '', pays: (courant.countryLimitation || []).slice(0, 6).join(',') });
+    }
+  };
 
   // 1. Recherche chez Kinguin (2 pages max = 200 résultats, pour rester rapide)
   let resultats = [];
@@ -893,6 +900,7 @@ async function importParMotCle(q) {
   // 2. Tri : on ne garde que ce que le bot sait livrer et qui marche pour nos clients
   const candidats = new Map(); // nom affiché -> fiche (on garde la moins chère)
   for (const product of resultats) {
+    courant = product;
     const nom = product.name || '';
     if (!mots.every(m => nom.toLowerCase().includes(m))) { ignorer('Ne correspond pas à la recherche'); continue; }
     if (estCompteExclu(product)) { ignorer('Compte (Account)'); continue; }
@@ -914,6 +922,7 @@ async function importParMotCle(q) {
     if (deja) ignorer('Doublon (offre plus chère)');
     candidats.set(nomFinal.toLowerCase(), { product, plateforme, categorie, sousCategorie, imageUrl, nomFinal, prix });
   }
+  courant = null;
 
   // 3. On retire ce qui est déjà au catalogue (même ID Kinguin ou même nom)
   let liste = [...candidats.values()];
@@ -948,7 +957,8 @@ async function importParMotCle(q) {
   return {
     ok: true, recherche, trouves: resultats.length,
     ajoutes: rows.map(r => ({ nom: r.nom, prix: r.prix, plateforme: r.plateforme })),
-    ignores
+    ignores,
+    details
   };
 }
 
