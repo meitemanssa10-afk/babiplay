@@ -573,7 +573,7 @@ const CODES_DEVISE_NON_EURO = ['usd','gbp','aed','mad','try','pln','czk','huf','
 
 // Régions dont les codes ne s'activent pas sur les comptes de nos clients (EU/FR).
 // US et UK sont volontairement gardés (avec avertissement sur la fiche produit).
-const REGIONS_REFUSEES = /\b(KR|JP|TR|BR|AR|IN|CN|RU|ASIA|LATAM)\b/;
+const REGIONS_REFUSEES = /\b(KR|JP|TR|BR|AR|IN|CN|RU|ASIA|LATAM|AU|NZ|CA)\b/;
 function regionRefusee(nom) {
   return REGIONS_REFUSEES.test(nom || '');
 }
@@ -866,7 +866,7 @@ async function runImportParCategories() {
 // IMPORT PAR MOT-CLÉ (bouton du back-office) : cherche chez Kinguin, garde uniquement les
 // produits livrables automatiquement et compatibles, puis les ajoute. Répond avec le détail.
 const PRIX_MAX_FCFA = 500000; // au-delà, c'est presque toujours un vendeur au prix délirant
-const SERVICES_EXCLUS = /altergift|boost|weekend league|champions finals|wins? guaranteed|coaching|piloted|carry/i;
+const SERVICES_EXCLUS = /altergift|mystery|random|boost|weekend league|champions finals|wins? guaranteed|coaching|piloted|carry/i;
 let motCleEnCours = false;
 
 async function importParMotCle(q) {
