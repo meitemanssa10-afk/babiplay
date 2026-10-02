@@ -188,6 +188,23 @@ function getYouTubeEmbed(url) {
 // donc le type à partir de la sous-catégorie puis du nom, et ce type pilote à la
 // fois l'encadré "Ce que vous achetez" et les étapes d'activation affichées.
 // ---------------------------------------------------------------------------
+// « Jeu + Pre-Order Bonus » (avec un +) = le jeu complet AVEC le bonus.
+// « Jeu - Pre-Order Bonus » (avec un tiret) = le bonus seul, sans le jeu.
+function estJeuPlusBonus(p) {
+  const nom = (p.nom || '').toLowerCase();
+  return /\s\+\s*pre-?order bonus/.test(nom) && !/\s-\s/.test(nom.split('+')[0]);
+}
+function dateSortieFR(p) {
+  const d = p.date_sortie ? new Date(p.date_sortie) : null;
+  return d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+}
+
+// Message unique pour TOUTES les précommandes (jeu, édition, bonus...)
+function textePrecommande(p) {
+  const quand = dateSortieFR(p) ? `le jour de la sortie, le <strong>${dateSortieFR(p)}</strong>` : '<strong>le jour de la sortie</strong>';
+  return `🕒 <strong>Précommande</strong> : le code d'activation sera livré par email ${quand}. Dès votre paiement, vous recevez un email qui confirme votre commande.`;
+}
+
 function typeProduit(p) {
   if (p.est_physique) return 'physique';
   if (p.plateforme === 'streaming') return 'streaming';
@@ -196,6 +213,7 @@ function typeProduit(p) {
   if (sc.includes('carte') || /gift card|giftcard|carte cadeau|wallet|top.?up|prepaid/.test(nom)) return 'carte';
   if (sc.includes('abonnement') || sc.includes('game pass') || /subscription|membership|game pass|playstation plus|ps plus|nintendo switch online|\b\d+\s*(month|months|mois)\b/.test(nom)) return 'abonnement';
   if (sc.includes('point') || /\bpoints\b|\bcoins\b|v-?bucks|robux|\buc\b|credits?\b|tokens?\b|fifa points|fc points/.test(nom)) return 'points';
+  if (estJeuPlusBonus(p)) return 'jeu';
   if (/\bdlc\b|pre-?order bonus|season pass|expansion pass|\badd-?on\b|\bupgrade\b/.test(nom)) return 'dlc';
   return 'jeu';
 }
@@ -215,12 +233,16 @@ const LIBELLE_TYPE = {
 function pointsAchat(p, type) {
   const boutique = pBoutique(p.plateforme);
   switch (type) {
-    case 'jeu': return [
-      `Vous achetez une <strong>clé d'activation</strong> pour ce jeu, à saisir sur ${boutique}.`,
-      'Une fois activée, la clé ajoute le jeu à votre compte de façon définitive. Vous le téléchargez ensuite depuis votre bibliothèque.',
-      'Ce n\'est ni une carte cadeau, ni de la monnaie de jeu : vous recevez ce jeu précis, et rien d\'autre.',
-      'La clé ne s\'active qu\'une seule fois, sur un seul compte.',
-    ];
+    case 'jeu': {
+      const pts = [
+        `Vous achetez une <strong>clé d'activation</strong> pour ce jeu, à saisir sur ${boutique}.`,
+        'Une fois activée, la clé ajoute le jeu à votre compte de façon définitive. Vous le téléchargez ensuite depuis votre bibliothèque.',
+      ];
+      if (estJeuPlusBonus(p)) pts.push('🎁 <strong>C\'est le jeu complet</strong>, avec <strong>en plus</strong> le bonus de précommande (objets offerts dans le jeu).');
+      pts.push('Ce n\'est ni une carte cadeau, ni de la monnaie de jeu : vous recevez ce jeu précis, et rien d\'autre.');
+      pts.push('La clé ne s\'active qu\'une seule fois, sur un seul compte.');
+      return pts;
+    }
     case 'dlc': {
       const nomMin = (p.nom || '').toLowerCase();
       const pts = [
@@ -424,9 +446,11 @@ function lexiqueNom(p) {
   const n = ' ' + (p.nom || '').toLowerCase() + ' ';
   const L = [];
   const a = (test, terme, sens) => { if (test.test(n)) L.push([terme, sens]); };
-  a(/pre-?order bonus/, 'Pre-order Bonus', 'Bonus offert à ceux qui précommandent le jeu (tenue, arme, objets...)');
+  const jeuPlusBonus = estJeuPlusBonus(p);
+  if (jeuPlusBonus) L.push(['+ Pre-order Bonus DLC', 'Le jeu complet, avec en plus le bonus offert aux précommandes (objets dans le jeu)']);
+  else a(/pre-?order bonus/, 'Pre-order Bonus', 'Bonus offert à ceux qui précommandent le jeu (tenue, arme, objets...)');
   a(/pre-?order(?! bonus)/, 'Pre-order', 'Précommande : le jeu n\'est pas encore sorti, le code fonctionnera à la date de sortie');
-  a(/\bdlc\b/, 'DLC', 'Contenu additionnel pour un jeu. Le jeu de base est obligatoire et vendu à part');
+  if (!jeuPlusBonus) a(/\bdlc\b/, 'DLC', 'Contenu additionnel pour un jeu. Le jeu de base est obligatoire et vendu à part');
   a(/season pass/, 'Season Pass', 'Accès aux futurs contenus additionnels du jeu');
   a(/\bupgrade\b/, 'Upgrade', 'Passage à une édition supérieure du jeu, qu\'il faut déjà posséder');
   a(/deluxe|gold edition|ultimate|complete edition|premium edition|vault edition/, 'Deluxe / Gold / Ultimate…', 'Édition plus complète du jeu, avec des bonus inclus');
@@ -502,7 +526,7 @@ function renderPage() {
       <h3>🛍️ Ce que vous achetez</h3>
       <span class="achat-type">${LIBELLE_TYPE[type]}</span>
       <ul class="achat-points">
-        ${pointsAchat(p, type).map(t => `<li><span>${t}</span></li>`).join('')}
+        ${(p.est_precommande && type !== 'physique' ? [textePrecommande(p), ...pointsAchat(p, type)] : pointsAchat(p, type)).map(t => `<li><span>${t}</span></li>`).join('')}
       </ul>
       <div class="mentions">${mentionsLegales(type)}</div>
     </div>`;
@@ -528,7 +552,8 @@ function renderPage() {
 
   // Description d'origine (souvent en anglais, parfois vide) : affichée seulement si
   // elle apporte vraiment quelque chose, et après l'encadré en français.
-  const descHtml = (p.description && p.description.trim().length > 20) ? `
+  // Précommande : la description générique (« activation immédiate ») serait fausse, on la masque
+  const descHtml = (!p.est_precommande && p.description && p.description.trim().length > 20) ? `
     <div class="info-box">
       <h3>📋 Description du produit</h3>
       <p class="info-desc">${p.description}</p>
@@ -598,10 +623,10 @@ function renderPage() {
           <div>
             <div class="buy-price">${fmt(p.prix)} <small>FCFA</small></div>
           </div>
-          <div class="buy-stock"><div class="buy-stock-dot"></div> ${type === 'physique' ? `En stock — livraison sous ${delai} jours` : 'En stock — livraison immédiate'}</div>
+          <div class="buy-stock"><div class="buy-stock-dot"></div> ${type === 'physique' ? `En stock — livraison sous ${delai} jours` : p.est_precommande ? `Précommande — code livré le jour de la sortie${dateSortieFR(p) ? ' (' + dateSortieFR(p) + ')' : ''}` : 'En stock — livraison immédiate'}</div>
           <button class="btn-add" onclick="addToCart()">🛒 Ajouter au panier</button>
           <div class="buy-perks">
-            <div class="perk"><span class="perk-icon">${type === 'physique' ? '🚚' : '📧'}</span><span>${type === 'physique' ? `Livraison en ${delai} jours` : 'Code envoyé par email instantanément'}</span></div>
+            <div class="perk"><span class="perk-icon">${type === 'physique' ? '🚚' : '📧'}</span><span>${type === 'physique' ? `Livraison en ${delai} jours` : p.est_precommande ? 'Email de confirmation dès le paiement, code le jour de la sortie' : 'Code envoyé par email instantanément'}</span></div>
             <div class="perk"><span class="perk-icon">📱</span><span>Orange Money · MTN · Moov · Wave</span></div>
             <div class="perk"><span class="perk-icon">💬</span><span>Support WhatsApp disponible</span></div>
             <div class="perk"><span class="perk-icon">🔒</span><span>Paiement 100% sécurisé PayDunya</span></div>
